@@ -97,10 +97,10 @@ export default function AddReference() {
     ).values()
   ).sort((a, b) => a.label.localeCompare(b.label));
 
-  // Show all references by default; selecting a POSP narrows the table.
+  // Keep the table empty until a POSP is selected.
   const filteredReferences = selectedPospFilter
     ? referencesList.filter((ref) => String(ref.pos_id) === String(selectedPospFilter))
-    : referencesList;
+    : [];
 
   const [formData, setFormData] = useState({
     bqp: "", manager: "", relationship: "", posp: "", name: "", mobile: "",
@@ -271,7 +271,7 @@ export default function AddReference() {
         if (response.data?.success) {
           toast.success(isEdit ? "Reference updated successfully!" : "Reference created successfully!", { id: toastId });
           const savedPospId = String(formData.posp);
-          await loadReferences(false);
+          await loadReferences();
           setSelectedPospFilter(savedPospId);
           handleReset();
         } else {
@@ -448,7 +448,7 @@ export default function AddReference() {
               onChange={(e) => setSelectedPospFilter(e.target.value)}
               className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-500/10 sm:w-auto sm:min-w-[200px]"
             >
-              <option value="">All POSPs</option>
+              <option value="">Select POSP to view...</option>
               {uniquePosps.map((posp) => (
                 <option key={posp.id} value={posp.id}>
                   {posp.label}
@@ -500,7 +500,7 @@ export default function AddReference() {
                   <td colSpan={8} className="bg-slate-50/5 py-10 text-center text-xs font-semibold italic text-slate-400">
                     {selectedPospFilter
                       ? "No references found matching the selected POSP."
-                      : "No references have been created yet."}
+                      : "Please select a POSP from the filter dropdown above to view references."}
                   </td>
                 </tr>
               )}
