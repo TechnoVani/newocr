@@ -11,12 +11,9 @@ import uploadRoutes from "./routes/upload.routes.js";
 import ocrRoutes from "./routes/ocr.routes.js";
 import policyRoutes from "./routes/policy.routes.js";
 import documentRoutes from "./routes/document.routes.js";
-import referenceRoutes from "./routes/reference.routes.js";
 
 import bqpRoutes from "./routes/bqp.routes.js";
-import reportingRoutes from "./routes/reporting.routes.js";
-import relationshipsRoutes from "./routes/relationships.routes.js";
-import posRoutes from "./routes/pos.routes.js";
+import referenceRoutes from "./routes/reference.routes.js";
 import setCountRoutes from "./routes/setcount.routes.js";
 
 import authMiddleware from "./middleware/auth.middleware.js";
@@ -99,10 +96,7 @@ app.use("/api/document", documentRoutes);
 app.use("/api/setcount", setCountRoutes);
 
 // Protected cascade dropdown endpoints
-app.use("/api/bqp", bqpRoutes);
-app.use("/api/reporting", reportingRoutes);
-app.use("/api/relationships", relationshipsRoutes);
-app.use("/api/posp", posRoutes);
+app.use("/api", bqpRoutes);
 app.use("/api/references", referenceRoutes);
 
 

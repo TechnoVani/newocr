@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import ReactSelect from "react-select";
 import { AlertCircle } from "lucide-react";
-import axiosInstance from "../config/axios";
 import { hierarchyApi } from "../services/hierarchyApi";
+import { referenceApi } from "../services/referenceApi";
 
 // Dropdown configuration for reference creation flow
 const DROPDOWN_STEPS = [
@@ -106,12 +106,9 @@ export default function AddReference() {
 
   const loadReferences = useCallback(async (showError = true) => {
     try {
-      const response = await axiosInstance.get("/references");
-      if (response.data?.success && Array.isArray(response.data.data)) {
-        setReferencesList(response.data.data);
-        return response.data.data;
-      }
-      throw new Error(response.data?.message || "Invalid references response");
+      const data = await referenceApi.getAll();
+      setReferencesList(data);
+      return data;
     } catch (err) {
       console.error("Failed to load references:", err);
       if (showError) {
@@ -176,7 +173,7 @@ export default function AddReference() {
   // Read the current BQP list directly from the backend on every page mount.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadHierarchyOptions("bqp", hierarchyApi.getBqps);
+    loadHierarchyOptions("bqp", hierarchyApi.getBqp);
   }, [loadHierarchyOptions]);
 
   const formatOptionLabel = (option) => {
@@ -327,11 +324,11 @@ export default function AddReference() {
         const toastId = "reference-save";
         toast.loading(isEdit ? "Updating reference..." : "Creating reference...", { id: toastId });
         
-        const response = isEdit 
-          ? await axiosInstance.put(`/references/${editingId}`, payload)
-          : await axiosInstance.post("/references", payload);
+        const response = isEdit
+          ? await referenceApi.update(editingId, payload)
+          : await referenceApi.create(payload);
 
-        if (response.data?.success) {
+        if (response?.success) {
           toast.success(isEdit ? "Reference updated successfully!" : "Reference created successfully!", { id: toastId });
           const savedPospId = String(formData.posp);
           await loadReferences();
@@ -339,7 +336,7 @@ export default function AddReference() {
           await loadPospReferences(savedPospId);
           handleReset();
         } else {
-          throw new Error(response.data?.message || `Failed to ${isEdit ? 'update' : 'create'} reference`);
+          throw new Error(response?.message || `Failed to ${isEdit ? 'update' : 'create'} reference`);
         }
       } catch (err) {
         toast.error(err.response?.data?.message || err.message || `Failed to save reference`, { id: "reference-save" });

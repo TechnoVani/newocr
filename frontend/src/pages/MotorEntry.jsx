@@ -95,7 +95,7 @@ export default function MotorEntry() {
   // Read the current BQP list directly from the backend on every page mount.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadDirectOptions("bqp", hierarchyApi.getBqps);
+    loadDirectOptions("bqp", hierarchyApi.getBqp);
   }, [loadDirectOptions]);
 
   const handleMotorChange = async (fieldName, val) => {

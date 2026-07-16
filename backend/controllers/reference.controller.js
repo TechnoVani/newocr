@@ -1,147 +1,93 @@
-import ReferenceModel from "../models/reference.model.js";
-import { successResponse, errorResponse } from "../utils/response.js";
+import ReferenceModel from '../models/reference.model.js';
+import { successResponse, errorResponse } from '../utils/response.js';
 
-const formatLabel = (name, code) => {
-    if (!name) return "-";
-    return code ? `${name} (${code})` : name;
+const isPositiveId = value => {
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number > 0;
 };
 
-const getValidatedReference = async (body) => {
-    const { bqp_id, reporting_id, relationship_id, pos_id } = body;
-    const name = String(body.name || "").trim();
-    const mobile = String(body.mobile || "").trim();
+const formatLabel = (name, code) => !name ? '-' : code ? `${name} (${code})` : name;
 
-    if (![bqp_id, reporting_id, relationship_id, pos_id].every(value => /^\d+$/.test(String(value)))) {
-        return { error: "Please select a valid BQP, manager, relationship manager and POSP" };
+const formatReference = row => ({
+    id: row.id,
+    bqp_id: row.bqp_id,
+    reporting_id: row.reporting_id,
+    relationship_id: row.relationship_id,
+    pos_id: row.pos_id,
+    bqp: formatLabel(row.bqp_name, row.bqp_code),
+    manager: formatLabel(row.manager_name, row.manager_code),
+    relationship: formatLabel(row.relationship_name, row.relationship_code),
+    posp: formatLabel(row.posp_name, row.posp_code),
+    name: row.ref_name,
+    mobile: row.ref_mobile || ''
+});
+
+const buildReferenceData = body => ({
+    bqp_id: Number(body?.bqp_id),
+    reporting_id: Number(body?.reporting_id),
+    relationship_id: Number(body?.relationship_id),
+    pos_id: Number(body?.pos_id),
+    ref_name: String(body?.name || '').trim(),
+    ref_mobile: String(body?.mobile || '').trim()
+});
+
+const validateReference = async (body, checkDuplicate = false) => {
+    const data = buildReferenceData(body);
+    const { bqp_id, reporting_id, relationship_id, pos_id, ref_name, ref_mobile } = data;
+
+    if (![bqp_id, reporting_id, relationship_id, pos_id].every(isPositiveId)) {
+        return { error: 'Please select valid BQP, manager, relationship manager and POSP' };
     }
-    if (!name) return { error: "Reference name is required" };
-    if (!/^\d{10}$/.test(mobile)) return { error: "A valid 10-digit mobile number is required" };
-
-    const validHierarchy = await ReferenceModel.isValidHierarchy({
-        bqp_id, reporting_id, relationship_id, pos_id
-    });
-    if (!validHierarchy) {
-        return { error: "The selected BQP, manager, relationship manager and POSP do not match" };
+    if (!ref_name) return { error: 'Reference name is required' };
+    if (!/^\d{10}$/.test(ref_mobile)) {
+        return { error: 'A valid 10-digit mobile number is required' };
     }
-
-    return { bqp_id, reporting_id, relationship_id, pos_id, name, mobile };
+    if (!(await ReferenceModel.isValidHierarchy(data))) {
+        return { error: 'The selected active hierarchy does not match' };
+    }
+    if (checkDuplicate && await ReferenceModel.duplicateExists(pos_id, ref_name, ref_mobile)) {
+        return { error: 'A reference with this name and mobile already exists for the selected POSP' };
+    }
+    return data;
 };
 
 class ReferenceController {
-    /**
-     * Create a new reference
-     */
-    static async create(req, res, next) {
-        try {
-            const validated = await getValidatedReference(req.body);
-            if (validated.error) return errorResponse(res, validated.error, null, 400);
-            const { bqp_id, reporting_id, relationship_id, pos_id, name, mobile } = validated;
-
-            const createdBy = req.user?.id;
-            if (!createdBy) {
-                return errorResponse(res, "Unauthorized request", null, 401);
-            }
-
-            const insertId = await ReferenceModel.create({
-                bqp_id,
-                reporting_id,
-                relationship_id,
-                pos_id,
-                ref_name: name,
-                ref_mobile: mobile,
-                created_by: createdBy
-            });
-
-            return successResponse(res, "Reference created successfully", { id: insertId }, 201);
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    /**
-     * Get all references
-     */
     static async getAll(req, res, next) {
         try {
             const rows = await ReferenceModel.findAll();
-            
-            const references = rows.map(row => ({
-                id: row.id,
-                bqp_id: row.bqp_id,
-                reporting_id: row.reporting_id,
-                relationship_id: row.relationship_id,
-                pos_id: row.pos_id,
-                bqp: formatLabel(row.bqp_name, row.bqp_code),
-                manager: formatLabel(row.manager_name, row.manager_code),
-                relationship: formatLabel(row.relationship_name, row.relationship_code),
-                posp: formatLabel(row.posp_name, row.posp_code),
-                name: row.ref_name,
-                mobile: row.ref_mobile || ""
-            }));
-
-            return successResponse(res, "References retrieved successfully", references);
-        } catch (error) {
-            next(error);
-        }
+            return successResponse(res, 'References retrieved successfully', rows.map(formatReference));
+        } catch (error) { next(error); }
     }
 
-    /**
-     * Update an existing reference
-     */
+    static async create(req, res, next) {
+        try {
+            const data = await validateReference(req.body, true);
+            if (data.error) return errorResponse(res, data.error, null, 400);
+            if (!isPositiveId(req.user?.id)) {
+                return errorResponse(res, 'Unauthorized request', null, 401);
+            }
+            const id = await ReferenceModel.create({
+                ...data,
+                created_by: req.user.id
+            });
+            return successResponse(res, 'Reference created successfully', { id }, 201);
+        } catch (error) { next(error); }
+    }
+
     static async update(req, res, next) {
         try {
-            const { id } = req.params;
-            if (!/^\d+$/.test(String(id)) || !(await ReferenceModel.exists(id))) {
-                return errorResponse(res, "Reference not found", null, 404);
+            if (!isPositiveId(req.params.id)) {
+                return errorResponse(res, 'Invalid reference ID', null, 404);
             }
-            const validated = await getValidatedReference(req.body);
-            if (validated.error) return errorResponse(res, validated.error, null, 400);
-            const { bqp_id, reporting_id, relationship_id, pos_id, name, mobile } = validated;
-
-            await ReferenceModel.update(id, {
-                bqp_id,
-                reporting_id,
-                relationship_id,
-                pos_id,
-                ref_name: name,
-                ref_mobile: mobile
-            });
-
-            return successResponse(res, "Reference updated successfully");
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async getByPospId(req, res, next) {
-        try {
-            const { pospId } = req.params;
-            if (!/^\d+$/.test(String(pospId))) {
-                return errorResponse(res, "pospId is required", null, 400);
+            if (!(await ReferenceModel.exists(req.params.id))) {
+                return errorResponse(res, 'Reference not found', null, 404);
             }
-
-            const rows = await ReferenceModel.getByPospId(pospId);
-            
-            const references = rows.map(row => ({
-                id: row.id,
-                bqp_id: row.bqp_id,
-                reporting_id: row.reporting_id,
-                relationship_id: row.relationship_id,
-                pos_id: row.pos_id,
-                bqp: formatLabel(row.bqp_name, row.bqp_code),
-                manager: formatLabel(row.manager_name, row.manager_code),
-                relationship: formatLabel(row.relationship_name, row.relationship_code),
-                posp: formatLabel(row.posp_name, row.posp_code),
-                name: row.ref_name,
-                mobile: row.ref_mobile || ""
-            }));
-
-            return successResponse(res, "References retrieved successfully", references);
-        } catch (error) {
-            next(error);
-        }
+            const data = await validateReference(req.body);
+            if (data.error) return errorResponse(res, data.error, null, 400);
+            await ReferenceModel.update(req.params.id, data);
+            return successResponse(res, 'Reference updated successfully');
+        } catch (error) { next(error); }
     }
-    
 }
 
 export default ReferenceController;
