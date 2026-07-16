@@ -1,10 +1,10 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import { connectDB } from "./config/database.js";
+import "./config/env.js";
+import { connectDB, checkDB } from "./config/database.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
@@ -20,8 +20,6 @@ import authMiddleware from "./middleware/auth.middleware.js";
 import policyFileAccessMiddleware from "./middleware/policyFileAccess.middleware.js";
 import errorMiddleware from "./middleware/error.middleware.js";
 import { getAllowedOrigins, normalizeOrigin } from "./config/origins.js";
-
-dotenv.config();
 
 const app = express();
 let databaseReady = false;
@@ -63,8 +61,16 @@ app.use(
 );
 
 // Public Routes
-app.get("/api/health", (req, res) => {
-    res.status(databaseReady ? 200 : 503).json({
+app.get("/api/health", async (req, res) => {
+    try {
+        await checkDB();
+        databaseReady = true;
+    } catch (error) {
+        databaseReady = false;
+        console.error("Database health check failed:", error.code || error.message);
+    }
+
+    return res.status(databaseReady ? 200 : 503).json({
         success: databaseReady,
         service: "operation-api",
         database: databaseReady ? "connected" : "unavailable"

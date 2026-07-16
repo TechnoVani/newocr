@@ -1,22 +1,19 @@
-import mysql from "mysql2/promise";
-import dotenv from "dotenv";
-dotenv.config();
+import db, { connectDB } from './config/database.js';
 
-const test = async () => {
-    try {
-        const connection = await mysql.createConnection({
-            host: process.env.DB_HOST || "localhost",
-            user: process.env.DB_USER || "root",
-            password: process.env.DB_PASSWORD || "",
-            database: process.env.DB_NAME || "notion",
-            port: Number(process.env.DB_PORT || 3306)
-        });
-        console.log("Connected! DB Name:", process.env.DB_NAME);
-        const [rows] = await connection.query("SHOW TABLES;");
-        console.log("Tables:", rows);
-        await connection.end();
-    } catch (err) {
-        console.error("Error:", err.message);
-    }
-};
-test();
+try {
+    await connectDB();
+    const [rows] = await db.query(
+        `SELECT DATABASE() AS database_name, COUNT(*) AS table_count
+         FROM information_schema.tables
+         WHERE table_schema = DATABASE()`
+    );
+    console.log('Database check passed:', rows[0]);
+} catch (error) {
+    console.error('Database check failed:', {
+        code: error.code || 'UNKNOWN',
+        message: error.message
+    });
+    process.exitCode = 1;
+} finally {
+    await db.end();
+}
