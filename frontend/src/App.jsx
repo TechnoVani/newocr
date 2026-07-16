@@ -1,6 +1,6 @@
 // src/App.jsx
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useSelector } from "react-redux";
+import useAuth from "./hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import MotorEntry from "./pages/MotorEntry";
 import Navbar from "./pages/Navbar";
@@ -17,7 +17,7 @@ import Footer from "./components/Footer";
 
 function App() {
   const location = useLocation();
-  const { token } = useSelector((state) => state.auth);
+  const { token } = useAuth();
   
   // UPDATE: Hide the navbar on BOTH the login and forgot-password pages
   const hideNavbar = ["/login", "/forgot-password", "/reset-password"].includes(location.pathname);
