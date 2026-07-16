@@ -26,41 +26,55 @@ class BqpModel {
         return rows;
     }
 
-    static async getEmployeesByBqp(bqpId, status) {
+    static async getReportingManagersByBqp(bqpId, status) {
         const [rows] = await db.query(
-            `SELECT id, name, employee_code, status, reporting_manager
-             FROM employees
-             WHERE status = ? AND reporting_manager = ?
-             ORDER BY name ASC`,
-            [status, Number(bqpId)]
+            `SELECT DISTINCT manager.id, manager.name,
+                    manager.employee_code, manager.status
+             FROM employees employee
+             INNER JOIN employees bqp ON bqp.id = employee.bqp
+             INNER JOIN employees manager ON manager.id = employee.reporting_manager
+             WHERE employee.bqp = ? AND employee.status = ?
+               AND bqp.status = ? AND bqp.is_bqp = 'Yes'
+               AND manager.status = ?
+             ORDER BY manager.name ASC`,
+            [Number(bqpId), status, status, status]
         );
         return rows;
     }
 
-    // ***** FIXED: Correct JOIN condition *****
-    static async getRelationshipManagersByManager(managerId, status) {
+    static async getRelationshipManagersByManager(bqpId, managerId, status) {
         const [rows] = await db.query(
             `SELECT DISTINCT relationship.id, relationship.name,
                     relationship.employee_code, relationship.status
              FROM employees employee
-             INNER JOIN employees relationship ON relationship.id = employee.relationship_manager   -- fixed
-             WHERE employee.relationship_manager = ?
+             INNER JOIN employees relationship ON relationship.id = employee.relationship_manager
+             WHERE employee.bqp = ? AND employee.reporting_manager = ?
                AND employee.status = ?
                AND relationship.status = ?
              ORDER BY relationship.name ASC`,
-            [Number(managerId), status, status]
+            [Number(bqpId), Number(managerId), status, status]
         );
         return rows;
     }
 
     // ***** Added optional veri filter *****
-    static async getPospByRelationshipManager(relationshipId, status, veri = null) {
+    static async getPospByRelationshipManager(
+        bqpId,
+        managerId,
+        relationshipId,
+        status,
+        veri = null
+    ) {
         let query = `
             SELECT id, name, pos_code, status
             FROM employee_pos
-            WHERE relationship_manager = ? AND status = ?
+            WHERE bqp = ? AND reporting_manager = ?
+              AND relationship_manager = ? AND status = ?
         `;
-        const params = [Number(relationshipId), status];
+        const params = [
+            Number(bqpId), Number(managerId),
+            Number(relationshipId), status
+        ];
 
         if (veri) {
             query += ` AND veri = ?`;

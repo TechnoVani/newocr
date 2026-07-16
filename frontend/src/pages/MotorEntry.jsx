@@ -141,9 +141,13 @@ export default function MotorEntry() {
     if (fieldName === "bqp") {
       await loadDirectOptions("manager", () => hierarchyApi.getReportingManagers(val));
     } else if (fieldName === "manager") {
-      await loadDirectOptions("relationship", () => hierarchyApi.getRelationshipManagers(val));
+      await loadDirectOptions("relationship", () =>
+        hierarchyApi.getRelationshipManagers(val, updatedForm.bqp)
+      );
     } else if (fieldName === "relationship") {
-      await loadDirectOptions("posp", () => hierarchyApi.getPosps(val));
+      await loadDirectOptions("posp", () =>
+        hierarchyApi.getPosps(val, updatedForm.bqp, updatedForm.manager)
+      );
     } else if (fieldName === "posp") {
       await loadDirectOptions("reference", () => hierarchyApi.getReferences(val));
     }

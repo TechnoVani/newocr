@@ -48,18 +48,22 @@ class BqpController {
             if (!isPositiveId(req.params.bqpId) || !status) {
                 return errorResponse(res, 'A valid bqpId and status are required', null, 400);
             }
-            const rows = await BqpModel.getEmployeesByBqp(req.params.bqpId, status);
-            return successResponse(res, 'Employees reporting to BQP fetched successfully', rows);
+            const rows = await BqpModel.getReportingManagersByBqp(req.params.bqpId, status);
+            return successResponse(res, 'Reporting managers fetched successfully', rows);
         } catch (error) { next(error); }
     }
 
     static async getRelationshipManagers(req, res, next) {
         try {
             const status = getChoice(req.query.status, ALLOWED_STATUSES, 'Active');
-            if (!isPositiveId(req.params.managerId) || !status) {
-                return errorResponse(res, 'A valid managerId and status are required', null, 400);
+            if (!isPositiveId(req.query.bqpId) || !isPositiveId(req.params.managerId) || !status) {
+                return errorResponse(res, 'A valid bqpId, managerId and status are required', null, 400);
             }
-            const rows = await BqpModel.getRelationshipManagersByManager(req.params.managerId, status);
+            const rows = await BqpModel.getRelationshipManagersByManager(
+                req.query.bqpId,
+                req.params.managerId,
+                status
+            );
             return successResponse(res, 'Relationship managers fetched successfully', rows);
         } catch (error) { next(error); }
     }
@@ -68,12 +72,22 @@ class BqpController {
     static async getPosps(req, res, next) {
         try {
             const status = getChoice(req.query.status, ALLOWED_STATUSES, 'Active');
-            const veri = getChoice(req.query.veri, ALLOWED_VERI, null); // optional
+            const veri = req.query.veri === undefined
+                ? null
+                : getChoice(req.query.veri, ALLOWED_VERI, null);
 
-            if (!isPositiveId(req.params.relationshipId) || !status) {
-                return errorResponse(res, 'A valid relationshipId and status are required', null, 400);
+            if (
+                !isPositiveId(req.query.bqpId) ||
+                !isPositiveId(req.query.managerId) ||
+                !isPositiveId(req.params.relationshipId) ||
+                !status ||
+                (req.query.veri !== undefined && !veri)
+            ) {
+                return errorResponse(res, 'A valid bqpId, managerId, relationshipId, status and veri value are required', null, 400);
             }
             const rows = await BqpModel.getPospByRelationshipManager(
+                req.query.bqpId,
+                req.query.managerId,
                 req.params.relationshipId,
                 status,
                 veri

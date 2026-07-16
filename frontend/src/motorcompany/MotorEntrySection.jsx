@@ -4,7 +4,7 @@ import { AlertCircle } from 'lucide-react';
 
 export const DROPDOWN_STEPS = [
   { name: "bqp", label: "BQP", endpoint: "/bqp", paramName: null, placeholder: "Select BQP" },
-  { name: "manager", label: "Reporting Manager", endpoint: "/managers", paramName: "bqpId", placeholder: "Select Manager" },
+  { name: "manager", label: "Reporting Manager", endpoint: "/bqp", paramName: "bqpId", placeholder: "Select Manager" },
   { name: "relationship", label: "Relationship Manager", endpoint: "/relationships", paramName: "managerId", placeholder: "Select Relationship" },
   { name: "posp", label: "POSP (Point of Sale)", endpoint: "/posp", paramName: "relationshipId", placeholder: "Select POSP" },
   { name: "reference", label: "Reference Number", placeholder: "Select Reference" },

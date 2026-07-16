@@ -25,13 +25,21 @@ class ReferenceModel {
              JOIN employees bqp ON bqp.id = ? AND bqp.status = ? AND bqp.is_bqp = ?
              JOIN employees reporting ON reporting.id = ? AND reporting.status = ?
              JOIN employees relationship ON relationship.id = ? AND relationship.status = ?
-             WHERE pos.id = ? AND pos.relationship_manager = ? AND pos.status = ?
+             JOIN employees assignment ON assignment.bqp = bqp.id
+                AND assignment.reporting_manager = reporting.id
+                AND assignment.relationship_manager = relationship.id
+                AND assignment.status = ?
+             WHERE pos.id = ?
+               AND pos.bqp = bqp.id
+               AND pos.reporting_manager = reporting.id
+               AND pos.relationship_manager = relationship.id
+               AND pos.status = ?
              LIMIT 1`,
             [
                 Number(bqp_id), STATUS.ACTIVE, BQP_FLAG.YES,
                 Number(reporting_id), STATUS.ACTIVE,
                 Number(relationship_id), STATUS.ACTIVE,
-                Number(pos_id), Number(relationship_id), STATUS.ACTIVE
+                STATUS.ACTIVE, Number(pos_id), STATUS.ACTIVE
             ]
         );
         return rows.length > 0;
