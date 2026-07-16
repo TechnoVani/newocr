@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import useAuth from "../hooks/useAuth";
 import { ArrowRight, CalendarDays, Clock3, FilePlus2, Files, History, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import axiosInstance from "../config/axios";
 
@@ -18,7 +18,7 @@ const formatDateTime = (value) => {
 };
 
 export default function Dashboard() {
-  const { user } = useSelector((state) => state.auth);
+  const { user } = useAuth();
   const [summary, setSummary] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

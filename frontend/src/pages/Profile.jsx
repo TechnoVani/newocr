@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { User, Mail, Phone, Calendar, MapPin, Award, BookOpen, Loader2, Edit3, ShieldAlert, UploadCloud, FileCheck2, FileUp, Eye, Landmark, Plus, Save, X, History, CreditCard, Camera } from "lucide-react";
 import axiosInstance from "../config/axios";
-import { loginSuccess } from "../redux/slices/authSlice";
+import useAuth from "../hooks/useAuth";
 
 const DOCUMENT_UPLOADS = [
   { name: "aadhaar_front", label: "Aadhaar Front" },
@@ -124,8 +123,7 @@ const AccountDetailCard = ({ account, recent = false }) => (
 );
 
 export default function Profile() {
-  const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { user, updateUser } = useAuth();
   const profilePictureObjectUrl = useRef(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -154,7 +152,7 @@ export default function Profile() {
         const response = await axiosInstance.get("/auth/me");
         if (response.data?.success) {
           const updatedUser = response.data.data.user;
-          dispatch(loginSuccess({ token: localStorage.getItem("authToken"), user: updatedUser }));
+          updateUser(updatedUser);
         }
       } catch (err) {
         setError(err.response?.data?.message || err.message || "Failed to load profile");
@@ -164,7 +162,7 @@ export default function Profile() {
     };
 
     fetchProfile();
-  }, [dispatch]);
+  }, [updateUser]);
 
   useEffect(() => {
     let active = true;
@@ -410,7 +408,7 @@ export default function Profile() {
       });
       if (response.data?.success) {
         const updatedUser = response.data.data.user;
-        dispatch(loginSuccess({ token: localStorage.getItem("authToken"), user: updatedUser }));
+        updateUser(updatedUser);
         setIsEditing(false);
       }
     } catch (err) {
@@ -580,10 +578,7 @@ export default function Profile() {
       if (profilePictureObjectUrl.current) URL.revokeObjectURL(profilePictureObjectUrl.current);
       profilePictureObjectUrl.current = objectUrl;
       setProfilePictureUrl(objectUrl);
-      dispatch(loginSuccess({
-        token: localStorage.getItem("authToken"),
-        user: { ...user, profile_picture_version: Date.now() },
-      }));
+      updateUser({ ...user, profile_picture_version: Date.now() });
       setProfilePictureMessage("Profile picture updated successfully.");
     } catch (err) {
       setProfilePictureMessage(await getRequestErrorMessage(err, "Unable to update profile picture."));

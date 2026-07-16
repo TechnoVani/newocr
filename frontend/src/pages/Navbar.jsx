@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Menu, X, ChevronDown, LogOut, Edit } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
-import { logoutUser } from "../redux/actions/authActions";
+import useAuth from "../hooks/useAuth";
 import axiosInstance from "../config/axios";
 import logo from "../assets/logo.png";
 
@@ -19,9 +18,8 @@ export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { user, logout } = useAuth();
   
   const profilePictureObjectUrl = useRef(null);
   const profileMenuRef = useRef(null);
@@ -68,7 +66,7 @@ export default function Navbar() {
   }, [userId, user?.profile_picture_version]);
 
   const handleLogout = () => {
-    dispatch(logoutUser());
+    logout();
     navigate("/login");
   };
 

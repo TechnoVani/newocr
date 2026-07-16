@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { clearError } from "../redux/slices/authSlice";
-import { loginUser } from "../redux/actions/authActions";
+import useAuth from "../hooks/useAuth";
 
 // ----- Inline SVG Icons -----
 const UserIcon = () => (
@@ -20,19 +18,14 @@ const LockIcon = () => (
 
 // ----- Main Login Component -----
 const Login = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading } = useSelector((state) => state.auth);
+  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   const [identifier, setIdentifier] = useState(() => localStorage.getItem("rememberedIdentifier") || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem("rememberedIdentifier")));
-
-  // Load remembered identifier from localStorage
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -47,10 +40,16 @@ const Login = () => {
       password,
     };
 
-    const result = await dispatch(loginUser(payload, rememberMe));
-
-    if (result.success) {
+    try {
+      setLoading(true);
+      toast.loading("Authenticating...", { id: "auth" });
+      const auth = await login(payload, rememberMe);
+      toast.success(`Welcome back, ${auth.user.name}!`, { id: "auth" });
       navigate("/dashboard", { replace: true });
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to login", { id: "auth" });
+    } finally {
+      setLoading(false);
     }
   };
 
