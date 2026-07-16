@@ -108,6 +108,7 @@ export default function AddReference() {
     try {
       const data = await referenceApi.getAll();
       setReferencesList(data);
+      setFilteredReferences(data);
       return data;
     } catch (err) {
       console.error("Failed to load references:", err);
@@ -143,8 +144,8 @@ export default function AddReference() {
     const requestId = tableRequestId.current + 1;
     tableRequestId.current = requestId;
     if (!pospId) {
-      setFilteredReferences([]);
-      return [];
+      setFilteredReferences(referencesList);
+      return referencesList;
     }
 
     setTableLoading(true);
@@ -161,7 +162,7 @@ export default function AddReference() {
     } finally {
       if (tableRequestId.current === requestId) setTableLoading(false);
     }
-  }, []);
+  }, [referencesList]);
 
   // Fetch references on mount
   useEffect(() => {
@@ -195,25 +196,47 @@ export default function AddReference() {
     setFormData(updatedForm);
     setErrors(updatedErrors);
 
-    setAllOptions((prev) => {
-      const next = { ...prev };
-      for (let i = currentStepIndex + 1; i < DROPDOWN_STEPS.length; i++) {
-        const dependentField = DROPDOWN_STEPS[i].name;
-        hierarchyRequestIds.current[dependentField] =
-          (hierarchyRequestIds.current[dependentField] || 0) + 1;
-        next[dependentField] = [];
-      }
-      return next;
+    const dependentFields = DROPDOWN_STEPS
+      .slice(currentStepIndex + 1)
+      .map((step) => step.name);
+
+    // Invalidate old requests synchronously before starting the next request.
+    // Side effects inside a React state updater can run later and incorrectly
+    // discard a valid reporting-manager response as stale.
+    dependentFields.forEach((dependentField) => {
+      hierarchyRequestIds.current[dependentField] =
+        (hierarchyRequestIds.current[dependentField] || 0) + 1;
     });
+
+    setAllOptions((prev) => ({
+      ...prev,
+      ...Object.fromEntries(dependentFields.map((field) => [field, []])),
+    }));
+    setAllLoading((prev) => ({
+      ...prev,
+      ...Object.fromEntries(dependentFields.map((field) => [field, false])),
+    }));
+
+    if (currentStepIndex < DROPDOWN_STEPS.findIndex((step) => step.name === "posp")) {
+      setSelectedPospFilter("");
+      setFilteredReferences(referencesList);
+    }
 
     if (!val) return;
 
     if (fieldName === "bqp") {
       await loadHierarchyOptions("manager", () => hierarchyApi.getReportingManagers(val));
     } else if (fieldName === "manager") {
-      await loadHierarchyOptions("relationship", () => hierarchyApi.getRelationshipManagers(val));
+      await loadHierarchyOptions("relationship", () =>
+        hierarchyApi.getRelationshipManagers(val, updatedForm.bqp)
+      );
     } else if (fieldName === "relationship") {
-      await loadHierarchyOptions("posp", () => hierarchyApi.getPosps(val));
+      await loadHierarchyOptions("posp", () =>
+        hierarchyApi.getPosps(val, updatedForm.bqp, updatedForm.manager)
+      );
+    } else if (fieldName === "posp") {
+      setSelectedPospFilter(val);
+      await loadPospReferences(val);
     }
   };
 
@@ -268,10 +291,14 @@ export default function AddReference() {
         ? loadHierarchyOptions("manager", () => hierarchyApi.getReportingManagers(item.bqp_id))
         : Promise.resolve([]),
       item.reporting_id
-        ? loadHierarchyOptions("relationship", () => hierarchyApi.getRelationshipManagers(item.reporting_id))
+        ? loadHierarchyOptions("relationship", () =>
+            hierarchyApi.getRelationshipManagers(item.reporting_id, item.bqp_id)
+          )
         : Promise.resolve([]),
       item.relationship_id
-        ? loadHierarchyOptions("posp", () => hierarchyApi.getPosps(item.relationship_id))
+        ? loadHierarchyOptions("posp", () =>
+            hierarchyApi.getPosps(item.relationship_id, item.bqp_id, item.reporting_id)
+          )
         : Promise.resolve([]),
     ]);
   };
@@ -567,7 +594,7 @@ export default function AddReference() {
                   <td colSpan={8} className="bg-slate-50/5 py-10 text-center text-xs font-semibold italic text-slate-400">
                     {selectedPospFilter
                       ? "No references found matching the selected POSP."
-                      : "Please select a POSP from the filter dropdown above to view references."}
+                      : "No references are available."}
                   </td>
                 </tr>
               )}

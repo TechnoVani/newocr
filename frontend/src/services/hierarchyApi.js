@@ -16,8 +16,15 @@ const activeParams = { status: "Active" };
 export const hierarchyApi = {
   getBqp: (status = "Active", isBqp = "Yes") =>
     getList("/bqp", { status, is_bqp: isBqp }),
-  getReportingManagers: (bqpId) => getList(`/reporting/${bqpId}`, activeParams),
-  getRelationshipManagers: (managerId) => getList(`/relationships/${managerId}`, activeParams),
-  getPosps: (relationshipId) => getList(`/posp/${relationshipId}`, activeParams),
+  getReportingManagers: (bqpId) => getList(`/bqp/${bqpId}`, activeParams),
+  getRelationshipManagers: (managerId, bqpId) =>
+    getList(`/relationships/${managerId}`, { ...activeParams, bqpId }),
+  getPosps: (relationshipId, bqpId, managerId, veri) =>
+    getList(`/posp/${relationshipId}`, {
+      ...activeParams,
+      bqpId,
+      managerId,
+      ...(veri ? { veri } : {}),
+    }),
   getReferences: (pospId) => getList(`/references/posp/${pospId}`),
 };
