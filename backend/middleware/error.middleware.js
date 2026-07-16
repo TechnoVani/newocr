@@ -8,7 +8,13 @@ const errorMiddleware = (err, req, res, next) => {
 
     const databaseErrorCodes = new Set([
         "ECONNREFUSED",
+        "ENOTFOUND",
+        "ETIMEDOUT",
+        "EHOSTUNREACH",
         "ER_ACCESS_DENIED_ERROR",
+        "ER_DBACCESS_DENIED_ERROR",
+        "ER_BAD_DB_ERROR",
+        "ER_CON_COUNT_ERROR",
         "PROTOCOL_CONNECTION_LOST",
         "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR"
     ]);

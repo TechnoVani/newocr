@@ -1,7 +1,5 @@
 import mysql from "mysql2/promise";
-import dotenv from "dotenv";
-
-dotenv.config();
+import "./env.js";
 
 const requiredDatabaseVariables = ["DB_HOST", "DB_USER", "DB_NAME"];
 const missingDatabaseVariables = requiredDatabaseVariables.filter(
@@ -20,50 +18,31 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: Number(process.env.DB_PORT || 3306),
+    connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 });
 
 export const connectDB = async () => {
+    const connection = await pool.getConnection();
     try {
-        const connection = await pool.getConnection();
+        await connection.query("SELECT 1");
         console.log("MySQL Database Connected Successfully");
-        
-        // Auto-create set_count table if it doesn't exist
-        const createTableQuery = `
-            CREATE TABLE IF NOT EXISTS set_count (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                pos_id VARCHAR(50) NOT NULL,
-                ref_id VARCHAR(50) NOT NULL,
-                business_type VARCHAR(50),
-                insurance_company VARCHAR(150),
-                vehicle_category VARCHAR(100),
-                insured_name VARCHAR(150) NOT NULL,
-                contact VARCHAR(20),
-                email VARCHAR(100),
-                first_year_od DECIMAL(15,2) DEFAULT 0.00,
-                first_year_tp DECIMAL(15,2) DEFAULT 0.00,
-                total_od DECIMAL(15,2) DEFAULT 0.00,
-                total_tp DECIMAL(15,2) DEFAULT 0.00,
-                irda_od DECIMAL(15,2) DEFAULT 0.00,
-                irda_tp DECIMAL(15,2) DEFAULT 0.00,
-                irda_net DECIMAL(15,2) DEFAULT 0.00,
-                pos_od DECIMAL(15,2) DEFAULT 0.00,
-                pos_tp DECIMAL(15,2) DEFAULT 0.00,
-                pos_net DECIMAL(15,2) DEFAULT 0.00,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            );
-        `;
-        await connection.query(createTableQuery);
-        console.log("MySQL set_count table verified/created successfully");
-        
-        connection.release();
+        return true;
     } catch (error) {
         console.error("Database Connection Failed:", error.message);
         throw error;
+    } finally {
+        connection.release();
     }
+};
+
+export const checkDB = async () => {
+    await pool.query("SELECT 1");
+    return true;
 };
 
 export default pool;
