@@ -1,0 +1,69 @@
+{
+  "name": "insurance-agent-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@heroicons/react": "^2.2.0",
+    "@material-tailwind/react": "^2.1.10",
+    "@mui/icons-material": "^7.3.11",
+    "@mui/material": "^7.3.1",
+    "@reduxjs/toolkit": "^2.12.0",
+    "axios": "^1.18.1",
+    "chart": "^0.1.2",
+    "chart.js": "^4.5.0",
+    "crypto-js": "^4.2.0",
+    "date-fns": "^4.1.0",
+    "js-cookie": "^3.0.8",
+    "jspdf": "^4.1.0",
+    "jspdf-autotable": "^5.0.2",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^0.542.0",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^3.11.174",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.3.0",
+    "react-datepicker": "^8.7.0",
+    "react-dom": "^18.3.1",
+    "react-helmet-async": "^2.0.5",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^5.7.0",
+    "react-redux": "^9.3.0",
+    "react-router-dom": "^7.18.1",
+    "react-select": "^5.10.2",
+    "react-toastify": "^11.0.5",
+    "recharts": "^2.15.4",
+    "redux-persist": "^6.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^10.2.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.3.2",
+    "vite": "^7.1.2"
+  },
+  "overrides": {
+    "@material-tailwind/react": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    }
+  }
+}
