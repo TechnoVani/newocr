@@ -1,13 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { Toaster } from "react-hot-toast";
+import { useState, useEffect, useCallback, useRef } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import UploadSection from "../motorcompany/UploadSection";
 import MotorEntrySection, { DROPDOWN_STEPS } from "../motorcompany/MotorEntrySection";
-import axiosInstance from "../config/axios";
-import { fetchBqp } from "../redux/actions/bqpActions";
-import { fetchReportingManagers } from "../redux/actions/reportingActions";
-import { fetchRelationshipManagers } from "../redux/actions/relationshipActions";
-import { fetchPospByRelationshipManager } from "../redux/actions/posActions";
+import { hierarchyApi } from "../services/hierarchyApi";
 
 // Static business type options
 const BUSINESS_TYPES = [
@@ -36,19 +31,22 @@ const EMPTY_MOTOR_ERRORS = {
 };
 
 export default function MotorEntry() {
-  const dispatch = useDispatch();
-  const { data: bqpList, loading: bqpLoading } = useSelector((state) => state.bqp);
-  const { byBqpId, loading: reportingLoading } = useSelector((state) => state.reporting);
-  const { byManagerId, loading: relationshipLoading } = useSelector((state) => state.relationship);
-  const { byRelationshipId, loading: posLoading } = useSelector((state) => state.pos);
-
+  const requestIds = useRef({});
   const [motorFormData, setMotorFormData] = useState({ ...EMPTY_MOTOR_FORM });
 
   const [localOptions, setLocalOptions] = useState({
+    bqp: [],
+    manager: [],
+    relationship: [],
+    posp: [],
     reference: [],
-    businessType: BUSINESS_TYPES, // static options always available
+    businessType: BUSINESS_TYPES,
   });
   const [localLoading, setLocalLoading] = useState({
+    bqp: false,
+    manager: false,
+    relationship: false,
+    posp: false,
     reference: false,
     businessType: false,
   });
@@ -56,49 +54,49 @@ export default function MotorEntry() {
   const [motorErrors, setMotorErrors] = useState({ ...EMPTY_MOTOR_ERRORS });
 
   const resetMotorEntry = () => {
+    ["manager", "relationship", "posp", "reference"].forEach((fieldName) => {
+      requestIds.current[fieldName] = (requestIds.current[fieldName] || 0) + 1;
+    });
     setMotorFormData({ ...EMPTY_MOTOR_FORM });
     setMotorErrors({ ...EMPTY_MOTOR_ERRORS });
-    setLocalOptions({
-      reference: [],
+    setLocalOptions((prev) => ({
+      ...prev,
+      manager: [], relationship: [], posp: [], reference: [],
       businessType: BUSINESS_TYPES,
-    });
-    setLocalLoading({
-      reference: false,
+    }));
+    setLocalLoading((prev) => ({
+      ...prev,
+      manager: false, relationship: false, posp: false, reference: false,
       businessType: false,
-    });
+    }));
   };
 
-  // Initial BQP fetch
-  useEffect(() => {
-    if (!bqpList.length && !bqpLoading) {
-      dispatch(fetchBqp());
-    }
-  }, [dispatch, bqpList.length, bqpLoading]);
-
-  // Fetch references when POSP changes
-  useEffect(() => {
-    const pospId = motorFormData.posp;
-    if (pospId) {
-      const fetchReferences = async () => {
-        setLocalLoading((prev) => ({ ...prev, reference: true }));
-        try {
-          const response = await axiosInstance.get(`/references/posp/${pospId}`);
-          setLocalOptions((prev) => ({ ...prev, reference: response.data.data || [] }));
-        } catch (error) {
-          console.error("Error fetching references:", error);
-          setLocalOptions((prev) => ({ ...prev, reference: [] }));
-        } finally {
-          setLocalLoading((prev) => ({ ...prev, reference: false }));
-        }
-      };
-      fetchReferences();
-    } else {
-      setLocalOptions((prev) => ({ ...prev, reference: [] }));
-      if (motorFormData.reference) {
-        setMotorFormData((prev) => ({ ...prev, reference: "" }));
+  const loadDirectOptions = useCallback(async (fieldName, request) => {
+    const requestId = (requestIds.current[fieldName] || 0) + 1;
+    requestIds.current[fieldName] = requestId;
+    setLocalLoading((prev) => ({ ...prev, [fieldName]: true }));
+    try {
+      const data = await request();
+      if (requestIds.current[fieldName] !== requestId) return [];
+      setLocalOptions((prev) => ({ ...prev, [fieldName]: data }));
+      return data;
+    } catch (error) {
+      if (requestIds.current[fieldName] !== requestId) return [];
+      setLocalOptions((prev) => ({ ...prev, [fieldName]: [] }));
+      toast.error(error.response?.data?.message || error.message || `Failed to load ${fieldName}`);
+      return [];
+    } finally {
+      if (requestIds.current[fieldName] === requestId) {
+        setLocalLoading((prev) => ({ ...prev, [fieldName]: false }));
       }
     }
-  }, [motorFormData.posp]);
+  }, []);
+
+  // Read the current BQP list directly from the backend on every page mount.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadDirectOptions("bqp", hierarchyApi.getBqps);
+  }, [loadDirectOptions]);
 
   const handleMotorChange = async (fieldName, val) => {
     const updatedForm = { ...motorFormData, [fieldName]: val || "" };
@@ -120,12 +118,13 @@ export default function MotorEntry() {
     }
     setMotorErrors(updatedErrors);
 
-    // Reset local options for subsequent steps (except businessType)
+    // Clear dependent API results so stale database rows are never reused.
     const updatedLocalOptions = { ...localOptions };
     const updatedLocalLoading = { ...localLoading };
     for (let i = currentStepIndex + 1; i < DROPDOWN_STEPS.length; i++) {
       const stepName = DROPDOWN_STEPS[i].name;
-      if (stepName === "reference") {
+      if (["manager", "relationship", "posp", "reference"].includes(stepName)) {
+        requestIds.current[stepName] = (requestIds.current[stepName] || 0) + 1;
         updatedLocalOptions[stepName] = [];
         updatedLocalLoading[stepName] = false;
       } else if (stepName === "businessType") {
@@ -139,17 +138,14 @@ export default function MotorEntry() {
 
     if (!val) return;
 
-    const nextStepIndex = currentStepIndex + 1;
-    if (nextStepIndex < DROPDOWN_STEPS.length) {
-      const nextStep = DROPDOWN_STEPS[nextStepIndex];
-
-      if (fieldName === "bqp" && nextStep.name === "manager") {
-        await dispatch(fetchReportingManagers(val));
-      } else if (fieldName === "manager" && nextStep.name === "relationship") {
-        await dispatch(fetchRelationshipManagers(val));
-      } else if (fieldName === "relationship" && nextStep.name === "posp") {
-        await dispatch(fetchPospByRelationshipManager(val));
-      }
+    if (fieldName === "bqp") {
+      await loadDirectOptions("manager", () => hierarchyApi.getReportingManagers(val));
+    } else if (fieldName === "manager") {
+      await loadDirectOptions("relationship", () => hierarchyApi.getRelationshipManagers(val));
+    } else if (fieldName === "relationship") {
+      await loadDirectOptions("posp", () => hierarchyApi.getPosps(val));
+    } else if (fieldName === "posp") {
+      await loadDirectOptions("reference", () => hierarchyApi.getReferences(val));
     }
   };
 
@@ -166,19 +162,19 @@ export default function MotorEntry() {
 
   // Combine all options
   const allOptions = {
-    bqp: bqpList,
-    manager: byBqpId[motorFormData.bqp] || [],
-    relationship: byManagerId[motorFormData.manager] || [],
-    posp: byRelationshipId[motorFormData.relationship] || [],
+    bqp: localOptions.bqp,
+    manager: localOptions.manager,
+    relationship: localOptions.relationship,
+    posp: localOptions.posp,
     reference: formattedReferenceOptions,
     businessType: businessTypeOptions, // ✅ fallback to static options
   };
 
   const allLoading = {
-    bqp: bqpLoading,
-    manager: reportingLoading,
-    relationship: relationshipLoading,
-    posp: posLoading,
+    bqp: localLoading.bqp,
+    manager: localLoading.manager,
+    relationship: localLoading.relationship,
+    posp: localLoading.posp,
     reference: localLoading.reference,
     businessType: localLoading.businessType,
   };

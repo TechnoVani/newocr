@@ -1,13 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useState, useEffect, useCallback, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import ReactSelect from "react-select";
 import { AlertCircle } from "lucide-react";
 import axiosInstance from "../config/axios";
-import { fetchBqp } from "../redux/actions/bqpActions";
-import { fetchReportingManagers } from "../redux/actions/reportingActions";
-import { fetchRelationshipManagers } from "../redux/actions/relationshipActions";
-import { fetchPospByRelationshipManager } from "../redux/actions/posActions";
+import { hierarchyApi } from "../services/hierarchyApi";
 
 // Dropdown configuration for reference creation flow
 const DROPDOWN_STEPS = [
@@ -75,16 +71,19 @@ const getCustomStyles = (hasError) => ({
 });
 
 export default function AddReference() {
-  const dispatch = useDispatch();
-
-  // Redux Selectors
-  const { data: bqpList, loading: bqpLoading } = useSelector((state) => state.bqp);
-  const { byBqpId, loading: reportingLoading } = useSelector((state) => state.reporting);
-  const { byManagerId, loading: relationshipLoading } = useSelector((state) => state.relationship);
-  const { byRelationshipId, loading: posLoading } = useSelector((state) => state.pos);
+  const hierarchyRequestIds = useRef({});
+  const tableRequestId = useRef(0);
+  const [allOptions, setAllOptions] = useState({
+    bqp: [], manager: [], relationship: [], posp: [],
+  });
+  const [allLoading, setAllLoading] = useState({
+    bqp: false, manager: false, relationship: false, posp: false,
+  });
 
   // References list fetched from backend
   const [referencesList, setReferencesList] = useState([]);
+  const [filteredReferences, setFilteredReferences] = useState([]);
+  const [tableLoading, setTableLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [selectedPospFilter, setSelectedPospFilter] = useState("");
 
@@ -96,11 +95,6 @@ export default function AddReference() {
         .map((ref) => [ref.pos_id, { id: ref.pos_id, label: ref.posp }])
     ).values()
   ).sort((a, b) => a.label.localeCompare(b.label));
-
-  // Show all references by default; selecting a POSP narrows the table.
-  const filteredReferences = selectedPospFilter
-    ? referencesList.filter((ref) => String(ref.pos_id) === String(selectedPospFilter))
-    : referencesList;
 
   const [formData, setFormData] = useState({
     bqp: "", manager: "", relationship: "", posp: "", name: "", mobile: "",
@@ -127,6 +121,51 @@ export default function AddReference() {
     }
   }, []);
 
+  const loadHierarchyOptions = useCallback(async (fieldName, request) => {
+    const requestId = (hierarchyRequestIds.current[fieldName] || 0) + 1;
+    hierarchyRequestIds.current[fieldName] = requestId;
+    setAllLoading((prev) => ({ ...prev, [fieldName]: true }));
+    try {
+      const data = await request();
+      if (hierarchyRequestIds.current[fieldName] !== requestId) return [];
+      setAllOptions((prev) => ({ ...prev, [fieldName]: data }));
+      return data;
+    } catch (err) {
+      if (hierarchyRequestIds.current[fieldName] !== requestId) return [];
+      setAllOptions((prev) => ({ ...prev, [fieldName]: [] }));
+      toast.error(err.response?.data?.message || err.message || `Failed to load ${fieldName}`);
+      return [];
+    } finally {
+      if (hierarchyRequestIds.current[fieldName] === requestId) {
+        setAllLoading((prev) => ({ ...prev, [fieldName]: false }));
+      }
+    }
+  }, []);
+
+  const loadPospReferences = useCallback(async (pospId) => {
+    const requestId = tableRequestId.current + 1;
+    tableRequestId.current = requestId;
+    if (!pospId) {
+      setFilteredReferences([]);
+      return [];
+    }
+
+    setTableLoading(true);
+    try {
+      const data = await hierarchyApi.getReferences(pospId);
+      if (tableRequestId.current !== requestId) return [];
+      setFilteredReferences(data);
+      return data;
+    } catch (err) {
+      if (tableRequestId.current !== requestId) return [];
+      setFilteredReferences([]);
+      toast.error(err.response?.data?.message || err.message || "Failed to load POSP references");
+      return [];
+    } finally {
+      if (tableRequestId.current === requestId) setTableLoading(false);
+    }
+  }, []);
+
   // Fetch references on mount
   useEffect(() => {
     // Fetching remote data on mount intentionally updates this component's state.
@@ -134,12 +173,11 @@ export default function AddReference() {
     loadReferences();
   }, [loadReferences]);
 
-  // Load initial BQP data on mount
+  // Read the current BQP list directly from the backend on every page mount.
   useEffect(() => {
-    if (!bqpList.length && !bqpLoading) {
-      dispatch(fetchBqp());
-    }
-  }, [dispatch, bqpList.length, bqpLoading]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadHierarchyOptions("bqp", hierarchyApi.getBqps);
+  }, [loadHierarchyOptions]);
 
   const formatOptionLabel = (option) => {
     if (!option) return "";
@@ -160,22 +198,26 @@ export default function AddReference() {
     setFormData(updatedForm);
     setErrors(updatedErrors);
 
+    setAllOptions((prev) => {
+      const next = { ...prev };
+      for (let i = currentStepIndex + 1; i < DROPDOWN_STEPS.length; i++) {
+        const dependentField = DROPDOWN_STEPS[i].name;
+        hierarchyRequestIds.current[dependentField] =
+          (hierarchyRequestIds.current[dependentField] || 0) + 1;
+        next[dependentField] = [];
+      }
+      return next;
+    });
+
     if (!val) return;
 
-    if (fieldName === "bqp") dispatch(fetchReportingManagers(val));
-    else if (fieldName === "manager") dispatch(fetchRelationshipManagers(val));
-    else if (fieldName === "relationship") dispatch(fetchPospByRelationshipManager(val));
-  };
-
-  const allOptions = {
-    bqp: bqpList,
-    manager: byBqpId[formData.bqp] || [],
-    relationship: byManagerId[formData.manager] || [],
-    posp: byRelationshipId[formData.relationship] || [],
-  };
-
-  const allLoading = {
-    bqp: bqpLoading, manager: reportingLoading, relationship: relationshipLoading, posp: posLoading,
+    if (fieldName === "bqp") {
+      await loadHierarchyOptions("manager", () => hierarchyApi.getReportingManagers(val));
+    } else if (fieldName === "manager") {
+      await loadHierarchyOptions("relationship", () => hierarchyApi.getRelationshipManagers(val));
+    } else if (fieldName === "relationship") {
+      await loadHierarchyOptions("posp", () => hierarchyApi.getPosps(val));
+    }
   };
 
   const isStepDisabled = (index) => {
@@ -187,6 +229,12 @@ export default function AddReference() {
     handleDropdownChange(fieldName, selectedOption ? selectedOption.value : "");
   };
 
+  const handlePospFilterChange = async (event) => {
+    const pospId = event.target.value;
+    setSelectedPospFilter(pospId);
+    await loadPospReferences(pospId);
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -194,12 +242,19 @@ export default function AddReference() {
   };
 
   const handleReset = () => {
+    ["manager", "relationship", "posp"].forEach((fieldName) => {
+      hierarchyRequestIds.current[fieldName] =
+        (hierarchyRequestIds.current[fieldName] || 0) + 1;
+    });
+    setAllOptions((prev) => ({
+      ...prev, manager: [], relationship: [], posp: [],
+    }));
     setFormData({ bqp: "", manager: "", relationship: "", posp: "", name: "", mobile: "" });
     setErrors({ bqp: "", manager: "", relationship: "", posp: "", name: "", mobile: "" });
     setEditingId(null);
   };
 
-  const handleEdit = (item) => {
+  const handleEdit = async (item) => {
     setEditingId(item.id);
     setFormData({
       bqp: item.bqp_id ? String(item.bqp_id) : "",
@@ -211,9 +266,17 @@ export default function AddReference() {
     });
     setErrors({ bqp: "", manager: "", relationship: "", posp: "", name: "", mobile: "" });
 
-    if (item.bqp_id) dispatch(fetchReportingManagers(item.bqp_id));
-    if (item.reporting_id) dispatch(fetchRelationshipManagers(item.reporting_id));
-    if (item.relationship_id) dispatch(fetchPospByRelationshipManager(item.relationship_id));
+    await Promise.all([
+      item.bqp_id
+        ? loadHierarchyOptions("manager", () => hierarchyApi.getReportingManagers(item.bqp_id))
+        : Promise.resolve([]),
+      item.reporting_id
+        ? loadHierarchyOptions("relationship", () => hierarchyApi.getRelationshipManagers(item.reporting_id))
+        : Promise.resolve([]),
+      item.relationship_id
+        ? loadHierarchyOptions("posp", () => hierarchyApi.getPosps(item.relationship_id))
+        : Promise.resolve([]),
+    ]);
   };
 
   const handleSubmit = (e) => {
@@ -271,8 +334,9 @@ export default function AddReference() {
         if (response.data?.success) {
           toast.success(isEdit ? "Reference updated successfully!" : "Reference created successfully!", { id: toastId });
           const savedPospId = String(formData.posp);
-          await loadReferences(false);
+          await loadReferences();
           setSelectedPospFilter(savedPospId);
+          await loadPospReferences(savedPospId);
           handleReset();
         } else {
           throw new Error(response.data?.message || `Failed to ${isEdit ? 'update' : 'create'} reference`);
@@ -445,10 +509,10 @@ export default function AddReference() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Filter by POSP:</span>
             <select
               value={selectedPospFilter}
-              onChange={(e) => setSelectedPospFilter(e.target.value)}
+              onChange={handlePospFilterChange}
               className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-500/10 sm:w-auto sm:min-w-[200px]"
             >
-              <option value="">All POSPs</option>
+              <option value="">Select POSP to view...</option>
               {uniquePosps.map((posp) => (
                 <option key={posp.id} value={posp.id}>
                   {posp.label}
@@ -474,7 +538,13 @@ export default function AddReference() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredReferences.length > 0 ? (
+              {tableLoading ? (
+                <tr>
+                  <td colSpan={8} className="bg-slate-50/5 py-10 text-center text-xs font-semibold text-slate-400">
+                    Loading references...
+                  </td>
+                </tr>
+              ) : filteredReferences.length > 0 ? (
                 filteredReferences.map((ref, idx) => (
                   <tr key={ref.id} className="transition-colors hover:bg-slate-50/50">
                     <td className="px-3 py-2 text-xs font-semibold text-slate-600 sm:px-5 sm:py-3">{idx + 1}</td>
@@ -500,7 +570,7 @@ export default function AddReference() {
                   <td colSpan={8} className="bg-slate-50/5 py-10 text-center text-xs font-semibold italic text-slate-400">
                     {selectedPospFilter
                       ? "No references found matching the selected POSP."
-                      : "No references have been created yet."}
+                      : "Please select a POSP from the filter dropdown above to view references."}
                   </td>
                 </tr>
               )}

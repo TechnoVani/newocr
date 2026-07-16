@@ -80,6 +80,17 @@ app.use("/api/auth", authRoutes);
 // Keep intentionally public routes (login/register/password reset) above it.
 app.use("/api", authMiddleware);
 
+// Hierarchy and reference dropdowns must always reflect the latest database rows.
+app.use(
+    ["/api/bqp", "/api/reporting", "/api/relationships", "/api/posp", "/api/references"],
+    (req, res, next) => {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        next();
+    }
+);
+
 app.use("/api/upload", uploadRoutes);
 app.use("/api/ocr", ocrRoutes);
 app.use("/api/policy", policyRoutes);
