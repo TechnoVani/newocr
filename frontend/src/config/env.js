@@ -8,25 +8,35 @@ const readRequiredEnv = (key) => {
 
 const stripTrailingSlashes = (value) => value.replace(/\/+$/, "");
 
-const readSingleUrl = (key) => {
-  const value = stripTrailingSlashes(readRequiredEnv(key));
-  if (value.includes(",")) {
-    throw new Error(`${key} must contain exactly one URL, not a comma-separated list`);
-  }
+const readUrls = (key) => readRequiredEnv(key)
+  .split(",")
+  .map((value) => stripTrailingSlashes(value.trim()))
+  .filter(Boolean)
+  .map((value) => {
+    try {
+      const url = new URL(value);
+      if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+      return { value, url };
+    } catch {
+      throw new Error(`${key} contains an invalid absolute URL: ${value}`);
+    }
+  });
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(value);
-  } catch {
-    throw new Error(`${key} must be a valid absolute URL`);
-  }
+const isLocalHostname = (hostname) => ["localhost", "127.0.0.1", "::1"].includes(hostname);
+const browserHostname = typeof window === "undefined" ? "" : window.location.hostname;
 
-  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-    throw new Error(`${key} must use http or https`);
-  }
-  return value;
-};
+const apiUrls = readUrls("VITE_API_BASE_URL");
+const preferredApi = isLocalHostname(browserHostname)
+  ? apiUrls.find(({ url }) => isLocalHostname(url.hostname))
+  : apiUrls.find(({ url }) => !isLocalHostname(url.hostname));
 
-export const API_BASE_URL = readSingleUrl("VITE_API_BASE_URL");
+export const API_BASE_URL = (preferredApi || apiUrls[0]).value;
 
-export const LOGIN_URL = readSingleUrl("VITE_REDIRECT_URL");
+const configuredLoginUrls = readUrls("VITE_REDIRECT_URL");
+const currentFrontendOrigin = typeof window === "undefined" ? "" : window.location.origin;
+const sameOriginLogin = configuredLoginUrls.find(({ url }) => (
+  url.origin === currentFrontendOrigin && !url.pathname.startsWith("/api")
+));
+
+export const LOGIN_URL = sameOriginLogin?.value
+  || (currentFrontendOrigin ? `${currentFrontendOrigin}/login` : configuredLoginUrls[0].value);
