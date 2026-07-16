@@ -171,6 +171,7 @@ CREATE TABLE `employees` (
   `user_type` varchar(50) DEFAULT NULL,
   `level` int(11) DEFAULT NULL,
   `status` varchar(20) DEFAULT 'Active',
+  `is_bqp` enum('Yes','No') NOT NULL DEFAULT 'No',
   `document_status` varchar(50) DEFAULT NULL,
   `designation` int(11) UNSIGNED DEFAULT NULL,
   `department` int(11) UNSIGNED DEFAULT NULL,
