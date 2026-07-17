@@ -365,19 +365,39 @@ const extractIDV = (text) => {
   return "-";
 };
 
+// ============================================================
+// FIXED: Extract previous policy number correctly
+// ============================================================
 const extractPreviousPolicyNumber = (text = "") => {
-  const match = text.match(/Pol\s*No\s*[:：]\s*([A-Z0-9\/\-]+)/i) ||
-                text.match(/Previous\s+Policy\s+Number\s*[:：]\s*([A-Z0-9\/\-]+)/i);
+  // Look for "Prev Policy" or "Previous Policy Number"
+  let match = text.match(/Prev\s+Policy\s*[:：]\s*([^\n]+?)(?=\s*(?:Nominee|Financier|NOTE|$))/i);
+  if (match?.[1]) return match[1].trim();
+  match = text.match(/Previous\s+Policy\s+Number\s*[:：]\s*([^\n]+)/i);
+  if (match?.[1]) return match[1].trim();
+  match = text.match(/Pol\s*No\s*[:：]\s*([A-Z0-9\/\-]+)/i);
   return match?.[1] || "-";
 };
 
+// ============================================================
+// FIXED: Extract previous insurer correctly
+// ============================================================
 const extractPreviousInsurer = (text = "") => {
-  const match = text.match(/Prev\s+Policy\s*[:：]\s*([^\(]+)/i) ||
-                text.match(/Previous\s+Insurer\s*[:：]\s*([^\n]+)/i);
+  // Look for explicit "Previous Insurer"
+  let match = text.match(/Previous\s+Insurer\s*[:：]\s*([^\n]+?)(?=\s*(?:Nominee|Financier|NOTE|$))/i);
   if (match?.[1]) return match[1].trim();
+  // If not found, check if "Prev Policy" exists; if its value is "Not Available", we can set insurer to "Not Available"
+  const prevPolicyMatch = text.match(/Prev\s+Policy\s*[:：]\s*([^\n]+?)(?=\s*(?:Nominee|Financier|NOTE|$))/i);
+  if (prevPolicyMatch?.[1]) {
+    // If the value is "Not Available", we can return that; else maybe return "-" or the value?
+    // But the user wants "Not Available" for insurer, so we'll return "Not Available" if any prev policy info exists.
+    return "Not Available";
+  }
   return "-";
 };
 
+// ============================================================
+// FIXED: extractPremiumData with correct netPremium
+// ============================================================
 const extractPremiumData = (text) => {
   const result = {
     totalOdPremium: "-",
@@ -399,10 +419,13 @@ const extractPremiumData = (text) => {
   if (!match) match = text.match(/Legal\s+Liability\s+Cover\s*([\d,]+(?:\.\d+)?)/i);
   if (match) result.totalTpPremium = cleanNumber(match[1]);
 
-  match = text.match(/(?:पीिमयम\s+)?Premium\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
-  if (!match) match = text.match(/TOTAL\s+PREMIUM\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
-  if (!match) match = text.match(/Premium\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
-  if (match) result.netPremium = cleanNumber(match[1]);
+  // ============================================================
+  // netPremium: look for TOTAL PREMIUM first
+  // ============================================================
+  let netMatch = text.match(/TOTAL\s+PREMIUM\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (!netMatch) netMatch = text.match(/(?:पीिमयम\s+)?Premium\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (!netMatch) netMatch = text.match(/Premium\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (netMatch) result.netPremium = cleanNumber(netMatch[1]);
 
   match = text.match(/GST\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (match) {

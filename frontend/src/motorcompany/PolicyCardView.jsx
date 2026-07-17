@@ -78,10 +78,19 @@ const fromDateInputValue = (dateValue) => {
   return `${day}-${month}-${year}`;
 };
 
-const cleanNumberInput = (value) => value.replace(/\D/g, '');
+// 🔥 Allow a single decimal point
+const cleanNumberInput = (value) => {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length > 2) {
+    return parts[0] + '.' + parts.slice(1).join('');
+  }
+  return cleaned;
+};
 
+// 🔥 Keep decimals, only remove commas
 const getPremiumValue = (value) => {
-  if (value === null || value === undefined || value === "" || value === "NA") return "0";
+  if (value === null || value === undefined || value === "" || value === "NA") return "";
   return String(value).replace(/,/g, "");
 };
 
@@ -110,7 +119,7 @@ const shouldShowPremiumField = (matchedPolicy, field) => {
   }
 };
 
-// ----- Normalise Fuel Type (for dropdown matching) -----
+// ----- Normalise Fuel Type -----
 const normalizeFuelType = (fuel) => {
   if (!fuel) return "";
   const lower = fuel.toLowerCase().trim();
@@ -120,7 +129,6 @@ const normalizeFuelType = (fuel) => {
   if (lower.includes("lpg")) return "LPG";
   if (lower.includes("electric")) return "Electric";
   if (lower.includes("hybrid")) return "Hybrid";
-  // If none match, return the original string (may still work if exact match)
   return fuel;
 };
 
@@ -212,7 +220,23 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
       </div>
     );
   } else if (type === "number") {
-    inputElement = <input type="text" inputMode="numeric" pattern="\d*" value={value || ""} onChange={(e) => onChange(cleanNumberInput(e.target.value))} onKeyPress={(e) => { const charCode = e.which ? e.which : e.keyCode; if (charCode > 31 && (charCode < 48 || charCode > 57)) e.preventDefault(); }} className={baseInputClass} />;
+    // Allows decimals
+    inputElement = (
+      <input
+        type="text"
+        inputMode="decimal"
+        pattern="[0-9.]*"
+        value={value || ""}
+        onChange={(e) => onChange(cleanNumberInput(e.target.value))}
+        onKeyPress={(e) => {
+          const charCode = e.which ? e.which : e.keyCode;
+          if (charCode > 31 && charCode !== 46 && (charCode < 48 || charCode > 57)) {
+            e.preventDefault();
+          }
+        }}
+        className={baseInputClass}
+      />
+    );
   } else if (type === "file") {
     const fileName = value?.name || (typeof value === 'string' ? value : '');
     inputElement = (
@@ -249,10 +273,10 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
       />
     );
   } else {
+    // Plain text input – used for seating and other free‑text fields
     inputElement = <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={baseInputClass} />;
   }
 
-  // ----- Unified layout: label left, input right (except for file and textarea) -----
   const isFullWidthType = type === "file" || isTextarea;
   return (
     <div className={`py-1.5 border-b border-slate-100 last:border-0 ${highlight ? 'bg-blue-50/50 -mx-2 px-2 rounded-lg border border-blue-100/50' : ''}`}>
@@ -291,7 +315,6 @@ function PolicyCardView({
   vehicle: initialVehicle,
   extractedVehicle,
   onSubmit,
-  // Motor props
   motorFormData,
   setMotorErrors,
 }) {
@@ -337,7 +360,6 @@ function PolicyCardView({
     { value: "Other", label: "Other" }
   ];
 
-  // ----- Fuel Type Options -----
   const fuelTypeOptions = [
     { value: "Petrol", label: "Petrol" },
     { value: "Diesel", label: "Diesel" },
@@ -397,8 +419,6 @@ function PolicyCardView({
   });
 
   useEffect(() => {
-    // Synchronize editable form state when a newly parsed policy replaces the current item.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       policyNumber: initialPolicyNumber,
       insuranceCompany: initialInsuranceCompany,
@@ -434,7 +454,12 @@ function PolicyCardView({
 
   const handleFieldChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
   const handleDateChange = (field, value) => setFormData(prev => ({ ...prev, policyDates: { ...prev.policyDates, [field]: value } }));
-  const handlePremiumChange = (field, value) => setFormData(prev => ({ ...prev, finalPremium: { ...prev.finalPremium, [field]: value } }));
+  const handlePremiumChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      finalPremium: { ...prev.finalPremium, [field]: value }
+    }));
+  };
   const handleVehicleChange = (field, value) => setFormData(prev => ({
     ...prev,
     vehicle: {
@@ -444,11 +469,10 @@ function PolicyCardView({
     }
   }));
 
-  // ----- Form Submission with Mandatory Commercial Vehicle Validation -----
+  // ----- Form Submission -----
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
-    // --- Motor dropdown validation ---
     const motorValidationErrors = {};
     let isValid = true;
     DROPDOWN_STEPS.forEach((step) => {
@@ -463,7 +487,6 @@ function PolicyCardView({
       return;
     }
 
-    // --- Commercial Vehicle mandatory fields ---
     if (formData.vehicleCategory === "Commercial Vehicle") {
       if (!mergedVehicle.commercialVehicleType || mergedVehicle.commercialVehicleType === "") {
         toast.error("Please select a Commercial Vehicle Type.");
@@ -475,7 +498,6 @@ function PolicyCardView({
       }
     }
 
-    // --- File and KYC validation ---
     const rawFile = item?.rawFile || null;
     if (!(rawFile instanceof File)) {
       toast.error("Please upload the policy PDF.");
@@ -635,7 +657,7 @@ function PolicyCardView({
               {shouldShowPremiumField(matchedPolicy, "totalTpPremium") && <EditableRow label="Total TP" value={getPremiumValue(formData.finalPremium?.totalTpPremium)} onChange={(val) => handlePremiumChange("totalTpPremium", val)} type="number" />}
               {shouldShowPremiumField(matchedPolicy, "netPremium") && <EditableRow label="Net Premium" value={getPremiumValue(formData.finalPremium?.netPremium)} onChange={(val) => handlePremiumChange("netPremium", val)} type="number" />}
               {shouldShowPremiumField(matchedPolicy, "gst") && <EditableRow label="GST" value={getPremiumValue(formData.finalPremium?.gst)} onChange={(val) => handlePremiumChange("gst", val)} type="number" />}
-              {shouldShowPremiumField(matchedPolicy, "totalPayable") && <EditableRow label="Total Payable" value={getPremiumValue(formData.finalPremium?.totalPayable)} onChange={(val) => handlePremiumChange("totalPayable", val)} type="number" highlight />}
+              {shouldShowPremiumField(matchedPolicy, "totalPayable") && <EditableRow label="Gross Premium" value={getPremiumValue(formData.finalPremium?.totalPayable)} onChange={(val) => handlePremiumChange("totalPayable", val)} type="number" highlight />}
             </div>
           </div>
 
@@ -653,15 +675,21 @@ function PolicyCardView({
               <EditableRow label="Body Type" value={mergedVehicle.bodyType} onChange={(val) => handleVehicleChange("bodyType", val)} />
               <EditableRow label="Fuel" value={mergedVehicle.fuelType} onChange={(val) => handleVehicleChange("fuelType", val)} type="select" options={fuelTypeOptions} />
               <EditableRow label="CC" value={mergedVehicle.cubicCapacity} onChange={(val) => handleVehicleChange("cubicCapacity", val)} />
-              <EditableRow label="Seating" value={mergedVehicle.seatingCapacity} onChange={(val) => handleVehicleChange("seatingCapacity", val)} type="number" />
+              
+              {/* 🔥 Seating field – now plain text to accept "1+4" */}
+              <EditableRow 
+                label="Seating" 
+                value={mergedVehicle.seatingCapacity} 
+                onChange={(val) => handleVehicleChange("seatingCapacity", val)} 
+                type="text" 
+              />
+              
               <EditableRow label="Financier" value={extractedVehicle?.financierName} onChange={(val) => handleVehicleChange("financierName", val)} />
               
-              {/* GVW - shown only for Commercial Vehicles */}
               {formData.vehicleCategory === "Commercial Vehicle" && (
                 <EditableRow label="GVW" value={mergedVehicle.gvw} onChange={(val) => handleVehicleChange("gvw", val)} />
               )}
 
-              {/* Conditional Commercial Vehicle Type & Misc-D sub-type (mandatory) */}
               {formData.vehicleCategory === "Commercial Vehicle" && (
                 <>
                   <EditableRow
@@ -690,7 +718,6 @@ function PolicyCardView({
               <EditableRow label="Aadhaar Back (Pair)" value={mergedVehicle.aadhaarBack} onChange={(file) => handleVehicleChange("aadhaarBack", file)} type="file" />
               <EditableRow label="PAN Card (Alternative)" value={mergedVehicle.panCard} onChange={(file) => handleVehicleChange("panCard", file)} type="file" />
 
-              {/* Submit button moved here – aligned right */}
               <div className="sm:col-span-2 md:col-span-3 lg:col-span-1 flex justify-end mt-1">
                 <button
                   type="submit"
