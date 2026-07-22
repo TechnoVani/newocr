@@ -5,18 +5,16 @@ import morgan from "morgan";
 
 import "./config/env.js";
 import { connectDB, checkDB } from "./config/database.js";
+import { ensureAccountSchema } from "./models/accounts/accountSchema.model.js";
+import { ensurePolicySchema } from "./models/ops/policySchema.model.js";
 
 import authRoutes from "./routes/auth.routes.js";
-import uploadRoutes from "./routes/upload.routes.js";
-import ocrRoutes from "./routes/ocr.routes.js";
-import policyRoutes from "./routes/policy.routes.js";
-import documentRoutes from "./routes/document.routes.js";
-
-import bqpRoutes from "./routes/bqp.routes.js";
-import referenceRoutes from "./routes/reference.routes.js";
-import setCountRoutes from "./routes/setcount.routes.js";
+import operationsRoutes from "./routes/ops/index.routes.js";
+import accountsRoutes from "./routes/accounts/index.routes.js";
+import departmentDashboardRoutes from "./routes/departments/departmentDashboard.routes.js";
 
 import authMiddleware from "./middleware/auth.middleware.js";
+import requireDepartmentAccess from "./middleware/departmentAccess.middleware.js";
 import policyFileAccessMiddleware from "./middleware/policyFileAccess.middleware.js";
 import errorMiddleware from "./middleware/error.middleware.js";
 import { getAllowedOrigins, normalizeOrigin } from "./config/origins.js";
@@ -56,6 +54,7 @@ app.use(morgan("dev"));
 app.use(
     "/uploads",
     authMiddleware,
+    requireDepartmentAccess("operations"),
     policyFileAccessMiddleware,
     express.static("public/uploads")
 );
@@ -79,13 +78,15 @@ app.get("/api/health", async (req, res) => {
 
 app.use("/api/auth", authRoutes);
 
-// Everything mounted under /api after this line requires a valid JWT.
-// Keep intentionally public routes (login/register/password reset) above it.
-app.use("/api", authMiddleware);
-
 // Hierarchy and reference dropdowns must always reflect the latest database rows.
 app.use(
-    ["/api/bqp", "/api/reporting", "/api/relationships", "/api/posp", "/api/references"],
+    [
+        "/api/operations/bqp",
+        "/api/operations/reporting",
+        "/api/operations/relationships",
+        "/api/operations/posp",
+        "/api/operations/references"
+    ],
     (req, res, next) => {
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.setHeader("Pragma", "no-cache");
@@ -94,16 +95,21 @@ app.use(
     }
 );
 
-app.use("/api/upload", uploadRoutes);
-app.use("/api/ocr", ocrRoutes);
-app.use("/api/policy", policyRoutes);
-app.use("/api/policies", policyRoutes);
-app.use("/api/document", documentRoutes);
-app.use("/api/setcount", setCountRoutes);
+app.use(
+    "/api/operations",
+    authMiddleware,
+    requireDepartmentAccess("operations"),
+    operationsRoutes
+);
 
-// Protected cascade dropdown endpoints
-app.use("/api", bqpRoutes);
-app.use("/api/references", referenceRoutes);
+app.use(
+    "/api/accounts",
+    authMiddleware,
+    requireDepartmentAccess("accounts"),
+    accountsRoutes
+);
+
+app.use("/api/departments", authMiddleware, departmentDashboardRoutes);
 
 
 
@@ -121,6 +127,8 @@ const startServer = () => {
 
         try {
             await connectDB();
+            await ensureAccountSchema();
+            await ensurePolicySchema();
             databaseReady = true;
         } catch (error) {
             databaseReady = false;

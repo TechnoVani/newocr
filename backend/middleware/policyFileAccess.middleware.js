@@ -1,4 +1,5 @@
-import PolicyModel from "../models/policy.model.js";
+import PolicyModel from "../models/ops/policy.model.js";
+import { getPolicyReadScope } from "../utils/dataScope.js";
 
 /**
  * Authorize access to:
@@ -19,7 +20,7 @@ const policyFileAccessMiddleware = async (req, res, next) => {
 
         const policyFolder = segments[2];
         const ownsFolder = await PolicyModel.userOwnsPolicyFolder(
-            req.user.id,
+            getPolicyReadScope(req.user),
             policyFolder
         );
 
