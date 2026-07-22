@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { connectDB } from "./config/database.js";
-import PolicyService from "./services/policy.service.js";
+import PolicyService from "./services/ops/policy.service.js";
 
 const testPolicyData = {
   bqp_id: "BR00000324",

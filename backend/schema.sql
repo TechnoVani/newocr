@@ -274,6 +274,7 @@ CREATE TABLE `insurance_branch` (
   `department` varchar(100) DEFAULT NULL,
   `mobile` varchar(20) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `created_by` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -294,6 +295,7 @@ CREATE TABLE `insurance_company` (
   `insurer` varchar(255) DEFAULT NULL,
   `link` text DEFAULT NULL,
   `type` varchar(100) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `created_by` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -380,7 +382,7 @@ CREATE TABLE `policies` (
   `make_name` varchar(150) DEFAULT NULL,
   `cc` varchar(50) DEFAULT NULL,
   `model_name` varchar(150) DEFAULT NULL,
-  `seating_capacity` int(11) DEFAULT NULL,
+  `seating_capacity` varchar(30) DEFAULT NULL,
   `variant_name` varchar(150) DEFAULT NULL,
   `financier` varchar(150) DEFAULT NULL,
   `irda_od` varchar(100) DEFAULT NULL,

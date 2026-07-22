@@ -1,0 +1,15 @@
+export const DEPARTMENT_DEFINITIONS = Object.freeze([
+  { slug: "sales", label: "Sales" },
+  { slug: "pos-management", label: "POS Management" },
+  { slug: "operations", label: "Operations", specialized: true },
+  { slug: "underwriting", label: "Underwriting" },
+  { slug: "claims", label: "Claims" },
+  { slug: "customer-support", label: "Customer Support" },
+  { slug: "renewal", label: "Renewal" },
+  { slug: "finance", label: "Finance" },
+  { slug: "accounts", label: "Accounts", specialized: true },
+  { slug: "human-resources", label: "Human Resources (HR)" },
+  { slug: "administration", label: "Administration" },
+  { slug: "information-technology", label: "Information Technology (IT)" },
+  { slug: "marketing", label: "Marketing" },
+]);

@@ -4,9 +4,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { successResponse, errorResponse } from "../utils/response.js";
-import { sendPasswordResetEmail } from "../services/mail.service.js";
-import EmployeeDocumentService from "../services/employeeDocument.service.js";
+import { sendPasswordResetEmail } from "../services/ops/mail.service.js";
+import EmployeeDocumentService from "../services/ops/employeeDocument.service.js";
 import { getFrontendUrl } from "../config/origins.js";
+import { getPortalAccess, isSuperAdmin } from "../config/departmentAccess.js";
 
 const getJwtConfig = () => {
     const secret = String(process.env.JWT_SECRET || "").trim();
@@ -107,6 +108,11 @@ class AuthController {
             // Remove password from response
             delete user.password;
 
+            // The frontend uses the department name to select the correct portal.
+            // `findByEmailOrContact` returns the department id from employees, while
+            // `findById` resolves it to the human-readable department name.
+            const userProfile = await UserModel.findById(user.id);
+
             return successResponse(res, "Login successful", {
                 token,
                 user: {
@@ -115,6 +121,10 @@ class AuthController {
                     email: user.personal_email,
                     contact: user.mobile,
                     employee_code: user.employee_code,
+                    department: userProfile?.department || null,
+                    user_type: userProfile?.user_type || null,
+                    is_super_admin: isSuperAdmin(userProfile),
+                    portal_access: getPortalAccess(userProfile),
                 }
             });
         } catch (error) {
@@ -129,7 +139,11 @@ class AuthController {
     static async getMe(req, res, next) {
         try {
             return successResponse(res, "Profile retrieved successfully", {
-                user: req.user
+                user: {
+                    ...req.user,
+                    is_super_admin: isSuperAdmin(req.user),
+                    portal_access: getPortalAccess(req.user)
+                }
             });
         } catch (error) {
             next(error);

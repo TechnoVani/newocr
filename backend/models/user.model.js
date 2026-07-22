@@ -21,7 +21,7 @@ class UserModel {
     static async findById(id) {
         const query = `
             SELECT 
-                e.id, e.employee_code, e.name, e.gender, e.date_of_birth, e.personal_email, 
+                e.id, e.employee_code, e.name, e.user_type, e.gender, e.date_of_birth, e.personal_email,
                 e.aadhaar_number, e.pan_number, e.mobile, e.emergency_contact, 
                 e.current_address, e.state, e.city, e.pin_code, 
                 e.joining_date, e.relieving_date, 
