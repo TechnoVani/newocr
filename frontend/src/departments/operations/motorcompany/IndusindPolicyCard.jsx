@@ -1,6 +1,5 @@
 // src/components/IndusindPolicyCard.jsx
 
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
@@ -177,18 +176,8 @@ const extractInsuredDetails = (text = "") => {
     }
   }
   
-  let gstin = "-";
-  const gstinPatterns = [
-    /GSTIN:\s*([A-Z0-9]{15})/i,
-    /GSTIN\s*[:]?\s*([A-Z0-9]{15})/i
-  ];
-  for (const pattern of gstinPatterns) {
-    const match = normalizedText.match(pattern);
-    if (match && match[1]) {
-      gstin = match[1];
-      break;
-    }
-  }
+ let gstin = "-";
+  
   
   return { insuredName, insuredAddress, panNumber, contactNumber, email, gstin };
 };
@@ -322,12 +311,10 @@ const extractVehicleDetailsFromText = (text) => {
     variant: "-",
     manufacturingYear: "-",
     fuelType: "-",
-    colour: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
-    commercialVehicleType: "-",
-    subType: "-",
-    gvw: "-"
+    gvw: "-",
+    ncb: "-"
   };
   
   if (!text) return result;
@@ -466,8 +453,10 @@ const extractVehicleDetailsFromText = (text) => {
   // Seating Capacity
   const seatPatterns = [
     /Seating\s*Capacity\s*Including\s*Driver\s*[:]?\s*(\d+)/i,
-    /Seating\s*Capacity\s*[:]?\s*(\d+)/i
+    /Seating\s*Capacity\s*[:]?\s*(\d+)/i,
+    /LCC\s*Including\s*Driver\s*[:]?\s*(\d+)/i // <-- Added new pattern
   ];
+  
   for (const pattern of seatPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
@@ -489,15 +478,18 @@ const extractVehicleDetailsFromText = (text) => {
     }
   }
 
-  // Colour
-  const colourPatterns = [
-    /Colour\s*[:]?\s*([A-Za-z\s]+?)(?:\n|,|$)/i,
-    /Color\s*[:]?\s*([A-Za-z\s]+?)(?:\n|,|$)/i
+  // No Claim Bonus
+  const ncbPatterns = [
+    /No\s*Claim\s*Bonus(?:\s*\(NCB\))?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%/i,
+    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%/i,
+    /\bNCB\s*\(\s*%\s*\)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i,
+    /Deduct\s*(\d+(?:\.\d+)?)\s*%\s*for\s*NCB/i // <-- Added new pattern
   ];
-  for (const pattern of colourPatterns) {
+  
+  for (const pattern of ncbPatterns) {
     const match = text.match(pattern);
-    if (match && match[1] && match[1].trim()) {
-      result.colour = match[1].trim();
+    if (match?.[1]) {
+      result.ncb = `${match[1]}%`;
       break;
     }
   }
@@ -573,13 +565,11 @@ function IndusindPolicyCard({ item }) {
     variant: sanitizeValue(extractedVehicle.variant),
     manufacturingYear: sanitizeValue(extractedVehicle.manufacturingYear),
     fuelType: sanitizeValue(extractedVehicle.fuelType),
-    colour: sanitizeValue(extractedVehicle.colour),
     cubicCapacity: sanitizeValue(extractedVehicle.cubicCapacity),
     seatingCapacity: sanitizeValue(extractedVehicle.seatingCapacity),
-    commercialVehicleType: sanitizeValue(extractedVehicle.commercialVehicleType),
-    subType: sanitizeValue(extractedVehicle.subType),
     financierName: sanitizeValue(extractedFinancier),
     gvw: sanitizeValue(extractedVehicle.gvw),
+    ncb: sanitizeValue(extractedVehicle.ncb),
   };
 
   return (

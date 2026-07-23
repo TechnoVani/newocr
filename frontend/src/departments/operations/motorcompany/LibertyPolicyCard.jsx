@@ -1,4 +1,3 @@
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
@@ -27,17 +26,6 @@ const cleanValue = (value) => {
 const removeHyphens = (value) => {
   if (!value || value === "-") return "-";
   return String(value).replace(/-/g, "");
-};
-
-const cleanAlphaNumeric = (value, keepSpaces = false) => {
-  if (!value) return "-";
-  let cleaned = String(value)
-    .replace(/\r|\n/g, "")
-    .replace(/\s+/g, keepSpaces ? " " : "");
-  if (!keepSpaces) {
-    cleaned = cleaned.replace(/[^A-Z0-9]/gi, "");
-  }
-  return cleaned.toUpperCase().trim();
 };
 
 // ============================================================
@@ -365,7 +353,7 @@ const extractVehicleDetails = (text) => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    colour: "-",
+    ncb: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
     geographicalArea: "-",
@@ -585,7 +573,7 @@ function LibertyPolicyCard({ item }) {
     model: extractedVehicle.model !== "-" ? extractedVehicle.model : sourceVehicle.model,
     variant: extractedVehicle.variant !== "-" ? extractedVehicle.variant : sourceVehicle.variant,
     manufacturingYear: extractedVehicle.manufacturingYear !== "-" ? extractedVehicle.manufacturingYear : sourceVehicle.manufacturingYear,
-    colour: extractedVehicle.colour !== "-" ? extractedVehicle.colour : sourceVehicle.colour,
+    ncb: extractedVehicle.ncb !== "-" ? extractedVehicle.ncb : sourceVehicle.ncb,
     cubicCapacity: extractedVehicle.cubicCapacity !== "-" ? extractedVehicle.cubicCapacity : sourceVehicle.cubicCapacity,
     seatingCapacity: extractedVehicle.seatingCapacity !== "-" ? extractedVehicle.seatingCapacity : sourceVehicle.seatingCapacity,
     geographicalArea: extractedVehicle.geographicalArea !== "-" ? extractedVehicle.geographicalArea : sourceVehicle.geographicalArea,

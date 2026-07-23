@@ -1,6 +1,5 @@
 // src/components/TATAAIGPolicyCard.jsx
 
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
@@ -391,12 +390,10 @@ const extractVehicleDetailsFromText = (text = "") => {
     gvw: "-",
     manufacturingYear: "-",
     fuelType: "-",
-    colour: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
     financierName: "-",
-    commercialVehicleType: "-",
-    subType: "-",
+    ncb: "-",
   };
   if (!text) return result;
   const txt = normalizeText(text);
@@ -466,9 +463,6 @@ const extractVehicleDetailsFromText = (text = "") => {
       const parts = mmv[1].split("/").map(v => v.trim()).filter(Boolean);
       result.make = parts[0] || "-";
       result.model = parts[1] || "-";
-      if (parts.length >= 5) {
-        result.subType = parts[parts.length - 1];
-      }
     }
   } else {
     const mmv = searchText.match(/Make\s*\/\s*Model\s*\/\s*Variant\s*([^\n]+)/i);
@@ -513,12 +507,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     if (gvwMatch) result.gvw = gvwMatch[1].trim();
   }
 
-  // Commercial Vehicle Type
-  if (isCommercial) {
-    const cvType = txt.match(/Public\s*Carrier\s*\/\s*Private\s*Carrier\s*([^\n]+)/i);
-    if (cvType) result.commercialVehicleType = cvType[1].replace(/\s+/g, " ").trim();
-  }
-
   // Financier
   const finMatch = searchText.match(/Hire\s*Purchase\s*\/\s*Hypothecation\s*\/\s*Lease\s*with\s*([\s\S]{0,100}?)(?=Seating|Licensed|Zone|RTO|$)/i);
   if (finMatch) {
@@ -526,6 +514,11 @@ const extractVehicleDetailsFromText = (text = "") => {
     if (financier && !/^NA$/i.test(financier) && !/^N\/A$/i.test(financier)) {
       result.financierName = formatFinancierName(financier);
     }
+  }
+
+  const ncbMatch = text.match(/No\s+Claim\s+Bonus\s*[:]?\s*[-]?\s*(\d+%)/i);
+  if (ncbMatch) {
+    result.ncb = ncbMatch[1];
   }
   return result;
 };

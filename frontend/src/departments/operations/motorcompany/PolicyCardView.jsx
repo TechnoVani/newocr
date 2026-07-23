@@ -137,6 +137,15 @@ const normalizeFuelType = (fuel) => {
   return fuel;
 };
 
+const extractNcb = (text = "") => {
+  const result = { ncb: "-" };
+  const ncbMatch = text.match(/No\s+Claim\s+Bonus\s*[:]?\s*[-]?\s*(\d+%)/i);
+  if (ncbMatch) {
+    result.ncb = ncbMatch[1];
+  }
+  return result.ncb;
+};
+
 // ----- Reusable UI Components -----
 const SectionHeader = ({ icon, title, color }) => {
   const gradients = {
@@ -324,36 +333,6 @@ function PolicyCardView({
   const resolvedMotorFormData = motorFormData || resolvedMotorProps.motorFormData || {};
   const resolvedSetMotorErrors = setMotorErrors || resolvedMotorProps.setMotorErrors;
 
-  // ----- Vehicle Classification Options -----
-  const commercialVehicleOptions = [
-    { value: "Taxi upto 6 pass", label: "Taxi upto 6 pass" },
-    { value: "Taxi More than 6 pass", label: "Taxi More than 6 pass" },
-    { value: "Three Wheeler - GCV - Public", label: "Three Wheeler - GCV - Public" },
-    { value: "Three Wheeler - PCV - UPTO 6 PASS", label: "Three Wheeler - PCV - UPTO 6 PASS" },
-    { value: "Three Wheeler - PCV - MORE THAN 6 PASS", label: "Three Wheeler - PCV - MORE THAN 6 PASS" },
-    { value: "GCV-Public(upto-2.5T)", label: "GCV-Public(upto-2.5T)" },
-    { value: "GCV-Public(2.5T>=3.5T)", label: "GCV-Public(2.5T>=3.5T)" },
-    { value: "GCV-Public(3.5T>=7.5T)", label: "GCV-Public(3.5T>=7.5T)" },
-    { value: "GCV-Public(7.5T-17T)", label: "GCV-Public(7.5T-17T)" },
-    { value: "GCV-Public(17T-26T)", label: "GCV-Public(17T-26T)" },
-    { value: "GCV-Public(26T-40T)", label: "GCV-Public(26T-40T)" },
-    { value: "GCV-Public(Above-40T)", label: "GCV-Public(Above-40T)" },
-    { value: "PCV-Route Bus", label: "PCV-Route Bus" },
-    { value: "PCV-Staff Bus", label: "PCV-Staff Bus" },
-    { value: "PCV-School Bus", label: "PCV-School Bus" },
-    { value: "Other", label: "Other" },
-    { value: "Misc-D", label: "Misc-D" }
-  ];
-
-  const miscVehicleOptions = [
-    { value: "Motor Trade Policy", label: "Motor Trade Policy" },
-    { value: "Agri Tractor", label: "Agri Tractor" },
-    { value: "Commercial Tractor", label: "Commercial Tractor" },
-    { value: "Misc and SP type of Vehicle", label: "Misc and SP type of Vehicle" },
-    { value: "Ambulance", label: "Ambulance" },
-    { value: "Other", label: "Other" }
-  ];
-
   const fuelTypeOptions = [
     { value: "Petrol", label: "Petrol" },
     { value: "Diesel", label: "Diesel" },
@@ -411,7 +390,6 @@ function PolicyCardView({
       rcDocument: null,
       previousPolicyDocument: null,
       surveyReport: null,
-      miscVehicleType: "",
     }
   }));
 
@@ -449,7 +427,6 @@ function PolicyCardView({
         rcDocument: null,
         previousPolicyDocument: null,
         surveyReport: null,
-        miscVehicleType: "",
       }
     }));
   }, [item?.id, initialPolicyNumber, initialInsuranceCompany, initialBranchAddress, initialProductType, initialVehicleCategory, initialInsuredName, initialPanNumber, initialGstin, initialContactNumber, initialEmail, initialInsuredAddress, initialPolicyDates, initialDateOfIssue, initialTotalValue, initialPreviousInsurer, initialPreviousPolicyNumber, initialFinalPremium, initialVehicle, extractedVehicle]);
@@ -471,7 +448,6 @@ function PolicyCardView({
     vehicle: {
       ...prev.vehicle,
       [field]: value,
-      ...(field === "commercialVehicleType" && value !== "Misc-D" ? { miscVehicleType: "" } : {}),
     }
   }));
 
@@ -491,17 +467,6 @@ function PolicyCardView({
       resolvedSetMotorErrors?.(motorValidationErrors);
       toast.error("Please fill in all Motor Entry dropdowns.");
       return;
-    }
-
-    if (formData.vehicleCategory === "Commercial Vehicle") {
-      if (!mergedVehicle.commercialVehicleType || mergedVehicle.commercialVehicleType === "") {
-        toast.error("Please select a Commercial Vehicle Type.");
-        return;
-      }
-      if (mergedVehicle.commercialVehicleType === "Misc-D" && !mergedVehicle.miscVehicleType) {
-        toast.error("Please select a Misc Vehicle Type.");
-        return;
-      }
     }
 
     const rawFile = item?.rawFile || null;
@@ -562,11 +527,8 @@ function PolicyCardView({
     variant: formData.vehicle.variant || extractedVehicle?.variant,
     manufacturingYear: formData.vehicle.manufacturingYear || extractedVehicle?.manufacturingYear,
     fuelType: formData.vehicle.fuelType || normalizeFuelType(extractedVehicle?.fuelType),
-    colour: formData.vehicle.colour || extractedVehicle?.colour,
     cubicCapacity: formData.vehicle.cubicCapacity || extractedVehicle?.cubicCapacity,
     seatingCapacity: formData.vehicle.seatingCapacity || extractedVehicle?.seatingCapacity,
-    commercialVehicleType: formData.vehicle.commercialVehicleType || extractedVehicle?.commercialVehicleType || "",
-    subType: extractedVehicle?.subType,
     financierName: extractedVehicle?.financierName,
     gvw: formData.vehicle.gvw || extractedVehicle?.gvw,
     aadhaarFront: formData.vehicle.aadhaarFront,
@@ -575,7 +537,11 @@ function PolicyCardView({
     rcDocument: formData.vehicle.rcDocument,
     previousPolicyDocument: formData.vehicle.previousPolicyDocument,
     surveyReport: formData.vehicle.surveyReport,
-    miscVehicleType: formData.vehicle.miscVehicleType || "",
+    ncb:
+      (formData.vehicle.ncb && formData.vehicle.ncb !== "-" ? formData.vehicle.ncb : "") ||
+      (extractedVehicle?.ncb && extractedVehicle.ncb !== "-" ? extractedVehicle.ncb : "") ||
+      extractNcb(item?.fullText || "") ||
+      "-",
   };
 
   const matchedPolicy = getPolicyCategory(formData.productType, "");
@@ -683,7 +649,7 @@ function PolicyCardView({
 
           {/* ===== VEHICLE DETAILS ===== */}
           <div className="bg-slate-50/20 border border-slate-100 rounded-2xl p-4 mb-5 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
-            <SectionHeader icon="🚗" title="VEHICLE DETAILS" color="red" />
+            <SectionHeader icon="🚗" title="VEHICLE DETAILS" color="light blue" />
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-2">
               <EditableRow label="Reg No" value={mergedVehicle.registrationNumber} onChange={(val) => handleVehicleChange("registrationNumber", val)} />
               <EditableRow label="Chassis No" value={mergedVehicle.chassisNumber} onChange={(val) => handleVehicleChange("chassisNumber", val)} />
@@ -709,26 +675,11 @@ function PolicyCardView({
                 <EditableRow label="GVW" value={mergedVehicle.gvw} onChange={(val) => handleVehicleChange("gvw", val)} />
               )}
 
-              {formData.vehicleCategory === "Commercial Vehicle" && (
-                <>
-                  <EditableRow
-                    label="Commercial Vehicle Type *"
-                    value={mergedVehicle.commercialVehicleType || ""}
-                    onChange={(val) => handleVehicleChange("commercialVehicleType", val)}
-                    type="select"
-                    options={commercialVehicleOptions}
-                  />
-                  {mergedVehicle.commercialVehicleType === "Misc-D" && (
-                    <EditableRow
-                      label="Misc Vehicle Type *"
-                      value={mergedVehicle.miscVehicleType || ""}
-                      onChange={(val) => handleVehicleChange("miscVehicleType", val)}
-                      type="select"
-                      options={miscVehicleOptions}
-                    />
-                  )}
-                </>
-              )}
+              <EditableRow
+                label="NCB"
+                value={mergedVehicle.ncb}
+                onChange={(val) => handleVehicleChange("ncb", val)}
+              />
 
               <div className="sm:col-span-2 md:col-span-3 lg:col-span-4 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2 text-[11px] font-semibold text-blue-700">
                 KYC required for every business type: Aadhaar front, Aadhaar back and PAN card.

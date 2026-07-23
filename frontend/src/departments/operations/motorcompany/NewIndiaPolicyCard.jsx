@@ -1,6 +1,5 @@
 // src/components/NewIndiaPolicyCard.jsx
 
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
@@ -10,37 +9,6 @@ import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
 const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
-
-const cleanValue = (value) => {
-  if (!value) return "-";
-  return String(value)
-    .replace(/\s+/g, " ")
-    .replace(/[\n\r]+/g, " ")
-    .trim();
-};
-
-const formatLabel = (key) => {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase());
-};
-
-const getPremiumValue = (value) => {
-  if (value === null || value === undefined || value === "" || value === "NA") {
-    return "0";
-  }
-  return String(value).replace(/,/g, "");
-};
-
-const copyText = async (text, setCopied) => {
-  try {
-    await navigator.clipboard.writeText(text || "");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  } catch (err) {
-    console.error(err);
-  }
 };
 
 // =======================================
@@ -58,17 +26,6 @@ const normalizeText = (text) => {
 // =======================================
 // FORMATTING FUNCTIONS (Combined & Reusable)
 // =======================================
-
-const cleanAlphaNumeric = (value, keepSpaces = false) => {
-  if (!value) return "-";
-  let cleaned = String(value)
-    .replace(/\r|\n/g, "")
-    .replace(/\s+/g, keepSpaces ? " " : "");
-  if (!keepSpaces) {
-    cleaned = cleaned.replace(/[^A-Z0-9]/gi, "");
-  }
-  return cleaned.toUpperCase().trim();
-};
 
 const formatEngineNumber = (engine = "", fullText = "") => {
   const cleanEngine = (value) => {
@@ -187,12 +144,6 @@ const formatVariantName = (variant) =>
   ]);
 
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i]);
-const formatCommercialVehicleType = (type) => formatGenericField(type, [/Sub Type/i]);
-const formatSubType = (subType) => formatGenericField(subType, [
-  /Name of the Financier/i, /Chassis no/i, /Type of fuel/i, /Cubic capacity/i,
-  /Type of body/i, /Gross Vehicle Weight/i, /Make\/Model/i, /Registration no/i,
-  /Seating capacity/i, /Variant/i, /Automobile Association/i, /Colour/i
-]);
 
 const formatFinancierName = (financier) => {
   if (!financier) return "-";
@@ -399,7 +350,7 @@ const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
     variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
-    colour: "-", cubicCapacity: "-", seatingCapacity: "-", financierName: "-", commercialVehicleType: "-", subType: "-"
+    cubicCapacity: "-", seatingCapacity: "-", financierName: "-", ncb: "-"
   };
   if (!text || typeof text !== "string") return result;
   const normalizedText = text.replace(/\r/g, "").replace(/[ \t]+/g, " ");
@@ -545,21 +496,6 @@ const extractVehicleDetailsFromText = (text = "") => {
   let gvwMatch = normalizedText.match(/Gross Vehicle Weight\s*\(GVW\)\s*[:\-]?\s*(\d+)/i);
   if (!gvwMatch) gvwMatch = normalizedText.match(/GVW\s*[:\-]?\s*(\d+)/i);
   if (gvwMatch?.[1]) result.gvw = gvwMatch[1];
-  let commercialTypeMatch = normalizedText.match(/Type of Commercial\s*Vehicles?\s*:\s*([^\n]+?)(?=Sub Type|$)/i);
-  if (!commercialTypeMatch) commercialTypeMatch = normalizedText.match(/Type of Commercial\s*Vehicles?\s*\n\s*([^\n]+?)(?=\s*Sub Type|$)/i);
-  if (!commercialTypeMatch) commercialTypeMatch = normalizedText.match(/Type of Commercial\s*Vehicles?\s*:\s*([A-Z\s\-]+)/i);
-  if (commercialTypeMatch?.[1]) {
-    result.commercialVehicleType = formatCommercialVehicleType(commercialTypeMatch[1].replace(/\n/g, " ").replace(/\s+/g, " ").replace(/Sub Type.*$/i, "").trim());
-  }
-  let subTypeMatch = normalizedText.match(/Sub Type\s*:\s*([^\n]+?)(?=Name of the Financier|Chassis no|Type of fuel|Cubic capacity|Type of body|Gross Vehicle Weight|Make\/Model|Registration no|Seating capacity|Variant|$)/i);
-  if (!subTypeMatch) subTypeMatch = normalizedText.match(/Sub Type\s*:\s*([^\n]+)/i);
-  if (!subTypeMatch) {
-    const combinedMatch2 = normalizedText.match(/Type of Commercial\s*Vehicles?\s*:\s*[^\n]+Sub Type\s*:\s*([^\n]+)/i);
-    if (combinedMatch2?.[1]) subTypeMatch = combinedMatch2;
-  }
-  if (subTypeMatch?.[1]) {
-    result.subType = formatSubType(subTypeMatch[1].replace(/\n/g, " ").replace(/\s+/g, " ").replace(/Name of the Financier.*$/i, "").replace(/Chassis no.*$/i, "").replace(/Type of fuel.*$/i, "").trim());
-  }
   let finMatch = normalizedText.match(/Geographical Area\s*\/\s*Zone[^\n]*\n\s*Name of the Financier\s*:\s*([^\n]+)/i);
   if (!finMatch) finMatch = normalizedText.match(/Name of the Financier\s*:\s*([^\n]+?)(?=\s*Cover Note No|\s*Automobile Association|\s*Chassis\s*no\.|$)/i);
   if (!finMatch) finMatch = normalizedText.match(/Name of the Financier\s+([A-Z\s]+(?:LTD\.?|LTD)?)/i);
@@ -608,6 +544,11 @@ const extractVehicleDetailsFromText = (text = "") => {
   }
   // ============================================================
 
+  const ncbMatch = text.match(/No\s+Claim\s+Bonus\s*[:]?\s*[-]?\s*(\d+%)/i);
+  if (ncbMatch) {
+    result.ncb = ncbMatch[1];
+  }
+
   return result;
 };
 
@@ -615,30 +556,11 @@ const extractVehicleDetailsFromText = (text = "") => {
 // UI COMPONENTS
 // =======================================
 
-const CompactDetailRow = ({ label, value, highlight = false }) => (
-  <div className={`flex justify-between items-start py-1.5 border-b border-gray-100 last:border-0 ${highlight ? 'bg-blue-50 -mx-2 px-2 rounded-lg' : ''}`}>
-    <span className="text-xs font-medium text-gray-500">{label}</span>
-    <span className="text-xs text-gray-800 font-medium text-right break-words max-w-[60%]">{value || "-"}</span>
-  </div>
-);
-
-const SectionHeader = ({ icon, title, color }) => {
-  const colors = { blue: "bg-blue-500", green: "bg-green-500", red: "bg-red-500", purple: "bg-purple-500", orange: "bg-orange-500", teal: "bg-teal-500" };
-  return (
-    <div className={`${colors[color]} text-white px-3 py-1.5 rounded-lg flex items-center gap-2 mb-3`}>
-      <span className="text-sm">{icon}</span>
-      <h4 className="text-xs font-semibold tracking-wide">{title}</h4>
-    </div>
-  );
-};
-
 // =======================================
 // MAIN COMPONENT
 // =======================================
 
 function NewIndiaPolicyCard({ item }) {
-  const [copied, setCopied] = useState(false);
-  
   const insured = item?.insuredDetails || {};
   const policy = item?.policyDetails || {};
   const vehicle = item?.vehicleDetails || {};

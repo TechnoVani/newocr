@@ -1,6 +1,5 @@
 // src/components/OrientalPolicyCard.jsx
 
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
@@ -357,7 +356,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    colour: "-",
+    ncb: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
     geographicalArea: "-",

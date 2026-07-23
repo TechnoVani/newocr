@@ -17,50 +17,53 @@
 //   text,
 //   keywords,
 //   fallback,
-//   wordCounts = [20, 50, 100, 150, 200, 500, 1000, 2000, 3000]
+//   wordCounts = [20, 50, 100, 150, 200, 500, 1000, 2000, 3000],
+//   parseSnippet = null
 // ) => {
 //   if (!text) return fallback;
 
+//   let progressiveResult = fallback;
+
 //   for (const count of wordCounts) {
 //     const snippet = getFirstNWords(text, count).toLowerCase();
+//     if (parseSnippet) {
+//       const parsed = parseSnippet(snippet);
+//       if (parsed) progressiveResult = parsed;
+//       continue;
+//     }
+
 //     for (const keyword of keywords) {
 //       if (snippet.includes(keyword.toLowerCase())) {
 //         return keyword;
 //       }
 //     }
 //   }
-//   return fallback;
+
+//   return progressiveResult;
 // };
 
 // // =======================================
-// // Helper: Directly parse common patterns from the policy type string
+// // Helper: Parsing patterns (Fallback mechanism)
 // // =======================================
 // const parseFromPolicyType = (policyType) => {
+//   if (!policyType) return null;
+
 //   const lower = policyType.toLowerCase();
   
-//   // Product type patterns - ORDERED BY SPECIFICITY
 //   if (lower.includes("bundled") || lower.includes("new vehicle")) return "Bundled Policy";
-//   if (lower.includes("standalone") || lower.includes("stand-alone")) return "Standalone OD Policy";
+//   if (lower.includes("standalone") || lower.includes("stand-alone") || lower.includes("STAND-ALONE")) return "Standalone OD Policy";
 //   if (lower.includes("package") || lower.includes("comprehensive")) return "Package Policy";
 //   if (lower.includes("liability only") || lower.includes("act policy")) return "Liability Policy";
   
-//   // Generic fallbacks (Checked last so they don't override specific terms)
 //   if (lower.includes("own damage") && lower.includes("third party")) return "Bundled Policy";
 //   if (lower.includes("own damage")) return "Standalone OD Policy";
 //   if (lower.includes("third party") || lower.includes("liability")) return "Liability Policy";
 
-//   // Vehicle category patterns
-//   if (lower.includes("private car")) return "Private Car";
-//   if (lower.includes("two wheeler") || lower.includes("bike") || lower.includes("motorcycle"))
-//     return "Two Wheeler";
-//   if (lower.includes("commercial") || lower.includes("goods carrying") || lower.includes("truck") || lower.includes("carrying passengers"))
-//     return "Commercial Vehicle";
-    
 //   return null;
 // };
 
 // // =======================================
-// // Product Type (UPDATED WITH EXPLICIT TITLE CHECKS)
+// // Product Type (PROGRESSIVE WORD-COUNT FIRST)
 // // =======================================
 
 // export const getProductType = (policyType = "", fullText = "") => {
@@ -68,71 +71,45 @@
 
 //   const combinedText = `${policyType} \n ${fullText}`.toLowerCase();
 
-//   // 1. EXPLICIT DOCUMENT TITLES (Highest Priority)
-//   // If the document explicitly states its type in the schedule title, trust it immediately.
-//   if (
-//     combinedText.includes("stand-alone own damage") ||
-//     combinedText.includes("standalone own damage") ||
-//     combinedText.includes("stand alone own damage")
-//   ) {
-//     return "Standalone OD Policy";
-//   }
+//   // 1. PARSE EACH PROGRESSIVELY LARGER WORD WINDOW.
+//   // Do not stop at the first partial match: a later window may turn
+//   // "own damage" into the more accurate bundled-policy combination.
+//   const progressivelyParsed = detectWithProgressiveWords(
+//     combinedText,
+//     [],
+//     null,
+//     undefined,
+//     parseFromPolicyType
+//   );
 
-//   // ---> NEW LOGIC: Checks for "New Vehicle" or "Bundled"
-//   if (combinedText.includes("bundled") || combinedText.includes("new vehicle")) {
-//     return "Bundled Policy";
-//   }
+//   if (progressivelyParsed) return progressivelyParsed;
 
-//   if (combinedText.includes("package policy") || combinedText.includes("comprehensive package")) {
-//     return "Package Policy";
-//   }
-
-//   if (combinedText.includes("liability only") || combinedText.includes("act policy")) {
-//     return "Liability Policy";
-//   }
-
-//   // 2. CONTEXTUAL INFERENCE (Fallback)
-//   // If no explicit title is found, but it mentions BOTH "Own Damage" and "Third Party" coverages.
-//   if (combinedText.includes("own damage") && combinedText.includes("third party")) {
-//     // If it mentions "package" or "comprehensive", keep it as Package Policy
-//     if (combinedText.includes("package") || combinedText.includes("comprehensive")) {
-//       return "Package Policy";
-//     }
-//     // Otherwise, assume it's a Bundled Policy
-//     return "Bundled Policy";
-//   }
-
-//   // 3. FIRST MATCH WINS (Lowest Priority Fallback)
-//   // Keyword mapping for Product Types
+//   // 2. DEFINE PRODUCT MAPPING FOR KEYWORD FALLBACK
 //   const productMap = {
-//     "Standalone OD Policy": ["standalone", "stand-alone", "stand alone", "own damage"],
+//     "Standalone OD Policy": ["stand-alone own damage", "standalone", "stand-alone", "stand alone", "own damage"],
+//     "Bundled Policy": ["bundled", "new vehicle"],
 //     "Package Policy": ["package", "comprehensive"],
-//     "Liability Policy": ["third party liability", "third party", "liability"],
+//     "Liability Policy": ["liability only", "act policy", "third party liability", "third party", "liability"],
 //   };
 
-//   let earliestIndex = Infinity;
-//   let matchedType = null;
+//   // Flatten keywords for the detector
+//   const allKeywords = Object.values(productMap).flat();
 
-//   // Scan the entire text and find which keyword appears FIRST (lowest index)
-//   for (const [type, keywords] of Object.entries(productMap)) {
-//     for (const keyword of keywords) {
-//       const index = combinedText.indexOf(keyword.toLowerCase());
-      
-//       // If the keyword is found AND it appears earlier than the previous best match
-//       if (index !== -1 && index < earliestIndex) {
-//         earliestIndex = index;
-//         matchedType = type;
+//   // 3. RUN PROGRESSIVE KEYWORD DETECTION
+//   const matchedKeyword = detectWithProgressiveWords(combinedText, allKeywords, null);
+
+//   if (matchedKeyword) {
+//     // Find the category that contains this keyword
+//     for (const [category, keywords] of Object.entries(productMap)) {
+//       if (keywords.includes(matchedKeyword.toLowerCase())) {
+//         return category;
 //       }
 //     }
 //   }
 
-//   if (matchedType) return matchedType;
-
-//   // Fallback to strict policyType parsing if no keywords are found in the text
+//   // 4. FINAL FALLBACK
 //   const parsed = parseFromPolicyType(policyType);
-//   if (parsed && Object.keys(productMap).includes(parsed)) {
-//     return parsed;
-//   }
+//   if (parsed) return parsed;
 
 //   return policyType || "-";
 // };
@@ -158,71 +135,49 @@
 // // Vehicle Category
 // // =======================================
 
-// export const getVehicleCategory = (policyType = "", vehicleType = "", fullText = "") => {
-//   if (!fullText && !vehicleType && !policyType) return "-";
+// export const getVehicleCategory = (policyType = "", fullText = "") => {
+//   if (!fullText && !policyType) return "-";
 
-//   // Build keyword-to-category mapping
 //   const categoryMap = {
 //     "Private Car": ["private car", "private vehicle"],
 //     "Two Wheeler": [
-//       "two wheeler",
-//       "bike",
-//       "motorcycle",
-//       "scooter",
-//       "two- wheeler",
-//       "two - wheeler",
-//       "two-wheeler",
+//       "two wheeler", "bike", "motorcycle", "scooter", 
+//       "two- wheeler", "two - wheeler", "two-wheeler"
 //     ],
 //     "Commercial Vehicle": [
-//       "commercial",
-//       "goods carrying",
-//       "commercial vehicles",
-//       "truck",
-//       "bus",
-//       "taxi",
-//       "carrying passengers",
-//       "three wheelers"
+//       "commercial", "goods carrying", "commercial vehicles", 
+//       "truck", "bus", "taxi", "carrying passengers", "three wheelers"
 //     ],
 //   };
 
-//   // Combine all sources
-//   const combinedText = `${policyType} ${vehicleType} ${fullText}`;
+//   const combinedText = `${policyType} ${fullText}`;
 
-//   // Progressive detection
-//   let matchedCategory = null;
+//   // Use the progressive detector
 //   const allKeywords = Object.values(categoryMap).flat();
 //   const matchedKeyword = detectWithProgressiveWords(combinedText, allKeywords, null);
   
 //   if (matchedKeyword) {
 //     for (const [category, keywords] of Object.entries(categoryMap)) {
-//       if (keywords.some((k) => k.toLowerCase() === matchedKeyword.toLowerCase())) {
-//         matchedCategory = category;
-//         break;
+//       if (keywords.includes(matchedKeyword.toLowerCase())) {
+//         return category;
 //       }
 //     }
 //   }
 
-//   // If still no match, try parsing the policyType directly
-//   if (!matchedCategory) {
-//     const parsed = parseFromPolicyType(policyType);
-//     if (parsed && Object.keys(categoryMap).includes(parsed)) {
-//       matchedCategory = parsed;
-//     } else {
-//       const lower = policyType.toLowerCase();
-//       if (lower.includes("private car")) matchedCategory = "Private Car";
-//       else if (lower.includes("two wheeler") || lower.includes("bike")) matchedCategory = "Two Wheeler";
-//       else if (lower.includes("commercial") || lower.includes("goods carrying")) matchedCategory = "Commercial Vehicle";
-//     }
+//   // Fallback to strict policyType parsing
+//   const parsed = parseFromPolicyType(policyType);
+//   if (parsed && ["Private Car", "Two Wheeler", "Commercial Vehicle"].includes(parsed)) {
+//     return parsed;
 //   }
 
-//   return matchedCategory || "-";
+//   return "-";
 // };
 
 // /**
 //  * Component that displays the vehicle category as a chip.
 //  */
-// export const VehicleCategory = ({ policyType, vehicleType, fullText, chipProps = {} }) => {
-//   const category = getVehicleCategory(policyType, vehicleType, fullText);
+// export const VehicleCategory = ({ policyType, fullText, chipProps = {} }) => {
+//   const category = getVehicleCategory(policyType, fullText);
 //   return (
 //     <Chip
 //       label={category}
@@ -235,106 +190,237 @@
 //   );
 // };
 
-// // Default export of both (optional)
 // export default { ProductType, VehicleCategory, getProductType, getVehicleCategory };
 
+
 // src/components/PolicyClassification.jsx
+
 import { Chip } from "@mui/material";
 
 // =======================================
 // Helper: Extract first N words
 // =======================================
-const getFirstNWords = (text, wordCount) => {
+const getFirstNWords = (text = "", wordCount = 20) => {
   if (!text) return "";
-  const words = text.trim().split(/\s+/);
-  return words.slice(0, wordCount).join(" ");
+
+  return String(text)
+    .trim()
+    .split(/\s+/)
+    .slice(0, wordCount)
+    .join(" ");
 };
 
 // =======================================
-// Helper: Progressive detection (Checks up to 3000 words)
+// Helper: Progressive detection
+// Checks 20 words first, then 50, 100, etc.
+// Returns immediately when the first match is found.
 // =======================================
 const detectWithProgressiveWords = (
   text,
-  keywords,
-  fallback,
-  wordCounts = [20, 50, 100, 150, 200, 500, 1000, 2000, 3000]
+  keywords = [],
+  fallback = null,
+  wordCounts = [20, 50, 100, 150, 200, 500, 1000, 2000, 3000],
+  parseSnippet = null
 ) => {
   if (!text) return fallback;
 
   for (const count of wordCounts) {
     const snippet = getFirstNWords(text, count).toLowerCase();
+
+    // Custom parsing logic
+    if (typeof parseSnippet === "function") {
+      const parsedResult = parseSnippet(snippet);
+
+      // Important: return first detected result immediately
+      if (parsedResult) {
+        return parsedResult;
+      }
+
+      continue;
+    }
+
+    // Keyword detection
     for (const keyword of keywords) {
-      // Direct check: If snippet contains the keyword, return it
-      if (snippet.includes(keyword.toLowerCase())) {
+      if (snippet.includes(String(keyword).toLowerCase())) {
         return keyword;
       }
     }
   }
+
   return fallback;
 };
 
 // =======================================
-// Helper: Parsing patterns (Fallback mechanism)
+// Helper: Product Type Parsing
+// Priority order is important.
 // =======================================
-const parseFromPolicyType = (policyType) => {
-  const lower = policyType.toLowerCase();
-  
-  if (lower.includes("bundled") || lower.includes("new vehicle")) return "Bundled Policy";
-  if (lower.includes("standalone") || lower.includes("stand-alone")) return "Standalone OD Policy";
-  if (lower.includes("package") || lower.includes("comprehensive")) return "Package Policy";
-  if (lower.includes("liability only") || lower.includes("act policy")) return "Liability Policy";
-  
-  if (lower.includes("own damage") && lower.includes("third party")) return "Bundled Policy";
-  if (lower.includes("own damage")) return "Standalone OD Policy";
-  if (lower.includes("third party") || lower.includes("liability")) return "Liability Policy";
+const parseFromPolicyType = (policyType = "") => {
+  if (!policyType) return null;
+
+  const lower = String(policyType)
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 1. Standalone must be checked first.
+  // This prevents later "third party" wording from changing it to Bundled.
+  if (
+    lower.includes("standalone") ||
+    lower.includes("stand-alone") ||
+    lower.includes("stand alone") ||
+    lower.includes("stand-alone own damage") ||
+    lower.includes("standalone own damage") ||
+    lower.includes("stand alone own damage")
+  ) {
+    return "Standalone OD Policy";
+  }
+
+  // 2. Explicit bundled wording
+  if (
+    lower.includes("bundled policy") ||
+    lower.includes("bundled") ||
+    lower.includes("new vehicle")
+  ) {
+    return "Bundled Policy";
+  }
+
+  // 3. Package policy
+  if (
+    lower.includes("package policy") ||
+    lower.includes("package") ||
+    lower.includes("comprehensive")
+  ) {
+    return "Package Policy";
+  }
+
+  // 4. Liability policy
+  if (
+    lower.includes("liability only") ||
+    lower.includes("act policy") ||
+    lower.includes("third party liability only")
+  ) {
+    return "Liability Policy";
+  }
+
+  /*
+   * Generic checks are kept after explicit policy names.
+   *
+   * Do not classify as Bundled only because both "own damage"
+   * and "third party" occur somewhere in a large policy document.
+   * Standalone OD policies can also mention third-party cover.
+   */
+  if (
+    lower.includes("own damage") &&
+    !lower.includes("third party")
+  ) {
+    return "Standalone OD Policy";
+  }
+
+  if (
+    lower.includes("third party") ||
+    lower.includes("liability")
+  ) {
+    return "Liability Policy";
+  }
 
   return null;
 };
 
 // =======================================
-// Product Type (PROGRESSIVE WORD-COUNT FIRST)
+// Product Type
 // =======================================
-
 export const getProductType = (policyType = "", fullText = "") => {
-  if (!fullText && !policyType) return "-";
+  if (!policyType && !fullText) return "-";
 
-  const combinedText = `${policyType} \n ${fullText}`.toLowerCase();
+  /*
+   * Keep policyType first because it is normally a smaller and more
+   * reliable source than the complete policy PDF text.
+   */
+  const combinedText = `${policyType}\n${fullText}`;
 
-  // 1. DEFINE PRODUCT MAPPING FOR PROGRESSIVE SEARCH
+  // 1. Check each word window progressively.
+  // First detected result wins.
+  const progressivelyParsed = detectWithProgressiveWords(
+    combinedText,
+    [],
+    null,
+    [20, 50, 100, 150, 200, 500, 1000, 2000, 3000],
+    parseFromPolicyType
+  );
+
+  if (progressivelyParsed) {
+    return progressivelyParsed;
+  }
+
+  // 2. Keyword fallback with priority order
   const productMap = {
-    "Standalone OD Policy": ["stand-alone own damage", "standalone", "stand-alone", "stand alone", "own damage"],
-    "Bundled Policy": ["bundled", "new vehicle"],
-    "Package Policy": ["package", "comprehensive"],
-    "Liability Policy": ["liability only", "act policy", "third party liability", "third party", "liability"],
+    "Standalone OD Policy": [
+      "stand-alone own damage",
+      "standalone own damage",
+      "stand alone own damage",
+      "stand-alone",
+      "standalone",
+      "stand alone"
+    ],
+
+    "Bundled Policy": [
+      "bundled policy",
+      "bundled",
+      "new vehicle"
+    ],
+
+    "Package Policy": [
+      "package policy",
+      "package",
+      "comprehensive"
+    ],
+
+    "Liability Policy": [
+      "liability only",
+      "act policy",
+      "third party liability only",
+      "third party liability"
+    ]
   };
 
-  // Flatten keywords for the detector
-  const allKeywords = Object.values(productMap).flat();
+  /*
+   * Search category by category instead of flattening everything.
+   * This keeps the priority:
+   * Standalone → Bundled → Package → Liability
+   */
+  for (const [category, keywords] of Object.entries(productMap)) {
+    const matchedKeyword = detectWithProgressiveWords(
+      combinedText,
+      keywords,
+      null
+    );
 
-  // 2. RUN PROGRESSIVE DETECTION (Checks 20 words, then 50, etc.)
-  const matchedKeyword = detectWithProgressiveWords(combinedText, allKeywords, null);
-
-  if (matchedKeyword) {
-    // Find the category that contains this keyword
-    for (const [category, keywords] of Object.entries(productMap)) {
-      if (keywords.includes(matchedKeyword.toLowerCase())) {
-        return category;
-      }
+    if (matchedKeyword) {
+      return category;
     }
   }
 
-  // 3. FALLBACK: If nothing found in the first 3000 words, use the standard parser
-  const parsed = parseFromPolicyType(policyType);
-  if (parsed) return parsed;
+  // 3. Parse only the supplied policyType as final fallback
+  const parsedPolicyType = parseFromPolicyType(policyType);
+
+  if (parsedPolicyType) {
+    return parsedPolicyType;
+  }
 
   return policyType || "-";
 };
 
 /**
- * Component that displays the product type as a chip.
+ * Component that displays the product type.
  */
-export const ProductType = ({ policyType, fullText, chipProps = {} }) => {
+export const ProductType = ({
+  policyType,
+  fullText,
+  chipProps = {}
+}) => {
   const productType = getProductType(policyType, fullText);
+
   return (
     <Chip
       label={productType}
@@ -350,50 +436,73 @@ export const ProductType = ({ policyType, fullText, chipProps = {} }) => {
 // =======================================
 // Vehicle Category
 // =======================================
-
-export const getVehicleCategory = (policyType = "", fullText = "") => {
-  if (!fullText && !policyType) return "-";
+export const getVehicleCategory = (
+  policyType = "",
+  fullText = ""
+) => {
+  if (!policyType && !fullText) return "-";
 
   const categoryMap = {
-    "Private Car": ["private car", "private vehicle"],
+    "Private Car": [
+      "private car",
+      "private vehicle"
+    ],
+
     "Two Wheeler": [
-      "two wheeler", "bike", "motorcycle", "scooter", 
-      "two- wheeler", "two - wheeler", "two-wheeler"
+      "two wheeler",
+      "two-wheeler",
+      "two- wheeler",
+      "two - wheeler",
+      "bike",
+      "motorcycle",
+      "scooter"
     ],
+
     "Commercial Vehicle": [
-      "commercial", "goods carrying", "commercial vehicles", 
-      "truck", "bus", "taxi", "carrying passengers", "three wheelers"
-    ],
+      "commercial vehicle",
+      "commercial vehicles",
+      "commercial",
+      "goods carrying",
+      "truck",
+      "bus",
+      "taxi",
+      "carrying passengers",
+      "three wheeler",
+      "three wheelers"
+    ]
   };
 
-  const combinedText = `${policyType} ${fullText}`;
+  const combinedText = `${policyType}\n${fullText}`;
 
-  // Use the progressive detector
-  const allKeywords = Object.values(categoryMap).flat();
-  const matchedKeyword = detectWithProgressiveWords(combinedText, allKeywords, null);
-  
-  if (matchedKeyword) {
-    for (const [category, keywords] of Object.entries(categoryMap)) {
-      if (keywords.includes(matchedKeyword.toLowerCase())) {
-        return category;
-      }
+  /*
+   * Check categories separately so an early and higher-priority
+   * category match is returned correctly.
+   */
+  for (const [category, keywords] of Object.entries(categoryMap)) {
+    const matchedKeyword = detectWithProgressiveWords(
+      combinedText,
+      keywords,
+      null
+    );
+
+    if (matchedKeyword) {
+      return category;
     }
-  }
-
-  // Fallback to strict policyType parsing
-  const parsed = parseFromPolicyType(policyType);
-  if (parsed && ["Private Car", "Two Wheeler", "Commercial Vehicle"].includes(parsed)) {
-    return parsed;
   }
 
   return "-";
 };
 
 /**
- * Component that displays the vehicle category as a chip.
+ * Component that displays the vehicle category.
  */
-export const VehicleCategory = ({ policyType, fullText, chipProps = {} }) => {
+export const VehicleCategory = ({
+  policyType,
+  fullText,
+  chipProps = {}
+}) => {
   const category = getVehicleCategory(policyType, fullText);
+
   return (
     <Chip
       label={category}
@@ -406,4 +515,9 @@ export const VehicleCategory = ({ policyType, fullText, chipProps = {} }) => {
   );
 };
 
-export default { ProductType, VehicleCategory, getProductType, getVehicleCategory };
+export default {
+  ProductType,
+  VehicleCategory,
+  getProductType,
+  getVehicleCategory
+};
