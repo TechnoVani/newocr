@@ -1,5 +1,4 @@
 // src/components/GoDigitPolicyCard.jsx
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 
 // Helper: Extract first N words
@@ -93,41 +92,12 @@ export const getVehicleCategory = (policyType = "", fullText = "") => {
   return matchedCategory || "-";
 };
 
-const cleanValue = (value) => {
-  if (!value) return "-";
-  return String(value)
-    .replace(/\s+/g, " ")
-    .replace(/[\n\r]+/g, " ")
-    .trim();
-};
-
 const normalizeText = (text) => {
   if (!text) return "";
   return text
     .replace(/\r/g, "\n")
     .replace(/\t/g, " ")
     .replace(/[ ]{2,}/g, " ");
-};
-
-// ----- Formatting -----
-const formatEngineNumber = (engine = "", fullText = "") => {
-  if (!engine && !fullText) return "-";
-  const value = engine || fullText;
-  const cleaned = String(value)
-    .replace(/[^A-Z0-9]/gi, "")
-    .toUpperCase()
-    .trim();
-  return cleaned || "-";
-};
-
-const formatChassisNumber = (chassis = "", fullText = "") => {
-  if (!chassis && !fullText) return "-";
-  const value = chassis || fullText;
-  const cleaned = String(value)
-    .replace(/[^A-Z0-9]/gi, "")
-    .toUpperCase()
-    .trim();
-  return cleaned || "-";
 };
 
 // ----- Extraction functions -----
@@ -768,14 +738,6 @@ const extractPreviousInsurer = (text = "") => {
   return "-";
 };
 
-const normalizeInsurer = (value = "") => {
-  return value
-    .replace(/\s{2,}/g, " ")
-    .replace(/\bLtd\.?\b/i, "Limited")
-    .replace(/\.$/, "")
-    .trim();
-};
-
 const formatFinancierName = (financier = "") => {
   if (!financier) return "-";
   const match = String(financier).match(
@@ -803,13 +765,11 @@ const extractVehicleDetailsFromText = (text = "") => {
     variant: "-",
     manufacturingYear: "-",
     fuelType: "-",
-    colour: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
     financierName: "-",
-    commercialVehicleType: "-",
-    subType: "-",
-    gvw: "-"
+    gvw: "-",
+    ncb: "-"
   };
   if (!text) return result;
 
@@ -885,6 +845,11 @@ const extractVehicleDetailsFromText = (text = "") => {
   if (financierMatch && financierMatch[1]) {
     const raw = financierMatch[1].trim();
     result.financierName = formatFinancierName(raw);
+  }
+
+  const ncbMatch = text.match(/No\s+Claim\s+Bonus\s*[:]?\s*[-]?\s*(\d+%)/i);
+  if (ncbMatch) {
+    result.ncb = ncbMatch[1];
   }
 
   return result;
@@ -974,11 +939,9 @@ function GoDigitPolicyCard({ item }) {
     cubicCapacity: extractedVehicle.cubicCapacity !== "-" ? extractedVehicle.cubicCapacity : item?.vehicleDetails?.cubicCapacity,
     seatingCapacity: extractedVehicle.seatingCapacity !== "-" ? extractedVehicle.seatingCapacity : item?.vehicleDetails?.seatingCapacity,
     fuelType: extractedVehicle.fuelType !== "-" ? extractedVehicle.fuelType : item?.vehicleDetails?.fuelType,
-    colour: extractedVehicle.colour !== "-" ? extractedVehicle.colour : item?.vehicleDetails?.colour,
     financierName: extractedVehicle.financierName !== "-" ? extractedVehicle.financierName : item?.vehicleDetails?.financierName,
-    commercialVehicleType: extractedVehicle.commercialVehicleType !== "-" ? extractedVehicle.commercialVehicleType : item?.vehicleDetails?.commercialVehicleType,
-    subType: extractedVehicle.subType !== "-" ? extractedVehicle.subType : item?.vehicleDetails?.subType,
     gvw: extractedVehicle.gvw !== "-" ? extractedVehicle.gvw : item?.vehicleDetails?.gvw,
+    ncb: extractedVehicle.ncb !== "-" ? extractedVehicle.ncb : item?.vehicleDetails?.ncb,
   };
 
   const sanitizedPolicyDates = {
@@ -996,13 +959,11 @@ function GoDigitPolicyCard({ item }) {
     variant: sanitizeValue(extractedVehicle.variant),
     manufacturingYear: sanitizeValue(extractedVehicle.manufacturingYear),
     fuelType: sanitizeValue(extractedVehicle.fuelType),
-    colour: sanitizeValue(extractedVehicle.colour),
     cubicCapacity: sanitizeValue(extractedVehicle.cubicCapacity),
     seatingCapacity: sanitizeValue(extractedVehicle.seatingCapacity),
-    commercialVehicleType: sanitizeValue(extractedVehicle.commercialVehicleType),
-    subType: sanitizeValue(extractedVehicle.subType),
     financierName: sanitizeValue(extractedVehicle.financierName),
     gvw: sanitizeValue(extractedVehicle.gvw),
+    ncb: sanitizeValue(extractedVehicle.ncb),
   };
 
   return (

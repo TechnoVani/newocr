@@ -1,6 +1,5 @@
 // src/components/UnitedPolicyCard.jsx
 
-import { useState } from "react";
 import PolicyCardView from "./PolicyCardView";
 import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
@@ -10,27 +9,6 @@ import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
 const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
-
-const cleanValue = (value) => {
-  if (!value) return "-";
-  return String(value)
-    .replace(/\s+/g, " ")
-    .replace(/[\n\r]+/g, " ")
-    .trim();
-};
-
-const formatLabel = (key) => {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase());
-};
-
-const getPremiumValue = (value) => {
-  if (value === null || value === undefined || value === "" || value === "NA") {
-    return "0";
-  }
-  return String(value).replace(/,/g, "");
 };
 
 const formatEngineNumber = (engine = "", fullText = "") => {
@@ -423,9 +401,6 @@ const extractPremiumData = (text) => {
 
   const normalized = text.replace(/\r/g, "\n").replace(/\t/g, " ").replace(/[ ]+/g, " ");
   const cleanAmount = (val) => val ? val.replace(/,/g, "").trim() : "-";
-  // Allow numbers with commas and optional decimal (e.g., 4,801.00)
-  const numberPattern = /([\d,]+(?:\.\d{2})?)/;
-  
   const extract = (patterns) => {
     for (const p of patterns) {
       const m = normalized.match(p);
@@ -434,7 +409,6 @@ const extractPremiumData = (text) => {
     return "-";
   };
 
-  const isPackage = normalized.includes("PACKAGE POLICY") || (normalized.includes("Basic premium on Vehicle") && normalized.includes("SCHEDULE OF PREMIUM"));
   const isLiability = normalized.includes("LIABILITY ONLY") || normalized.includes("THIRD PARTY");
 
   // OD Premium (0 for liability policies)
@@ -497,7 +471,7 @@ const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
     variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
-    colour: "-", cubicCapacity: "-", seatingCapacity: "-", financierName: "-"
+    cubicCapacity: "-", seatingCapacity: "-", financierName: "-", ncb: "-"
   };
   if (!text || typeof text !== "string") return result;
 
@@ -783,8 +757,6 @@ const extractVehicleDetailsFromText = (text = "") => {
 // =======================================
 
 function UnitedPolicyCard({ item }) {
-  const [copied, setCopied] = useState(false);
-  
   const insured = item?.insuredDetails || {};
   const policy = item?.policyDetails || {};
   const vehicle = item?.vehicleDetails || {};

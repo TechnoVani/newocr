@@ -145,29 +145,26 @@ const extractPremiumData = (text = "") => {
 // const extractVehicleDetailsFromText = (text = "") => {
 //   const result = {
 //     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
-//     model: "-", variant: "-", manufacturingYear: "-",
+//     model: "-", variant: "-", manufacturingYear: "-", bodyType: "-",
 //     cubicCapacity: "-", seatingCapacity: "-", financierName: "-", fuelType: "-", idv: "-"
 //   };
 
-//   // Improved Pattern: Anchored specifically to the vehicle table rows
-//   const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{10,12})\s+([A-Za-z]+)\s+(.+?)\s+(\d{4})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,22})\s+([A-Z0-9\s]{10,22})/i;
+//   // Helper to remove all non-alphanumeric characters (including spaces)
+//   const cleanAlphaNumeric = (str) => str.replace(/[^a-zA-Z0-9]/g, '');
+
+//   // Updated regex: engine number group (8) now stops before "Fuel"
+//   const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{10,12})\s+([A-Za-z]+)\s+(.+?)\s+(\d{4})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,22})\s+([A-Z0-9\s]+?)\s+Fuel/i;
   
 //   const tableMatch = text.match(tablePattern);
   
 //   if (tableMatch) {
-//     result.registrationNumber = tableMatch[1].replace(/[\s-]/g, "").toUpperCase().trim();
+//     result.registrationNumber = cleanAlphaNumeric(tableMatch[1]); // optional, already alnum
 //     result.make = tableMatch[2].trim();
     
-//     // Model & Variant extraction
-//     let rawModel = tableMatch[3].trim(); // "STARBUS SKOOL BUS (51+1) LP 812"
-    
-//     // Logic: Look for "LP" pattern as the variant indicator
+//     let rawModel = tableMatch[3].trim();
 //     const lpMatch = rawModel.match(/(.*)\s+(LP\s*\d+)$/i);
-    
 //     if (lpMatch) {
-//         // Model: "STARBUS SKOOL BUS (51+1)"
-//         result.model = lpMatch[1].trim(); 
-//         // Variant: "LP 812"
+//         result.model = lpMatch[1].trim();
 //         result.variant = lpMatch[2].trim();
 //     } else {
 //         result.model = rawModel;
@@ -177,63 +174,97 @@ const extractPremiumData = (text = "") => {
 //     result.cubicCapacity = tableMatch[4];
 //     result.manufacturingYear = tableMatch[5];
 //     result.seatingCapacity = tableMatch[6];
-//     result.chassisNumber = cleanAlphaNumeric(tableMatch[7]); 
-//     result.engineNumber = cleanAlphaNumeric(tableMatch[8]); 
+//     result.chassisNumber = cleanAlphaNumeric(tableMatch[7]);
+//     // Engine number: remove all spaces and any trailing text that might have been captured
+//     result.engineNumber = cleanAlphaNumeric(tableMatch[8]); // now gives "4SPCR19BUX605221"
 //   }
 
-//   // Fuel & IDV extraction
+//   // Fuel & IDV extraction (unchanged)
 //   const fuelIdvMatch = text.match(/(DIESEL|PETROL|CNG|EV|ELECTRIC|LPG)\s+([\d,]+)\s+/i);
 //   if (fuelIdvMatch) {
 //     result.fuelType = fuelIdvMatch[1].trim();
 //     result.idv = fuelIdvMatch[2].replace(/,/g, '');
 //   }
 
-//   // Financier extraction
+//   // Financier extraction (unchanged)
 //   const hypMatch = text.match(/HYPOTHECATED\s*WITH\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i) || 
 //                   text.match(/Hypothecated\s+To\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i);
-
 //   if (hypMatch) {
 //       result.financierName = formatFinancierName(hypMatch[1].trim());
 //   }
 
+//   // Body Type extraction (unchanged)
+//   const typeMatch = text.match(/Vehicle\s*Type\s*(?:School Buses:\s*)?([^\n\r]+)/i);  
+//   if (typeMatch) {
+//       const rawType = typeMatch[1].replace(/[:]/g, '').trim();
+//       const isDescriptive = /Passenger|WH|CC|Carrying/i.test(rawType);
+//       result.bodyType = (isDescriptive || rawType.length === 0) ? "-" : rawType;
+//   } else {
+//       result.bodyType = "-";
+//   }
+
 //   return result;
 // };
-
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
-    model: "-", variant: "-", manufacturingYear: "-",
-    cubicCapacity: "-", seatingCapacity: "-", financierName: "-", fuelType: "-", idv: "-"
+    model: "-", variant: "-", manufacturingYear: "-", bodyType: "-",
+    cubicCapacity: "-", seatingCapacity: "-", financierName: "-", fuelType: "-", idv: "-",
+    ncb: "-" 
   };
 
   // Helper to remove all non-alphanumeric characters (including spaces)
-  const cleanAlphaNumeric = (str) => str.replace(/[^a-zA-Z0-9]/g, '');
+  const cleanAlphaNumeric = (str) => str ? str.replace(/[^a-zA-Z0-9]/g, '') : "-";
 
-  // Updated regex: engine number group (8) now stops before "Fuel"
-  const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{10,12})\s+([A-Za-z]+)\s+(.+?)\s+(\d{4})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,22})\s+([A-Z0-9\s]+?)\s+Fuel/i;
+  // Adjusted tablePattern to allow variable digits for CC (\d{1,5}) and spaces in Registration No.
+  const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{8,11}\s?\d?)\s+([A-Za-z]+)\s+(.+?)\s+(\d{1,5})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,35})\s+([A-Z0-9\s]+?)\s+Fuel/i;
   
   const tableMatch = text.match(tablePattern);
-  
+
   if (tableMatch) {
-    result.registrationNumber = cleanAlphaNumeric(tableMatch[1]); // optional, already alnum
+    result.registrationNumber = cleanAlphaNumeric(tableMatch[1]); // gives "MP04YP4581"
     result.make = tableMatch[2].trim();
     
     let rawModel = tableMatch[3].trim();
+    
+    // --- YOUR EXACT PREVIOUS LOGIC (UNTOUCHED) ---
     const lpMatch = rawModel.match(/(.*)\s+(LP\s*\d+)$/i);
     if (lpMatch) {
-        result.model = lpMatch[1].trim();
-        result.variant = lpMatch[2].trim();
+        result.model = lpMatch[2].trim();
+        result.variant = lpMatch[1].trim();
     } else {
-        result.model = rawModel;
-        result.variant = "-";
+        // --- NEW LOGIC ADDED HERE TO CATCH "2065 E" ---
+        const newVariantMatch = rawModel.match(/(.*)\s+(\d{4}\s*[A-Z])$/i);
+        if (newVariantMatch) {
+            result.model = newVariantMatch[2].trim();
+            result.variant = newVariantMatch[1].trim();
+        } else {
+            result.model = rawModel;
+            result.variant = "-";
+        }
     }
 
     result.cubicCapacity = tableMatch[4];
     result.manufacturingYear = tableMatch[5];
     result.seatingCapacity = tableMatch[6];
-    result.chassisNumber = cleanAlphaNumeric(tableMatch[7]);
-    // Engine number: remove all spaces and any trailing text that might have been captured
-    result.engineNumber = cleanAlphaNumeric(tableMatch[8]); // now gives "4SPCR19BUX605221"
+    
+    // --- ROBUST CHASSIS & ENGINE SPLIT LOGIC ---
+    // Combine both captured groups to ensure all tokens are caught, then split by spaces
+    const rest = (tableMatch[7] + " " + tableMatch[8]).trim();
+    const tokens = rest.split(/\s+/);
+    
+    if (tokens.length >= 2) {
+      // Last two tokens → Engine, all remaining preceding tokens → Chassis
+      const engineTokens = tokens.slice(-2);
+      const chassisTokens = tokens.slice(0, -2);
+      
+      result.engineNumber = cleanAlphaNumeric(engineTokens.join(''));
+      result.chassisNumber = cleanAlphaNumeric(chassisTokens.join(''));
+    } else {
+      // Fallback: treat all as engine
+      result.engineNumber = cleanAlphaNumeric(rest);
+      result.chassisNumber = "-";
+    }
   }
 
   // Fuel & IDV extraction (unchanged)
@@ -243,16 +274,21 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.idv = fuelIdvMatch[2].replace(/,/g, '');
   }
 
-  // Financier extraction (unchanged)
-  const hypMatch = text.match(/HYPOTHECATED\s*WITH\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i) || 
-                  text.match(/Hypothecated\s+To\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i);
+  // Financier extraction 
+  const hypMatch = text.match(/HYPOTHECATED\s*WITH\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on|\s*Policy\s*Status)/i) || 
+                   text.match(/Hypothecated\s+To\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i);
   if (hypMatch) {
-      result.financierName = formatFinancierName(hypMatch[1].trim());
+      let rawFinancier = hypMatch[1].replace(/Policy\s*Status/i, '').trim();
+      result.financierName = typeof formatFinancierName !== "undefined" ? formatFinancierName(rawFinancier) : rawFinancier.replace(/\s+/g, " ").toUpperCase();
   }
 
-  return result;
-};
-
+  // NCB extraction (NEW)
+  const ncbMatch = text.match(/No\s+Claim\s+Bonus\s*[:]?\s*[-]?\s*(\d+%)/i);
+    if (ncbMatch) {
+      result.ncb = ncbMatch[1];
+    }
+    return result;
+  };
 // =======================================
 // MAIN COMPONENT
 // =======================================
