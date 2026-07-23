@@ -174,7 +174,18 @@ const formatModelName = (model) => {
   return removeHyphens(cleaned);
 };
 
-const formatVariantName = (variant) => formatGenericField(variant, [/Gvw/i, /GVW/i, /Year of manufacture/i, /Type of body/i, /Colour/i, /Registration/i]);
+// ***** FIX 1: Added "Automobile Association" to stop words *****
+const formatVariantName = (variant) =>
+  formatGenericField(variant, [
+    /Gvw/i,
+    /GVW/i,
+    /Year of manufacture/i,
+    /Type of body/i,
+    /Colour/i,
+    /Registration/i,
+    /Automobile Association/i,   // <-- added
+  ]);
+
 const formatBodyType = (body) => formatGenericField(body, [/Gross Vehicle Weight/i, /GVW/i, /Type of fuel/i, /Year/i, /Colour/i]);
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i]);
 const formatCommercialVehicleType = (type) => formatGenericField(type, [/Sub Type/i]);
@@ -351,23 +362,37 @@ const extractPremiumData = (text = "") => {
   if (!text) return defaultResult;
   const result = {};
   const premiumSection = text.match(/SCHEDULE OF PREMIUM([\s\S]*?)(?=Total Payable|Limitation as to use|$)/i);
+  
   if (premiumSection) {
     const premiumText = premiumSection[1];
     const calcOdMatch = premiumText.match(/Calculated OD Premium\s*([\d.]+)/i);
     if (calcOdMatch) result.calculatedOdPremium = calcOdMatch[1];
+    
     const calcTpMatch = premiumText.match(/Calculated TP Premium\s*([\d.]+)/i);
-    if (calcTpMatch) result.calculatedTpPremium = calcTpMatch[1];    
-    const totalOdMatch = premiumText.match(/Total OD Premium\s*([\d.]+)/i) || text.match(/Total OD Premium in Rs\s*([\d.]+)/i) || text.match(/Total OD Premium in\s*\(Rs\)\s*([\d.]+)/i) || text.match(/Total OD Premium in\s+(\d+)/i);
+    if (calcTpMatch) result.calculatedTpPremium = calcTpMatch[1];     
+    
+    // Updated match logic
+    const totalOdMatch = premiumText.match(/Total OD Premium\s*([\d.]+)/i) || 
+                         text.match(/Total OD Premium in Rs\s*([\d.]+)/i) || 
+                         text.match(/Total OD Premium in\s*\(Rs\)\s*([\d.]+)/i) || 
+                         text.match(/Total OD Premium\s*\(Rs\)\s*([\d.]+)/i);
+                         
     if (totalOdMatch) result.totalOdPremium = totalOdMatch[1]; 
-   const totalTpMatch = premiumText.match(/Total TP Premium\s*([\d.]+)/i) || text.match(/Total TP Premium\s*\(Rs\)\s*([\d.]+)/i);   
+    
+    const totalTpMatch = premiumText.match(/Total TP Premium\s*([\d.]+)/i) || text.match(/Total TP Premium\s*\(Rs\)\s*([\d.]+)/i);   
     if (totalTpMatch) result.totalTpPremium = totalTpMatch[1];
   }
+
+  // ... rest of your code (Net Premium, GST, etc.)
   const netMatch = text.match(/Net Premium\s*\(Rs\)\s*([\d,]+)/i) || text.match(/Net Premium in Rs\s*[\s:]*([\d,]+)/i);
   if (netMatch) result.netPremium = netMatch[1].replace(/,/g, "");
+  
   const gstMatch = text.match(/GST\s*\(Rs\)\s*([\d,]+)/i) || text.match(/GST in Rs\s*[\s:]*([\d,]+)/i);
   if (gstMatch) result.gst = gstMatch[1].replace(/,/g, "");
+  
   const totalMatch = text.match(/Total Payable\s*\(Rs\)\s*([\d,]+)/i) || text.match(/Total Payable in Rs\s*[\s:]*([\d,]+)/i);
   if (totalMatch) result.totalPayable = totalMatch[1].replace(/,/g, "");
+  
   return { ...defaultResult, ...result };
 };
 
@@ -383,27 +408,33 @@ const extractVehicleDetailsFromText = (text = "") => {
   // ============================================================
   // FIXED: Registration number – keep hyphens
   // ============================================================
-  let registrationNumber = "-";
+    let registrationNumber = "-";
 
-  // Primary: match "Registration no." or "Registration Number" explicitly
-  let regMatch = normalizedText.match(/Registration\s*(?:no\.?|Number)\s*[:\-]?\s*([A-Z0-9\-]+)/i);
-  if (regMatch?.[1]) {
-    registrationNumber = regMatch[1].trim();
-  } else {
-    // Fallback: more liberal
-    const fallbackMatch = normalizedText.match(/(?:Reg(?:istration)?\s*no\.?|Registration\s*Number)\s*[:\-]?\s*([A-Z0-9\-]+)/i);
-    if (fallbackMatch?.[1]) registrationNumber = fallbackMatch[1].trim();
-  }
+    // Primary: match "Registration no." or "Registration Number" explicitly
+    let regMatch = normalizedText.match(/Registration\s*(?:no\.?|Number)\s*[:\-]?\s*([A-Z0-9\-]+)/i);
+    if (regMatch?.[1]) {
+      registrationNumber = regMatch[1].trim();
+    } else {
+      // Fallback: more liberal
+      const fallbackMatch = normalizedText.match(/(?:Reg(?:istration)?\s*no\.?|Registration\s*Number)\s*[:\-]?\s*([A-Z0-9\-]+)/i);
+      if (fallbackMatch?.[1]) registrationNumber = fallbackMatch[1].trim();
+    }
 
-  // If still not found, try capturing a typical Indian registration format (e.g., XX-00-XX-0000)
-  if (registrationNumber === "-") {
-    const genericMatch = normalizedText.match(/\b([A-Z]{2}-\d{2}-[A-Z]{1,2}-\d{4})\b/i);
-    if (genericMatch?.[1]) registrationNumber = genericMatch[1].trim();
-  }
+    // If still not found, try capturing a typical Indian registration format (e.g., XX-00-XX-0000)
+    if (registrationNumber === "-") {
+      const genericMatch = normalizedText.match(/\b([A-Z]{2}-\d{2}-[A-Z]{1,2}-\d{4})\b/i);
+      if (genericMatch?.[1]) registrationNumber = genericMatch[1].trim();
+    }
 
-  // Clean up extra spaces (should not be necessary, but safe)
-  registrationNumber = registrationNumber.replace(/\s+/g, ' ').trim();
-  result.registrationNumber = registrationNumber;
+    // Clean up extra spaces (should not be necessary, but safe)
+    registrationNumber = registrationNumber.replace(/\s+/g, ' ').trim();
+
+    // ----- NEW: Remove all hyphens from the registration number -----
+    if (registrationNumber !== "-") {
+      registrationNumber = registrationNumber.replace(/-/g, '');
+    }
+
+    result.registrationNumber = registrationNumber;
   // ============================================================
 
   // Chassis and Engine extraction (unchanged)
@@ -504,8 +535,22 @@ const extractVehicleDetailsFromText = (text = "") => {
 
   const ccMatch = normalizedText.match(/Cubic capacity\(cc\).*?(\d{2,5}\s*cc)/is);
   if (ccMatch?.[1]) result.cubicCapacity = ccMatch[1].replace(/\s+/g, "").trim();
-  const seatMatch = normalizedText.match(/Seating capacity including\s*Driver\s*(\d+)/is);
-  if (seatMatch?.[1]) result.seatingCapacity = seatMatch[1];
+
+  // ***** FIX 2: Improved seating capacity extraction *****
+  let seatCapacity = "-";
+  let seatMatch = normalizedText.match(/Seating\s*capacity\s*(?:including\s*Driver)?\s*[:\-]?\s*(\d+)/i);
+  if (seatMatch?.[1]) {
+    seatCapacity = seatMatch[1];
+  } else {
+    seatMatch = normalizedText.match(/Seating\s*capacity\s*\(including\s*Driver\)\s*[:\-]?\s*(\d+)/i);
+    if (seatMatch?.[1]) seatCapacity = seatMatch[1];
+  }
+  if (seatCapacity === "-") {
+    seatMatch = normalizedText.match(/Seating\s*capacity\s*[:\-]?\s*(\d+)/i);
+    if (seatMatch?.[1]) seatCapacity = seatMatch[1];
+  }
+  result.seatingCapacity = seatCapacity;
+
   let gvwMatch = normalizedText.match(/Gross Vehicle Weight\s*\(GVW\)\s*[:\-]?\s*(\d+)/i);
   if (!gvwMatch) gvwMatch = normalizedText.match(/GVW\s*[:\-]?\s*(\d+)/i);
   if (gvwMatch?.[1]) result.gvw = gvwMatch[1];
@@ -542,6 +587,36 @@ const extractVehicleDetailsFromText = (text = "") => {
   } else {
     result.financierName = "N/A";
   }
+
+  // ============================================================
+  // NEW POST‑PROCESSING: split model and variant, and strip model prefix from variant
+  // ============================================================
+  if (result.model !== "-" && result.model !== "") {
+    // If model contains a space followed by 2+ uppercase letters and an opening parenthesis,
+    // split it into base model and variant (e.g., "LPT 1613 TCIC (42" → base="LPT 1613", var="TCIC (42")
+    const keywordIndex = result.model.search(/\s+[A-Z]{2,}\s*\(/);
+    if (keywordIndex !== -1) {
+      const baseModel = result.model.substring(0, keywordIndex).trim();
+      const variantPart = result.model.substring(keywordIndex).trim();
+      if (baseModel) {
+        result.model = baseModel;
+        // If variant was not already set or if it equals the old full model, assign the split‑off part
+        if (result.variant === "-" || result.variant === baseModel + " " + variantPart) {
+          result.variant = variantPart;
+        }
+      }
+    }
+  }
+
+  // If the variant starts with the model name, remove that prefix
+  if (result.variant !== "-" && result.model !== "-") {
+    const prefix = result.model + " ";
+    if (result.variant.startsWith(prefix)) {
+      result.variant = result.variant.substring(prefix.length).trim();
+    }
+  }
+  // ============================================================
+
   return result;
 };
 

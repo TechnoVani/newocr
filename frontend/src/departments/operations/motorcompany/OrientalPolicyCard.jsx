@@ -322,18 +322,23 @@ const extractInsuredDetails = (text = "") => {
       panNumber = fallbackMatch[1].trim().toUpperCase();
     }
   }
+  
+  // Added [\w.*-] to capture the masked email
+  const contactLine = normalizedText.match(/([\d*]{4,})\s*\/\/\s*([\w.*-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
 
-  // ---- Contact & Email (unchanged) ----
-  const contactLine = normalizedText.match(/\b(\d{10})\s*\/\s*([\w.-]+@[\w.-]+\.\w+)/i);
   let contactNumber = "-";
   let email = "-";
+
   if (contactLine) {
     contactNumber = contactLine[1] || "-";
     email = contactLine[2] || "-";
   } else {
-    const contactMatch = normalizedText.match(/Contact Number\s*\/\s*[\/\s]*([X\d]+)/i);
+    
+    const contactMatch = normalizedText.match(/(?:Mobile|Tel|Phone|Validated Mobile Number)[^\d]*([\d*]{7,})/i);
     contactNumber = contactMatch?.[1] || "-";
-    const emailMatch = normalizedText.match(/Email \s*([^\s]+@[^\s]+)/i);
+    
+    // Regex looks for an email pattern that includes asterisks
+    const emailMatch = normalizedText.match(/([a-zA-Z0-9.*_-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
     email = emailMatch?.[1] || "-";
   }
 
@@ -851,6 +856,152 @@ const extractPreviousInsurer = (text = "") => {
   return "-";
 };
 
+// const extractPremiumData = (text = "") => {
+//   const result = {
+//     calculatedOdPremium: "0",
+//     calculatedTpPremium: "0",
+//     totalOdPremium: "0",
+//     totalTpPremium: "0",
+//     netPremium: "0",
+//     gst: "0",
+//     totalPayable: "0"
+//   };
+
+  
+//   const motorTotalOdMatch = text.match(
+//     /MOTOR\s+TOTAL\s+OD\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
+//   );
+//   if (motorTotalOdMatch) {
+//     const odVal = motorTotalOdMatch[7].replace(/,/g, "").trim();
+//     result.totalOdPremium = odVal;
+//     result.calculatedOdPremium = odVal;
+//   }
+
+//   // 2) TP / GST / TOTAL from the Oriental block
+//   const orientalBlock = text.match(
+//     /TP\s+TOTAL\s+TOTAL\s+PREMIUM\s+STAMP\s+DUTY\s+ADD\s*\\?\:IGST[_ ]?OD\s+ADD\s*\\?\:IGST[_ ]?TP\s+TOTAL\s+AMOUNT\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
+//   );
+
+//   if (orientalBlock) {
+//     result.totalTpPremium = orientalBlock[5];
+//     result.calculatedTpPremium = orientalBlock[5];
+//     result.netPremium = orientalBlock[6];
+
+//     const gstOd = parseFloat(orientalBlock[8].replace(/,/g, ""));
+//     const gstTp = parseFloat(orientalBlock[9].replace(/,/g, ""));
+//     result.gst = (gstOd + gstTp).toLocaleString("en-IN", {
+//       minimumFractionDigits: 2,
+//       maximumFractionDigits: 2
+//     });
+//     result.totalPayable = orientalBlock[10];
+//   }
+
+//   // If the Oriental block gave us everything, return early.
+//   if (
+//     result.totalOdPremium !== "0" &&
+//     result.totalTpPremium !== "0" &&
+//     result.netPremium !== "0" &&
+//     result.gst !== "0" &&
+//     result.totalPayable !== "0"
+//   ) {
+//     return result;
+//   }
+
+//   // ============================================================
+//   //  ORIGINAL FIRST CODE – ADDED LOGIC (specific format)
+//   // ============================================================
+//   // 1) Extract OD premium from "MOTOR TOTAL OD" block – take the last number
+//   const motorOdMatch = text.match(
+//     /MOTOR\s+TOTAL\s+OD\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
+//   );
+//   if (motorOdMatch) {
+//     const odVal = motorOdMatch[7].replace(/,/g, '');
+//     result.totalOdPremium = odVal;
+//     result.calculatedOdPremium = odVal;
+//   }
+
+//   // 2) Extract the 12-number premium block after the "ADD :BASIC TP..." line
+//   const premiumBlockMatch = text.match(
+//     /ADD\s*:BASIC\s+TP\s+COVER\s+BASIC\s+TP\s+TOTAL\s+ADD\s*:PA\s+FOR\s+OWNER\s+DRIVER[^\n]*\s+([\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+)/i
+//   );
+//   if (premiumBlockMatch) {
+//     const numbers = premiumBlockMatch[1].trim().split(/\s+/).map(n => n.replace(/,/g, ''));
+//     if (numbers.length >= 12) {
+//       result.totalTpPremium = numbers[4];
+//       result.netPremium = numbers[5];
+//       const gstSum = [numbers[7], numbers[8], numbers[9], numbers[10]]
+//         .reduce((sum, val) => sum + parseFloat(val), 0);
+//       result.gst = gstSum.toFixed(2);
+//       result.totalPayable = numbers[11];
+//       result.calculatedTpPremium = result.totalTpPremium;
+//       return result;
+//     }
+//   }
+  
+//   const odMatch = text.match(/TOTAL\s+OD\s+([\d,.]+)/i);
+//   if (odMatch) {
+//     const val = odMatch[1].replace(/,/g, '');
+//     result.totalOdPremium = val;
+//     result.calculatedOdPremium = val;
+//   }
+
+//   // 2) Extract Premium summary after "TOTAL PREMIUM ADD" (8 numbers)
+//   const premiumMatch = text.match(
+//     /TOTAL\s+PREMIUM\s+ADD\s*:?\s*IGST\s+STAMP\s+DUTY\s+TOTAL\s+AMOUNT\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
+//   );
+//   if (premiumMatch) {
+//     result.totalTpPremium = premiumMatch[4].replace(/,/g, '');
+//     result.netPremium = premiumMatch[5].replace(/,/g, '');
+//     result.gst = premiumMatch[6].replace(/,/g, '');
+//     result.totalPayable = premiumMatch[8].replace(/,/g, '');
+//     result.calculatedTpPremium = result.totalTpPremium;
+//   } else {
+//     // Fallback: older pattern with 10 numbers
+//     const summaryMatch = text.match(
+//       /TOTAL\s+PREMIUM\s+STAMP\s+DUTY\s+ADD\s*:?\s*IGST\s+TOTAL\s+AMOUNT\s+([\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+)/i
+//     );
+//     if (summaryMatch) {
+//       const numbers = summaryMatch[1].trim().split(/\s+/).map(n => n.replace(/,/g, ''));
+//       if (numbers.length >= 10) {
+//         result.totalTpPremium = numbers[5];
+//         result.totalOdPremium = numbers[6];
+//         result.gst = numbers[8];
+//         result.totalPayable = numbers[9];
+//         result.netPremium = String(parseFloat(numbers[6]) + parseFloat(numbers[5]));
+//         result.calculatedOdPremium = numbers[6];
+//         result.calculatedTpPremium = numbers[5];
+//       }
+//       return result;
+//     }
+
+//     // Old pattern: TOTAL PREMIUM ADD :IGST STAMP DUTY TOTAL AMOUNT (7 numbers)
+//     let match = text.match(
+//       /TOTAL\s+PREMIUM\s+ADD\s*:?\s*IGST\s+STAMP\s+DUTY\s+TOTAL\s+AMOUNT\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
+//     );
+//     if (match) {
+//       result.totalTpPremium = match[4];
+//       result.netPremium = match[4];
+//       result.gst = match[5];
+//       result.totalPayable = match[7];
+//       result.calculatedTpPremium = match[4];
+//       return result;
+//     }
+
+//     // Simple fallbacks
+//     match = text.match(/TOTAL\s+PREMIUM\s+([\d,.]+)/i);
+//     if (match) {
+//       result.totalTpPremium = match[1];
+//       result.netPremium = match[1];
+//     }
+//     match = text.match(/IGST\s+([\d,.]+)/i);
+//     if (match) result.gst = match[1];
+//     match = text.match(/TOTAL\s+AMOUNT\s+([\d,.]+)/i);
+//     if (match) result.totalPayable = match[1];
+//   }
+
+//   return result;
+// };
+
 const extractPremiumData = (text = "") => {
   const result = {
     calculatedOdPremium: "0",
@@ -862,7 +1013,60 @@ const extractPremiumData = (text = "") => {
     totalPayable: "0"
   };
 
-  
+  if (!text) return result;
+
+  // ============================================================
+  // 1. ORIENTAL‑SPECIFIC EXTRACTION (based on provided sample)
+  // ============================================================
+
+  // --- OD Premium: extract last number from "MOTOR TOTAL OD" block ---
+  const odBlockMatch = text.match(
+    /MOTOR\s+TOTAL\s+OD\s+([\d,.]+(?:\s+[\d,.]+)*)/i
+  );
+  if (odBlockMatch) {
+    const numbers = odBlockMatch[1].trim().split(/\s+/).map(n => n.replace(/,/g, ''));
+    if (numbers.length > 0) {
+      const odValue = numbers[numbers.length - 1]; // take the last number
+      result.totalOdPremium = odValue;
+      result.calculatedOdPremium = odValue;
+    }
+  }
+
+  // --- TP and Net Premium: extract from "BASIC TP COVER" block ---
+  const tpBlockMatch = text.match(
+    /BASIC\s+TP\s+COVER.*?TOTAL\s+AMOUNT\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
+  );
+  if (tpBlockMatch) {
+    // Groups: 1-5 are various TP components, 6=TP total, 7=net premium, 8=stamp, 9=GST, 10=total payable
+    const tpValue = tpBlockMatch[6].replace(/,/g, '');
+    const netValue = tpBlockMatch[7].replace(/,/g, '');
+    const gstValue = tpBlockMatch[9].replace(/,/g, '');
+    const totalPayableValue = tpBlockMatch[10].replace(/,/g, '');
+
+    result.totalTpPremium = tpValue;
+    result.calculatedTpPremium = tpValue;
+    result.netPremium = netValue;
+    result.gst = gstValue;
+    result.totalPayable = totalPayableValue;
+  }
+
+  // If we successfully extracted all three main values, return early.
+  if (
+    result.totalOdPremium !== "0" &&
+    result.totalTpPremium !== "0" &&
+    result.netPremium !== "0"
+  ) {
+    return result;
+  }
+
+  // ============================================================
+  // 2. FALLBACK: existing extraction logic (unchanged)
+  // ============================================================
+
+  // ---- Original OD extraction (with the new flexible OD match) ----
+  // (already tried above, but keep other patterns just in case)
+
+  // ---- Original TP/Net extraction (fallback) ----
   const motorTotalOdMatch = text.match(
     /MOTOR\s+TOTAL\s+OD\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i
   );
