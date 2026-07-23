@@ -365,7 +365,6 @@ const extractVehicleDetails = (text) => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    bodyType: "-",
     colour: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
@@ -484,38 +483,6 @@ if (yearValue) {
   result.manufacturingYear = yearValue;
 }
 
-  // ----- Body Type (improved) -----
-let bodyValue = null;
-
-// Primary: "Body Type :" on Page 2 – stop before "Name of Financier" or "Add On Covers"
-const bodyMatch = normalized.match(/Body\s+Type\s*:\s*([A-Za-z\s]+?)(?=\s+Name\s+of\s+Financier|\s+Add\s+On\s+Covers|\s*$)/i);
-if (bodyMatch && bodyMatch[1]) {
-  bodyValue = bodyMatch[1].trim();
-}
-
-// Fallback: "Type of Body" on Page 1 – stop before "CC/HP" or "Licensed Carrying"
-if (!bodyValue) {
-  const fallback = normalized.match(/Type\s+of\s+Body\s+([A-Za-z\s]+?)(?=\s+CC\/HP|\s+Licensed\s+Carrying|\s+Add\s+On\s+Covers|\s*$)/i);
-  if (fallback && fallback[1]) {
-    bodyValue = fallback[1].trim();
-  }
-}
-
-// Last resort: capture until a known stop word
-if (!bodyValue) {
-  const index = normalized.search(/Type\s+of\s+Body\s+/i);
-  if (index !== -1) {
-    const afterLabel = normalized.slice(index).replace(/^Type\s+of\s+Body\s+/i, '');
-    const stopMatch = afterLabel.match(/^(.*?)(?=\s+CC\/HP|\s+Licensed\s+Carrying|\s+Add\s+On\s+Covers|\s+Name\s+of\s+Financier|$)/i);
-    if (stopMatch && stopMatch[1]) {
-      bodyValue = stopMatch[1].trim();
-    }
-  }
-}
-
-if (bodyValue) {
-  result.bodyType = bodyValue;
-}
   // ----- Cubic Capacity (unchanged) -----
   const ccMatch = normalized.match(/CC\/HP\/GVW\s*\/KW\s*([\d]+)/i) ||
                   normalized.match(/Cubic\s+Capacity\s*:\s*([\d]+)/i);
@@ -608,7 +575,7 @@ function LibertyPolicyCard({ item }) {
   const extractedVehicle = extractVehicleDetails(fullText);
 
   const productType = getProductType("", fullText);
-  const vehicleCategory = getVehicleCategory("", "", fullText);
+  const vehicleCategory = getVehicleCategory("", fullText);
 
   const vehicle = {
     registrationNumber: extractedVehicle.registrationNumber !== "-" ? extractedVehicle.registrationNumber : sourceVehicle.registrationNumber,
@@ -618,7 +585,6 @@ function LibertyPolicyCard({ item }) {
     model: extractedVehicle.model !== "-" ? extractedVehicle.model : sourceVehicle.model,
     variant: extractedVehicle.variant !== "-" ? extractedVehicle.variant : sourceVehicle.variant,
     manufacturingYear: extractedVehicle.manufacturingYear !== "-" ? extractedVehicle.manufacturingYear : sourceVehicle.manufacturingYear,
-    bodyType: extractedVehicle.bodyType !== "-" ? extractedVehicle.bodyType : sourceVehicle.bodyType,
     colour: extractedVehicle.colour !== "-" ? extractedVehicle.colour : sourceVehicle.colour,
     cubicCapacity: extractedVehicle.cubicCapacity !== "-" ? extractedVehicle.cubicCapacity : sourceVehicle.cubicCapacity,
     seatingCapacity: extractedVehicle.seatingCapacity !== "-" ? extractedVehicle.seatingCapacity : sourceVehicle.seatingCapacity,

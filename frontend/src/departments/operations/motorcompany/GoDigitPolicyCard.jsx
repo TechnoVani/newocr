@@ -41,8 +41,8 @@ const parseFromPolicyType = (policyType) => {
 };
 
 // ---------- Vehicle Category (unchanged) ----------
-export const getVehicleCategory = (policyType = "", vehicleType = "", fullText = "") => {
-  if (!fullText && !vehicleType && !policyType) return "-";
+export const getVehicleCategory = (policyType = "", fullText = "") => {
+  if (!fullText && !policyType) return "-";
 
   const categoryMap = {
     "Private Car": ["private car", "private vehicle"],
@@ -65,7 +65,7 @@ export const getVehicleCategory = (policyType = "", vehicleType = "", fullText =
     ],
   };
 
-  const combinedText = `${policyType} ${vehicleType} ${fullText}`;
+  const combinedText = `${policyType} ${fullText}`;
   let matchedCategory = null;
   const allKeywords = Object.values(categoryMap).flat();
   const matchedKeyword = detectWithProgressiveWords(combinedText, allKeywords, null);
@@ -802,7 +802,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    bodyType: "-",
     fuelType: "-",
     colour: "-",
     cubicCapacity: "-",
@@ -927,7 +926,7 @@ function GoDigitPolicyCard({ item }) {
   );
 
   const vehicleCategory = sanitizeValue(
-    getVehicleCategory(item?.policyDetails?.policyType, item?.vehicleDetails?.bodyType, fullText)
+    getVehicleCategory(item?.policyDetails?.policyType, fullText)
   );
   const dateOfIssue = sanitizeValue(extractDateOfIssue(fullText));
   const totalValue = sanitizeValue(extractIDV(fullText));
@@ -974,7 +973,6 @@ function GoDigitPolicyCard({ item }) {
     manufacturingYear: extractedVehicle.manufacturingYear !== "-" ? extractedVehicle.manufacturingYear : item?.vehicleDetails?.manufacturingYear,
     cubicCapacity: extractedVehicle.cubicCapacity !== "-" ? extractedVehicle.cubicCapacity : item?.vehicleDetails?.cubicCapacity,
     seatingCapacity: extractedVehicle.seatingCapacity !== "-" ? extractedVehicle.seatingCapacity : item?.vehicleDetails?.seatingCapacity,
-    bodyType: extractedVehicle.bodyType !== "-" ? extractedVehicle.bodyType : item?.vehicleDetails?.bodyType,
     fuelType: extractedVehicle.fuelType !== "-" ? extractedVehicle.fuelType : item?.vehicleDetails?.fuelType,
     colour: extractedVehicle.colour !== "-" ? extractedVehicle.colour : item?.vehicleDetails?.colour,
     financierName: extractedVehicle.financierName !== "-" ? extractedVehicle.financierName : item?.vehicleDetails?.financierName,
@@ -997,7 +995,6 @@ function GoDigitPolicyCard({ item }) {
     model: sanitizeValue(extractedVehicle.model),
     variant: sanitizeValue(extractedVehicle.variant),
     manufacturingYear: sanitizeValue(extractedVehicle.manufacturingYear),
-    bodyType: sanitizeValue(extractedVehicle.bodyType),
     fuelType: sanitizeValue(extractedVehicle.fuelType),
     colour: sanitizeValue(extractedVehicle.colour),
     cubicCapacity: sanitizeValue(extractedVehicle.cubicCapacity),

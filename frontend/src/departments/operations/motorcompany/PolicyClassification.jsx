@@ -351,8 +351,8 @@ export const ProductType = ({ policyType, fullText, chipProps = {} }) => {
 // Vehicle Category
 // =======================================
 
-export const getVehicleCategory = (policyType = "", vehicleType = "", fullText = "") => {
-  if (!fullText && !vehicleType && !policyType) return "-";
+export const getVehicleCategory = (policyType = "", fullText = "") => {
+  if (!fullText && !policyType) return "-";
 
   const categoryMap = {
     "Private Car": ["private car", "private vehicle"],
@@ -366,7 +366,7 @@ export const getVehicleCategory = (policyType = "", vehicleType = "", fullText =
     ],
   };
 
-  const combinedText = `${policyType} ${vehicleType} ${fullText}`;
+  const combinedText = `${policyType} ${fullText}`;
 
   // Use the progressive detector
   const allKeywords = Object.values(categoryMap).flat();
@@ -392,8 +392,8 @@ export const getVehicleCategory = (policyType = "", vehicleType = "", fullText =
 /**
  * Component that displays the vehicle category as a chip.
  */
-export const VehicleCategory = ({ policyType, vehicleType, fullText, chipProps = {} }) => {
-  const category = getVehicleCategory(policyType, vehicleType, fullText);
+export const VehicleCategory = ({ policyType, fullText, chipProps = {} }) => {
+  const category = getVehicleCategory(policyType, fullText);
   return (
     <Chip
       label={category}

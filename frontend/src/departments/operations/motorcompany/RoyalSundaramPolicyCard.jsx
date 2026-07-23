@@ -175,7 +175,6 @@ const formatModelName = (model) => {
 };
 
 const formatVariantName = (variant) => formatGenericField(variant, [/Gvw/i, /GVW/i, /Year of manufacture/i, /Type of body/i, /Colour/i, /Registration/i]);
-const formatBodyType = (body) => formatGenericField(body, [/Gross Vehicle Weight/i, /GVW/i, /Type of fuel/i, /Year/i, /Colour/i]);
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i]);
 const formatCommercialVehicleType = (type) => formatGenericField(type, [/Sub Type/i]);
 const formatSubType = (subType) => formatGenericField(subType, [
@@ -421,7 +420,7 @@ const extractPremiumData = (text = "") => {
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
-    variant: "-", gvw: "-", manufacturingYear: "-", bodyType: "-", fuelType: "-",
+    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
     colour: "-", cubicCapacity: "-", seatingCapacity: "-", financierName: "-",
     commercialVehicleType: "-", subType: "-"
   };
@@ -432,9 +431,6 @@ const extractVehicleDetailsFromText = (text = "") => {
   // ----- Simple label → value extractions (no fallbacks) -----
   const regMatch = normalizedText.match(/Registration\s*Number\s+([A-Z0-9\-]+)/i);
   if (regMatch) result.registrationNumber = regMatch[1];
-
-  const bodyMatch = normalizedText.match(/Type\s*of\s*Body\s+([A-Za-z]+)/i);
-  if (bodyMatch) result.bodyType = bodyMatch[1];
 
   const engineMatch = normalizedText.match(/Engine\s*Number\s+([A-Z0-9\-]+)/i);
   if (engineMatch) result.engineNumber = engineMatch[1];
@@ -500,7 +496,7 @@ function RoyalSundaramPolicyCard({ item }) {
   const email = insured?.email || autoInsuredDetails?.email || "-";
   const gstin = autoInsuredDetails?.gstin || "-";
 
-  const vehicleCategory = getVehicleCategory(policy?.policyType, vehicle?.bodyType, item?.fullText);
+  const vehicleCategory = getVehicleCategory(policy?.policyType, item?.fullText);
   const productType = getProductType(policy?.policyType, item?.fullText);
   const dateOfIssue = extractDateOfIssue(item?.fullText);
   const totalValue = extractIDV(item?.fullText);

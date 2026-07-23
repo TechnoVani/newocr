@@ -411,7 +411,7 @@ const extractPremiumData = (text = "") => {
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
-    variant: "-", gvw: "-", manufacturingYear: "-", bodyType: "-", fuelType: "-",
+    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
     colour: "-", cubicCapacity: "-", seatingCapacity: "-", geographicalArea: "-",
     financierName: "-", commercialVehicleType: "-", subType: "-"
   };
@@ -489,16 +489,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     if (variantMatch2) variantValue = variantMatch2[1].trim();
   }
   result.variant = variantValue || "-";
-  
-  // ========== BODY TYPE (if available, e.g., "SUV", "Hatchback", etc.) ==========
-  let bodyTypeValue = null;
-  const bodyMatch1 = normalizedText.match(/Body Type\s+([A-Za-z\s]+?)(?=\s+Year|\s+Fuel|\s+Seating|$)/i);
-  if (bodyMatch1) bodyTypeValue = bodyMatch1[1].trim();
-  if (!bodyTypeValue) {
-    const bodyMatch2 = normalizedText.match(/Type of body\s+([A-Za-z\s]+?)(?=\s+Year|\s+Fuel|$)/i);
-    if (bodyMatch2) bodyTypeValue = bodyMatch2[1].trim();
-  }
-  result.bodyType = bodyTypeValue || "-";
   
   // ========== FINANCIER - with comma removal ==========
   let financierValue = null;
@@ -592,7 +582,7 @@ function SBIPolicyCard({ item }) {
   const gstin = sanitizeValue(autoInsuredDetails?.gstin);
 
   // Use shared classification utilities
-  const vehicleCategory = sanitizeValue(getVehicleCategory(policy?.policyType, vehicle?.bodyType, item?.fullText));
+  const vehicleCategory = sanitizeValue(getVehicleCategory(policy?.policyType, item?.fullText));
   const productType = sanitizeValue(getProductType(policy?.policyType, item?.fullText));
   const dateOfIssue = sanitizeValue(extractDateOfIssue(item?.fullText));
   const totalValue = sanitizeValue(extractIDV(item?.fullText));
@@ -628,7 +618,6 @@ function SBIPolicyCard({ item }) {
     model: sanitizeValue(extractedVehicle.model !== "-" ? extractedVehicle.model : vehicle?.model),
     variant: sanitizeValue(extractedVehicle.variant !== "-" ? extractedVehicle.variant : vehicle?.variant),
     manufacturingYear: sanitizeValue(extractedVehicle.manufacturingYear !== "-" ? extractedVehicle.manufacturingYear : vehicle?.manufacturingYear),
-    bodyType: sanitizeValue(extractedVehicle.bodyType !== "-" ? extractedVehicle.bodyType : vehicle?.bodyType),
     fuelType: sanitizeValue(extractedVehicle.fuelType !== "-" ? extractedVehicle.fuelType : vehicle?.fuelType),
     colour: sanitizeValue(extractedVehicle.colour !== "-" ? extractedVehicle.colour : vehicle?.colour),
     cubicCapacity: sanitizeValue(extractedVehicle.cubicCapacity !== "-" ? extractedVehicle.cubicCapacity : vehicle?.cubicCapacity),
@@ -648,7 +637,6 @@ function SBIPolicyCard({ item }) {
     model: sanitizeValue(extractedVehicle.model),
     variant: sanitizeValue(extractedVehicle.variant),
     manufacturingYear: sanitizeValue(extractedVehicle.manufacturingYear),
-    bodyType: sanitizeValue(extractedVehicle.bodyType),
     fuelType: sanitizeValue(extractedVehicle.fuelType),
     colour: sanitizeValue(extractedVehicle.colour),
     cubicCapacity: sanitizeValue(extractedVehicle.cubicCapacity),

@@ -44,7 +44,7 @@ const extractBranchAddress = (text = "") => {
 const extractInsuredDetails = (text = "") => {
   const result = { insuredName: "-", insuredAddress: "-", panNumber: "-", contactNumber: "-", email: "-", gstin: "-" };
   const nameMatch = text.match(/1\.\s*Proposer\s*Name\s*[:]\s*(.+?)(?=\s*2\.\s*Proposer\s*Address)/is);
-  if (nameMatch) result.insuredName = nameMatch[1].replace(/\s*KALAPIPAL\s*$/i, "").trim();
+  if (nameMatch) result.insuredName = nameMatch[1].replace(/\s*$/i, "").trim();
 
   const addrMatch = text.match(/2\.\s*Proposer\s*Address\s*[:]\s*(.+?)(?=\s*3\.\s*Proposer\s*Mobile\s*Number)/is);
   if (addrMatch) result.insuredAddress = addrMatch[1].replace(/\s+/g, " ").trim();
@@ -142,32 +142,86 @@ const extractPremiumData = (text = "") => {
 // VEHICLE EXTRACTION
 // =======================================
 
+// const extractVehicleDetailsFromText = (text = "") => {
+//   const result = {
+//     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
+//     model: "-", variant: "-", manufacturingYear: "-",
+//     cubicCapacity: "-", seatingCapacity: "-", financierName: "-", fuelType: "-", idv: "-"
+//   };
+
+//   // Improved Pattern: Anchored specifically to the vehicle table rows
+//   const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{10,12})\s+([A-Za-z]+)\s+(.+?)\s+(\d{4})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,22})\s+([A-Z0-9\s]{10,22})/i;
+  
+//   const tableMatch = text.match(tablePattern);
+  
+//   if (tableMatch) {
+//     result.registrationNumber = tableMatch[1].replace(/[\s-]/g, "").toUpperCase().trim();
+//     result.make = tableMatch[2].trim();
+    
+//     // Model & Variant extraction
+//     let rawModel = tableMatch[3].trim(); // "STARBUS SKOOL BUS (51+1) LP 812"
+    
+//     // Logic: Look for "LP" pattern as the variant indicator
+//     const lpMatch = rawModel.match(/(.*)\s+(LP\s*\d+)$/i);
+    
+//     if (lpMatch) {
+//         // Model: "STARBUS SKOOL BUS (51+1)"
+//         result.model = lpMatch[1].trim(); 
+//         // Variant: "LP 812"
+//         result.variant = lpMatch[2].trim();
+//     } else {
+//         result.model = rawModel;
+//         result.variant = "-";
+//     }
+
+//     result.cubicCapacity = tableMatch[4];
+//     result.manufacturingYear = tableMatch[5];
+//     result.seatingCapacity = tableMatch[6];
+//     result.chassisNumber = cleanAlphaNumeric(tableMatch[7]); 
+//     result.engineNumber = cleanAlphaNumeric(tableMatch[8]); 
+//   }
+
+//   // Fuel & IDV extraction
+//   const fuelIdvMatch = text.match(/(DIESEL|PETROL|CNG|EV|ELECTRIC|LPG)\s+([\d,]+)\s+/i);
+//   if (fuelIdvMatch) {
+//     result.fuelType = fuelIdvMatch[1].trim();
+//     result.idv = fuelIdvMatch[2].replace(/,/g, '');
+//   }
+
+//   // Financier extraction
+//   const hypMatch = text.match(/HYPOTHECATED\s*WITH\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i) || 
+//                   text.match(/Hypothecated\s+To\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i);
+
+//   if (hypMatch) {
+//       result.financierName = formatFinancierName(hypMatch[1].trim());
+//   }
+
+//   return result;
+// };
+
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
-    model: "-", variant: "-", manufacturingYear: "-", bodyType: "-",
+    model: "-", variant: "-", manufacturingYear: "-",
     cubicCapacity: "-", seatingCapacity: "-", financierName: "-", fuelType: "-", idv: "-"
   };
 
-  // Improved Pattern: Anchored specifically to the vehicle table rows
-  const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{10,12})\s+([A-Za-z]+)\s+(.+?)\s+(\d{4})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,22})\s+([A-Z0-9\s]{10,22})/i;
+  // Helper to remove all non-alphanumeric characters (including spaces)
+  const cleanAlphaNumeric = (str) => str.replace(/[^a-zA-Z0-9]/g, '');
+
+  // Updated regex: engine number group (8) now stops before "Fuel"
+  const tablePattern = /Registration\s*No\.?[\s\S]*?([A-Z0-9]{10,12})\s+([A-Za-z]+)\s+(.+?)\s+(\d{4})\s+(\d{4})\s+(\d{1,3})\s+([A-Z0-9\s]{15,22})\s+([A-Z0-9\s]+?)\s+Fuel/i;
   
   const tableMatch = text.match(tablePattern);
   
   if (tableMatch) {
-    result.registrationNumber = tableMatch[1].replace(/[\s-]/g, "").toUpperCase().trim();
+    result.registrationNumber = cleanAlphaNumeric(tableMatch[1]); // optional, already alnum
     result.make = tableMatch[2].trim();
     
-    // Model & Variant extraction
-    let rawModel = tableMatch[3].trim(); // "STARBUS SKOOL BUS (51+1) LP 812"
-    
-    // Logic: Look for "LP" pattern as the variant indicator
+    let rawModel = tableMatch[3].trim();
     const lpMatch = rawModel.match(/(.*)\s+(LP\s*\d+)$/i);
-    
     if (lpMatch) {
-        // Model: "STARBUS SKOOL BUS (51+1)"
-        result.model = lpMatch[1].trim(); 
-        // Variant: "LP 812"
+        result.model = lpMatch[1].trim();
         result.variant = lpMatch[2].trim();
     } else {
         result.model = rawModel;
@@ -177,42 +231,24 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.cubicCapacity = tableMatch[4];
     result.manufacturingYear = tableMatch[5];
     result.seatingCapacity = tableMatch[6];
-    result.chassisNumber = cleanAlphaNumeric(tableMatch[7]); 
-    result.engineNumber = cleanAlphaNumeric(tableMatch[8]); 
+    result.chassisNumber = cleanAlphaNumeric(tableMatch[7]);
+    // Engine number: remove all spaces and any trailing text that might have been captured
+    result.engineNumber = cleanAlphaNumeric(tableMatch[8]); // now gives "4SPCR19BUX605221"
   }
 
-  // Fuel & IDV extraction
+  // Fuel & IDV extraction (unchanged)
   const fuelIdvMatch = text.match(/(DIESEL|PETROL|CNG|EV|ELECTRIC|LPG)\s+([\d,]+)\s+/i);
   if (fuelIdvMatch) {
     result.fuelType = fuelIdvMatch[1].trim();
     result.idv = fuelIdvMatch[2].replace(/,/g, '');
   }
 
-  // Financier extraction
+  // Financier extraction (unchanged)
   const hypMatch = text.match(/HYPOTHECATED\s*WITH\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i) || 
                   text.match(/Hypothecated\s+To\s*[:]?\s*([^\n\r]+?)(?=\s*\d+\.\s*Add\s+on)/i);
-
   if (hypMatch) {
       result.financierName = formatFinancierName(hypMatch[1].trim());
   }
-
-  // Body Type extraction
-  const typeMatch = text.match(/Vehicle\s*Type\s*(?:School Buses:\s*)?([^\n\r]+)/i);  
-    if (typeMatch) {
-      const rawType = typeMatch[1].replace(/[:]/g, '').trim();
-      
-      // Logic: If the captured text contains descriptive details (like Passenger Capacity or Wheel Count) 
-      // rather than a true body type, return "-"
-      const isDescriptive = /Passenger|WH|CC|Carrying/i.test(rawType);
-      
-      if (isDescriptive || rawType.length === 0) {
-        result.bodyType = "-";
-      } else {
-        result.bodyType = rawType;
-      }
-    } else {
-      result.bodyType = "-";
-    }
 
   return result;
 };
@@ -240,7 +276,7 @@ function BajajGeneralPolicyCard({ item }) {
       insuranceCompany={extractInsuranceCompany(fullText)}
       branchAddress={extractBranchAddress(fullText)}
       productType={getProductType(policy?.policyType, fullText)}
-      vehicleCategory={getVehicleCategory(policy?.policyType, extractedVehicle.bodyType, fullText)}
+      vehicleCategory={getVehicleCategory(policy?.policyType, fullText)}
       insuredName={autoInsuredDetails.insuredName}
       panNumber={autoInsuredDetails.panNumber}
       gstin={autoInsuredDetails.gstin}

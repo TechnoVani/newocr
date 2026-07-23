@@ -186,7 +186,6 @@ const formatVariantName = (variant) =>
     /Automobile Association/i,   // <-- added
   ]);
 
-const formatBodyType = (body) => formatGenericField(body, [/Gross Vehicle Weight/i, /GVW/i, /Type of fuel/i, /Year/i, /Colour/i]);
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i]);
 const formatCommercialVehicleType = (type) => formatGenericField(type, [/Sub Type/i]);
 const formatSubType = (subType) => formatGenericField(subType, [
@@ -399,7 +398,7 @@ const extractPremiumData = (text = "") => {
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
-    variant: "-", gvw: "-", manufacturingYear: "-", bodyType: "-", fuelType: "-",
+    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
     colour: "-", cubicCapacity: "-", seatingCapacity: "-", financierName: "-", commercialVehicleType: "-", subType: "-"
   };
   if (!text || typeof text !== "string") return result;
@@ -506,18 +505,10 @@ const extractVehicleDetailsFromText = (text = "") => {
     let combinedText = bodyFuelCombined[1].trim().replace(/Cubic capacity.*$/i, '');
     const parts = combinedText.split("/");
     if (parts.length >= 2) {
-      result.bodyType = parts.slice(0, -1).join(" ").trim();
       result.fuelType = parts[parts.length - 1].trim();
     } else {
-      result.bodyType = combinedText.trim();
       result.fuelType = combinedText.trim();
     }
-  }
-  if (result.bodyType === "-") {
-    let bodyMatch = normalizedText.match(/Type of body\s*:\s*([^\n]+?)(?=\s*Gross Vehicle Weight|\s*GVW|\s*Type of fuel|$)/i);
-    if (!bodyMatch) bodyMatch = normalizedText.match(/Type of body\s*\/\s*Type of Fuel\s*([A-Za-z]+)\//i);
-    if (!bodyMatch) bodyMatch = normalizedText.match(/Type of body\s*\/\s*Type of Fuel\s*([A-Za-z]+)/i);
-    if (bodyMatch?.[1]) result.bodyType = bodyMatch[1].trim().replace(/\/(Diesel|Petrol|CNG|LPG|Electric).*$/i, '').replace(/Cubic.*$/i, '');
   }
   if (result.fuelType === "-") {
     let fuelMatch = normalizedText.match(/Type of fuel\s*:\s*([^\n]+?)(?=\s*Cubic|$)/i);
@@ -667,7 +658,7 @@ function NewIndiaPolicyCard({ item }) {
   const email = insured?.email || autoInsuredDetails?.email || "-";
   const gstin = autoInsuredDetails?.gstin || "-";
 
-  const vehicleCategory = getVehicleCategory(policy?.policyType, vehicle?.bodyType, item?.fullText); // now imported
+  const vehicleCategory = getVehicleCategory(policy?.policyType, item?.fullText); // now imported
   const productType = getProductType(policy?.policyType, item?.fullText); // now imported
   const dateOfIssue = extractDateOfIssue(item?.fullText);
   const totalValue = extractIDV(item?.fullText);

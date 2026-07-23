@@ -174,7 +174,6 @@ const formatModelName = (model) => {
 };
 
 const formatVariantName = (variant) => formatGenericField(variant, [/Gvw/i, /GVW/i, /Year of manufacture/i, /Type of body/i, /Colour/i, /Registration/i]);
-const formatBodyType = (body) => formatGenericField(body, [/Gross Vehicle Weight/i, /GVW/i, /Type of fuel/i, /Year/i, /Colour/i]);
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i]);
 const formatCommercialVehicleType = (type) => formatGenericField(type, [/Sub Type/i]);
 const formatSubType = (subType) => formatGenericField(subType, [
@@ -434,7 +433,7 @@ const extractPremiumData = (fullText = "") => {
 const extractVehicleDetails = (fullText = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
-    variant: "-", gvw: "-", manufacturingYear: "-", bodyType: "-", fuelType: "-",
+    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
     colour: "-", cubicCapacity: "-", seatingCapacity: "-", financierName: "-",
     commercialVehicleType: "-", subType: "-"
   };
@@ -494,12 +493,11 @@ const extractVehicleDetails = (fullText = "") => {
     }
   }
 
-  // 4. Body Type / Fuel Type
+  // 4. Fuel Type
   const bodyFuelMatch = text.match(
     /([A-Z]+(?:\s+[A-Z]+)?)\s*\/\s*([A-Z]+)\s+\d+\s*\/\s*\d+\s*\/\s*\d{4}/i
   );
   if (bodyFuelMatch) {
-    result.bodyType = bodyFuelMatch[1].replace(/\s+/g, " ").trim().toUpperCase();
     result.fuelType = bodyFuelMatch[2].replace(/\s+/g, " ").trim();
   }
 
@@ -605,7 +603,6 @@ function ShriramPolicyCard({ item }) {
     variant: vehicle?.variant || vehicleDetails?.variant || "-",
     gvw: vehicle?.gvw || vehicleDetails?.gvw || "-",
     manufacturingYear: vehicle?.manufacturingYear || vehicleDetails?.manufacturingYear || "-",
-    bodyType: vehicle?.bodyType || vehicleDetails?.bodyType || "-",
     fuelType: vehicle?.fuelType || vehicleDetails?.fuelType || "-",
     colour: vehicle?.colour || vehicleDetails?.colour || "-",
     cubicCapacity: vehicle?.cubicCapacity || vehicleDetails?.cubicCapacity || "-",
@@ -617,7 +614,7 @@ function ShriramPolicyCard({ item }) {
 
   // Classification
   const productType = getProductType ? getProductType(policy?.policyType, item?.fullText) : "TWO WHEELER";
-  const vehicleCategory = getVehicleCategory ? getVehicleCategory(policy?.policyType, mergedVehicle.bodyType, item?.fullText) : "TWO_WHEELER";
+  const vehicleCategory = getVehicleCategory ? getVehicleCategory(policy?.policyType, item?.fullText) : "TWO_WHEELER";
 
   return (
     <PolicyCardView
