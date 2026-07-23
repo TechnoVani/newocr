@@ -81,15 +81,6 @@ const formatVariantName = (variant) =>
     /Variant/i,
   ]);
 
-const formatBodyType = (body) =>
-  formatGenericField(body, [
-    /Gross Vehicle Weight/i,
-    /GVW/i,
-    /Type of fuel/i,
-    /Year/i,
-    /Colour/i,
-  ]);
-
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i, /cc/i]);
 
 const formatFinancierName = (financier) => {
@@ -399,7 +390,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     variant: "-",
     gvw: "-",
     manufacturingYear: "-",
-    bodyType: "-",
     fuelType: "-",
     colour: "-",
     cubicCapacity: "-",
@@ -477,7 +467,6 @@ const extractVehicleDetailsFromText = (text = "") => {
       result.make = parts[0] || "-";
       result.model = parts[1] || "-";
       if (parts.length >= 5) {
-        result.bodyType = parts.slice(2, parts.length - 1).join(" ");
         result.subType = parts[parts.length - 1];
       }
     }
@@ -499,12 +488,6 @@ const extractVehicleDetailsFromText = (text = "") => {
   // Chassis
   const chassisMatch = searchText.match(/Chassis\s*No\.?\s*([A-Z0-9]+)/i) || txt.match(/Chassis\s*No\.?\s*([A-Z0-9]+)/i);
   if (chassisMatch) result.chassisNumber = formatChassisNumber(chassisMatch[1]);
-
-  // Body (private only)
-  if (!isCommercial) {
-    const bodyMatch = searchText.match(/Body\s*Type\s*(.*?)(?=\s*CC\/KW|\s*Mfg\.|\s*Date of|\s*Hire|\s*Seating|$)/i);
-    if (bodyMatch) result.bodyType = formatBodyType(bodyMatch[1].trim());
-  }
 
   // CC
   const ccMatch = searchText.match(/CC\/KW\s*(\d+)/i) || txt.match(/CC\/KW\s*(\d+)/i);
@@ -577,7 +560,7 @@ function TATAAIGPolicyCard({ item }) {
   const extractedVehicle = extractVehicleDetailsFromText(fullText);
   const autoPremium = extractPremiumData(fullText);
 
-  const vehicleCategory = getVehicleCategory(policy?.policyType, vehicle?.bodyType, fullText);
+  const vehicleCategory = getVehicleCategory(policy?.policyType, fullText);
   const productType = getProductType(policy?.policyType, fullText);
 
   const finalPremium = {

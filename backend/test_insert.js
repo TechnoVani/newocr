@@ -40,7 +40,6 @@ const testPolicyData = {
   manufacturing_year: 2026,
   commercial_vehicle_type: "",
   chassis_number: "MD2A92DX1SCJ60204",
-  body_type: "Metal",
   sub_type: "DUAL CHANNEL ABS",
   engine_number: "JEX CSJ26916",
   fuel: "Petrol",

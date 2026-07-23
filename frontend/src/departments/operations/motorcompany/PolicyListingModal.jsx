@@ -5,7 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 const rawData = [
   { "company": "Bajaj", "vehicle": "Tw", "product": "" },
   { "company": "Bajaj", "vehicle": "Pvt Car", "product": "" },
-  { "company": "Bajaj", "vehicle": "Commercial", "product": "Package {Bus}" },
+  { "company": "Bajaj", "vehicle": "Commercial", "product": "Package {(School Bus)}" },
   { "company": "GoDigit", "vehicle": "Tw", "product": "Package" },
   { "company": "GoDigit", "vehicle": "Pvt Car", "product": "Package, TP" },
   { "company": "GoDigit", "vehicle": "Commercial", "product": "" },

@@ -40,7 +40,6 @@ const REPORT_COLUMNS = [
   { key: "manufacturing_year", label: "Manufacturing Year" },
   { key: "chassis_number", label: "Chassis Number" },
   { key: "engine_number", label: "Engine Number" },
-  { key: "body_type", label: "Body Type" },
   { key: "fuel", label: "Fuel" },
   { key: "commercial_vehicle_type", label: "Commercial Vehicle Type" },
   { key: "sub_type", label: "Sub Type" },

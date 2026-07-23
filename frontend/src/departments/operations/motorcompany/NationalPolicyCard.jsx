@@ -467,7 +467,6 @@ const extractVehicleDetailsFromText = (text) => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    bodyType: "-",
     colour: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
@@ -530,16 +529,13 @@ const extractVehicleDetailsFromText = (text) => {
                       text.match(/िनमारण\s*वषर\s*Year\s+of\s+Mfg\.?\s*[:：]?\s*(\d{4})/i);
     if (yearMatch) result.manufacturingYear = yearMatch[1];
 
-    // --- Body Type / Colour ---
+    // --- Colour ---
     const bodyMatch = text.match(/Body\s+Type\s*\/\s*Color\s*[:：]?\s*([^\n]+)/i) ||
                       text.match(/ढाचा\s*का\s*पकार\s*\/\s*रंग\s*Body\s+Type\s*\/\s*Color\s*[:：]?\s*([^\n]+)/i) ||
                       text.match(/Type\s+of\s+Body\s*[:：]?\s*([A-Za-z\s&\/]+)(?=\s+\d+|$)/i);
     if (bodyMatch) {
       const bodyColor = bodyMatch[1].trim();
       const parts = bodyColor.split(/\s*\/\s*/);
-      
-      let rawBody = parts.length >= 2 ? parts[0].trim() : bodyColor;
-      result.bodyType = rawBody.replace(/\b(?:FULLY BUILT|HALF BUILT|CABIN & CHASSIS|CABIN AND CHASSIS)\b/gi, "").trim() || "-";
       
       if (parts.length >= 2) {
         result.colour = parts[1].trim();
@@ -601,7 +597,6 @@ const extractVehicleDetailsFromText = (text) => {
       result.registrationNumber = cleanRegistrationNumber(match[1]);
       result.engineNumber = match[2];
       result.chassisNumber = match[3];
-      result.bodyType = match[4] ? match[4].trim() : "-";
       result.cubicCapacity = match[5];
       result.manufacturingYear = match[6];
       result.seatingCapacity = match[7];
@@ -620,9 +615,7 @@ const extractVehicleDetailsFromText = (text) => {
           result.engineNumber = tokens[1] || "-";
           result.chassisNumber = tokens[2] || "-";
           let idx = 3;
-          let bodyParts = [];
-          while (idx < tokens.length && /^[A-Z]+$/.test(tokens[idx])) bodyParts.push(tokens[idx++]);
-          result.bodyType = bodyParts.length ? bodyParts.join(" ") : "-";
+          while (idx < tokens.length && /^[A-Z]+$/.test(tokens[idx])) idx++;
           if (idx < tokens.length && /^\d+$/.test(tokens[idx])) result.cubicCapacity = tokens[idx++];
           if (idx < tokens.length && /^\d{4}$/.test(tokens[idx])) result.manufacturingYear = tokens[idx++];
           if (idx < tokens.length) result.seatingCapacity = tokens[idx++];
@@ -685,7 +678,7 @@ function NationalPolicyCard({ item }) {
   const email = insured?.email || autoInsuredDetails?.email || "-";
   const gstin = autoInsuredDetails?.gstin || "-";
 
-  const vehicleCategory = getVehicleCategory(policy?.policyType, vehicle?.bodyType, fullText);
+  const vehicleCategory = getVehicleCategory(policy?.policyType, fullText);
   const productType = getProductType(policy?.policyType, fullText);
 
   const finalPremium = {

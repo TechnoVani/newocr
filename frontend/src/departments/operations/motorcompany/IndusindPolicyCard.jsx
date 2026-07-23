@@ -321,7 +321,6 @@ const extractVehicleDetailsFromText = (text) => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    bodyType: "-",
     fuelType: "-",
     colour: "-",
     cubicCapacity: "-",
@@ -477,15 +476,6 @@ const extractVehicleDetailsFromText = (text) => {
     }
   }
 
-  // Body Type
-  const bodyMatch = text.match(/(?:Type\s*of\s*Body|Body\s*Type)\s*[:\-]?\s*([A-Z]+)/i);
-  if (bodyMatch && bodyMatch[1]) {
-    let bodyType = bodyMatch[1].trim();
-    if (!/NATOTAL|TOTAL|PREMIUM/i.test(bodyType) && bodyType.length >= 2) {
-      result.bodyType = bodyType;
-    }
-  }
-
   // Fuel Type
   const fuelPatterns = [
     /Type\s*of\s*Fuel\s*[:]?\s*([A-Za-z]+)/i,
@@ -547,7 +537,7 @@ function IndusindPolicyCard({ item }) {
   const email = sanitizeValue(insured?.email || autoInsuredDetails?.email);
   const gstin = sanitizeValue(autoInsuredDetails?.gstin);
 
-  const vehicleCategory = sanitizeValue(getVehicleCategory(policy?.policyType, vehicle?.bodyType, item?.fullText));
+  const vehicleCategory = sanitizeValue(getVehicleCategory(policy?.policyType, item?.fullText));
   const productType = sanitizeValue(getProductType(policy?.policyType, item?.fullText));
   
   const dateOfIssue = sanitizeValue(extractDateOfIssue(item?.fullText));
@@ -582,7 +572,6 @@ function IndusindPolicyCard({ item }) {
     model: sanitizeValue(extractedVehicle.model),
     variant: sanitizeValue(extractedVehicle.variant),
     manufacturingYear: sanitizeValue(extractedVehicle.manufacturingYear),
-    bodyType: sanitizeValue(extractedVehicle.bodyType),
     fuelType: sanitizeValue(extractedVehicle.fuelType),
     colour: sanitizeValue(extractedVehicle.colour),
     cubicCapacity: sanitizeValue(extractedVehicle.cubicCapacity),

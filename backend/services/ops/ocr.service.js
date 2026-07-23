@@ -231,7 +231,6 @@ class OCRService {
                 - manufacturing_year (Integer)
                 - commercial_vehicle_type
                 - chassis_number
-                - body_type
                 - sub_type
                 - engine_number
                 - fuel (e.g., Petrol, Diesel, CNG)

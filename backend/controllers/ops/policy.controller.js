@@ -52,7 +52,6 @@ function mapFrontendToBackend(frontendData) {
     data.model_name = frontendData.model_name || v.model;
     data.variant_name = frontendData.variant_name || v.variant;
     data.manufacturing_year = frontendData.manufacturing_year || v.manufacturingYear;
-    data.body_type = frontendData.body_type || v.bodyType;
     data.fuel = frontendData.fuel || v.fuelType;
     data.cc = frontendData.cc || v.cubicCapacity;
     const seatingCapacity = frontendData.seating_capacity ?? v.seatingCapacity;

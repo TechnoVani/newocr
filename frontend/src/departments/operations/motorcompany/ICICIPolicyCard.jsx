@@ -323,7 +323,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     variant: "",
     gvw: "",
     manufacturingYear: "",
-    bodyType: "",
     fuelType: "",
     colour: "",
     cubicCapacity: "",
@@ -391,7 +390,6 @@ const extractVehicleDetailsFromText = (text = "") => {
       result.make = parts[0] || "";
       result.model = parts[1] || "";
       if (parts.length >= 5) {
-        result.bodyType = parts.slice(2, parts.length - 1).join(" ");
         result.subType = parts[parts.length - 1];
       }
     }
@@ -413,12 +411,6 @@ const extractVehicleDetailsFromText = (text = "") => {
   // Chassis
   const chassisMatch = searchText.match(/Chassis\s*No\.?\s*([A-Z0-9]+)/i) || txt.match(/Chassis\s*No\.?\s*([A-Z0-9]+)/i);
   if (chassisMatch) result.chassisNumber = chassisMatch[1].toUpperCase();
-
-  // Body Type (private only)
-  if (!isCommercial) {
-    const bodyMatch = searchText.match(/Body\s*Type\s*(.*?)(?=\s*CC\/KW|\s*Mfg\.|\s*Date of|\s*Hire|\s*Seating|$)/i);
-    if (bodyMatch) result.bodyType = bodyMatch[1].trim();
-  }
 
   // Cubic Capacity
   const ccMatch = searchText.match(/CC\/KW\s*(\d+)/i) || txt.match(/CC\/KW\s*(\d+)/i);
@@ -525,7 +517,7 @@ function TATAAIGPolicyCard({ item }) {
       insuranceCompany={sanitizeValue(extractInsuranceCompanyName(fullText))}
       branchAddress={sanitizeValue(extractBranchAddress(fullText))}
       productType={sanitizeValue(getProductType(policy?.policyType, fullText))}
-      vehicleCategory={sanitizeValue(getVehicleCategory(policy?.policyType, extractedVehicle?.bodyType, fullText))}
+      vehicleCategory={sanitizeValue(getVehicleCategory(policy?.policyType, fullText))}
       insuredName={sanitizeValue(insured?.insuredName || autoInsuredDetails?.insuredName)}
       panNumber={sanitizeValue(insured?.panNumber || autoInsuredDetails?.panNumber)}
       gstin={sanitizeValue(autoInsuredDetails?.gstin)}

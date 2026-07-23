@@ -143,7 +143,6 @@ const formatModelName = (model) => {
 };
 
 const formatVariantName = (variant) => formatGenericField(variant, [/Gvw/i, /GVW/i, /Year of manufacture/i, /Type of body/i, /Colour/i, /Registration/i]);
-const formatBodyType = (body) => formatGenericField(body, [/Gross Vehicle Weight/i, /GVW/i, /Type of fuel/i, /Year/i, /Colour/i]);
 const formatFuelType = (fuel) => formatGenericField(fuel, [/Cubic/i]);
 
 const formatFinancierName = (financier) => {
@@ -497,7 +496,7 @@ const extractPremiumData = (text) => {
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
-    variant: "-", gvw: "-", manufacturingYear: "-", bodyType: "-", fuelType: "-",
+    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
     colour: "-", cubicCapacity: "-", seatingCapacity: "-", financierName: "-"
   };
   if (!text || typeof text !== "string") return result;
@@ -523,7 +522,6 @@ const extractVehicleDetailsFromText = (text = "") => {
         result.make = dataMatch[7].trim();
         result.model = dataMatch[8].trim();
         if (dataMatch[9]) result.variant = dataMatch[9].trim();   // e.g., "735"
-        if (dataMatch[10]) result.bodyType = dataMatch[10].trim(); // e.g., "TRACTOR/Agricultural Tractors"
         if (dataMatch[11]) result.manufacturingYear = dataMatch[11].trim();
         if (dataMatch[12]) result.cubicCapacity = dataMatch[12].trim();
         if (dataMatch[13]) result.gvw = dataMatch[13].trim();
@@ -546,7 +544,6 @@ const extractVehicleDetailsFromText = (text = "") => {
         result.make = dataMatch[7].trim();
 
         let model = dataMatch[8].trim();
-        result.bodyType = dataMatch[9].trim();
         result.manufacturingYear = dataMatch[10].trim();
         result.cubicCapacity = dataMatch[11].trim();
         result.seatingCapacity = dataMatch[12].trim();
@@ -662,19 +659,10 @@ const extractVehicleDetailsFromText = (text = "") => {
     
     const parts = combinedText.split("/");
     if (parts.length >= 2) {
-      result.bodyType = parts.slice(0, -1).join(" ").trim();
       result.fuelType = isElectric ? "electric" : parts[parts.length - 1].trim();
     } else {
-      result.bodyType = combinedText.trim();
       result.fuelType = isElectric ? "electric" : combinedText.trim();
     }
-  }
-  
-  if (result.bodyType === "-") {
-    let bodyMatch = normalizedText.match(/Type of body\s*:\s*([^\n]+?)(?=\s*Gross Vehicle Weight|\s*GVW|\s*Type of fuel|$)/i);
-    if (!bodyMatch) bodyMatch = normalizedText.match(/Type of body\s*\/\s*Type of Fuel\s*([A-Za-z]+)\//i);
-    if (!bodyMatch) bodyMatch = normalizedText.match(/Type of body\s*\/\s*Type of Fuel\s*([A-Za-z]+)/i);
-    if (bodyMatch?.[1]) result.bodyType = bodyMatch[1].trim().replace(/\/(Diesel|Petrol|CNG|LPG|Electric).*$/i, '').replace(/Cubic.*$/i, '');
   }
 
   // --- SAFE FUEL TYPE EXTRACTION TO PREVENT "ID" BUG ---
@@ -782,10 +770,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     const saSeatMatch = normalizedText.match(/Seating Capacity\(Including\s*SideCar\)\s*(\d+)/i);
     if (saSeatMatch) result.seatingCapacity = saSeatMatch[1];
   }
-  if (result.bodyType === "-") {
-    const saBodyMatch = normalizedText.match(/Type Of Body\s*([A-Z\s]+?)(?=AA Membership|Seating Capacity|$)/i);
-    if (saBodyMatch) result.bodyType = saBodyMatch[1].trim();
-  }
   if (result.financierName === "-" || result.financierName === "N/A") {
     const saFinMatch = normalizedText.match(/(?:Financier\s*.*?|Name of the Financier\s*:?\s*)([A-Z\s&]+(?:BANK|FINANCE|LTD|LIMITED)[^\(]*)/i);
     if (saFinMatch) result.financierName = formatFinancierName(saFinMatch[1]);
@@ -820,7 +804,7 @@ function UnitedPolicyCard({ item }) {
   const email = insured?.email || autoInsuredDetails?.email || "-";
   const gstin = autoInsuredDetails?.gstin || "-";
 
-  const vehicleCategory = getVehicleCategory(policy?.policyType, vehicle?.bodyType, item?.fullText); // now imported
+  const vehicleCategory = getVehicleCategory(policy?.policyType, item?.fullText); // now imported
   const productType = getProductType(policy?.policyType, item?.fullText); // now imported
   const dateOfIssue = extractDateOfIssue(item?.fullText);
   const totalValue = extractIDV(item?.fullText);

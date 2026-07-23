@@ -561,7 +561,6 @@ function PolicyCardView({
     model: formData.vehicle.model || extractedVehicle?.model,
     variant: formData.vehicle.variant || extractedVehicle?.variant,
     manufacturingYear: formData.vehicle.manufacturingYear || extractedVehicle?.manufacturingYear,
-    bodyType: formData.vehicle.bodyType || extractedVehicle?.bodyType,
     fuelType: formData.vehicle.fuelType || normalizeFuelType(extractedVehicle?.fuelType),
     colour: formData.vehicle.colour || extractedVehicle?.colour,
     cubicCapacity: formData.vehicle.cubicCapacity || extractedVehicle?.cubicCapacity,
@@ -693,7 +692,6 @@ function PolicyCardView({
               <EditableRow label="Model" value={mergedVehicle.model} onChange={(val) => handleVehicleChange("model", val)} />
               <EditableRow label="Variant" value={mergedVehicle.variant} onChange={(val) => handleVehicleChange("variant", val)} />
               <EditableRow label="Year" value={mergedVehicle.manufacturingYear} onChange={(val) => handleVehicleChange("manufacturingYear", val)} type="year" />
-              <EditableRow label="Body Type" value={mergedVehicle.bodyType} onChange={(val) => handleVehicleChange("bodyType", val)} />
               <EditableRow label="Fuel" value={mergedVehicle.fuelType} onChange={(val) => handleVehicleChange("fuelType", val)} type="select" options={fuelTypeOptions} />
               <EditableRow label="CC" value={mergedVehicle.cubicCapacity} onChange={(val) => handleVehicleChange("cubicCapacity", val)} />
               

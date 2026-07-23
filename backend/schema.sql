@@ -374,7 +374,6 @@ CREATE TABLE `policies` (
   `manufacturing_year` int(11) DEFAULT NULL,
   `commercial_vehicle_type` varchar(100) DEFAULT NULL,
   `chassis_number` varchar(150) DEFAULT NULL,
-  `body_type` varchar(100) DEFAULT NULL,
   `sub_type` varchar(100) DEFAULT NULL,
   `engine_number` varchar(150) DEFAULT NULL,
   `fuel` varchar(50) DEFAULT NULL,

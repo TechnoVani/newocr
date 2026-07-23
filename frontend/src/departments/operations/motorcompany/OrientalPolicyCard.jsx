@@ -357,7 +357,6 @@ const extractVehicleDetailsFromText = (text = "") => {
     model: "-",
     variant: "-",
     manufacturingYear: "-",
-    bodyType: "-",
     colour: "-",
     cubicCapacity: "-",
     seatingCapacity: "-",
@@ -437,7 +436,6 @@ const extractVehicleDetailsFromText = (text = "") => {
       result.engineNumber = flatRowMatch[1];
       result.chassisNumber = flatRowMatch[2];
       make = flatRowMatch[3];
-      result.bodyType = flatRowMatch[4];
       let modelVariantRaw = flatRowMatch[5].trim();
       
       // Explicit split logic for Honda Shine 125 based on your request
@@ -653,18 +651,6 @@ const extractVehicleDetailsFromText = (text = "") => {
   // ---- Geographical Area ----
   const geoMatch = normalizedText.match(/Geographical\s+Area\s*:?\s*([A-Z\s]+)/i);
   if (geoMatch) result.geographicalArea = geoMatch[1].trim();
-
-  // ---- Body Type ----
-  if (result.bodyType === "-") {
-    let bodyType = "-";
-    const bodyFallback = normalizedText.match(
-      /\b\d{3,5}\s+([A-Z][A-Z\s]{1,25}?)\s+\d+\s*\+\s*\d+\b/i
-    );
-    if (bodyFallback) {
-      bodyType = bodyFallback[1].trim().toUpperCase();
-    }
-    result.bodyType = bodyType;
-  }
 
   // ---- Financier ----
   let financierName = "-";
@@ -1221,7 +1207,7 @@ function OrientalPolicyCard({ item }) {
   const email = insured?.email || autoInsuredDetails?.email || "-";
   const gstin = autoInsuredDetails?.gstin || "-";
 
-  const vehicleCategory = getVehicleCategory(policy?.policyType, vehicle?.bodyType, item?.fullText);
+  const vehicleCategory = getVehicleCategory(policy?.policyType, item?.fullText);
   const productType = getProductType(policy?.policyType, item?.fullText);
   const dateOfIssue = extractDateOfIssue(item?.fullText);
   const totalValue = extractIDV(item?.fullText);
