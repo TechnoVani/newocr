@@ -314,7 +314,7 @@ const extractVehicleDetailsFromText = (text) => {
     cubicCapacity: "-",
     seatingCapacity: "-",
     gvw: "-",
-    ncb: "-"
+    ncb: "0%"
   };
   
   if (!text) return result;
@@ -569,7 +569,6 @@ function IndusindPolicyCard({ item }) {
     seatingCapacity: sanitizeValue(extractedVehicle.seatingCapacity),
     financierName: sanitizeValue(extractedFinancier),
     gvw: sanitizeValue(extractedVehicle.gvw),
-    ncb: sanitizeValue(extractedVehicle.ncb),
   };
 
   return (

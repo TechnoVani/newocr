@@ -465,13 +465,13 @@ const extractPremiumData = (text) => {
 };
 
 // ============================================================
-// UPDATED VEHICLE DETAILS EXTRACTION (fixed tractor regex)
+// UPDATED VEHICLE DETAILS EXTRACTION
 // ============================================================
 const extractVehicleDetailsFromText = (text = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
     variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
-    cubicCapacity: "-", seatingCapacity: "-", financierName: "-", ncb: "-"
+    cubicCapacity: "-", seatingCapacity: "-", financierName: "-", ncb: "0%"
   };
   if (!text || typeof text !== "string") return result;
 
@@ -628,7 +628,7 @@ const extractVehicleDetailsFromText = (text = "") => {
   if (bodyFuelCombined?.[1]) {
     let combinedText = bodyFuelCombined[1].trim().replace(/Cubic capacity.*$/i, '');
     
-    // NEW LOGIC ADDED: Check for electric vehicles
+    // Check for electric vehicles
     const isElectric = /ELECTRIC/i.test(combinedText);
     
     const parts = combinedText.split("/");
@@ -749,6 +749,24 @@ const extractVehicleDetailsFromText = (text = "") => {
     if (saFinMatch) result.financierName = formatFinancierName(saFinMatch[1]);
   }
 
+  const ncbPatterns = [
+    /No\s*Claim\s*Bonus[\s:\-]*(\d{1,2}(?:\.\d+)?)\s*%/i,
+    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?[\s:\-]*(\d{1,2}(?:\.\d+)?)\s*%/i,
+    /\bNCB\s*\(\s*%\s*\)[\s:\-]*(\d{1,2}(?:\.\d+)?)/i,
+    /Deduct\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*for\s*NCB/i
+  ];
+  
+  for (const pattern of ncbPatterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      result.ncb = `${match[1]}%`; 
+      break;
+    }
+  }
+  if (!result.ncb && text.match(/\b(?:NCB\s*Discount|No\s*Claim\s*Bonus)\b/i)) {
+    result.ncb = "0%";
+  }
+
   return result;
 };
 
@@ -798,6 +816,23 @@ function UnitedPolicyCard({ item }) {
                        item?.fullText?.match(/Policy Number\s*:\s*(\S+)/i)?.[1] || 
                        item?.fullText?.match(/Policy No.\s+(\S+)/i)?.[1] || "-";
 
+  // ✅ ADDED `mergedVehicle` SO IT PASSES THE EXTRACTED DATA AND NCB DOWN TO POLICYCARDVIEW
+  const mergedVehicle = {
+    registrationNumber: vehicle?.registrationNumber || extractedVehicle?.registrationNumber || "-",
+    chassisNumber: vehicle?.chassisNumber || extractedVehicle?.chassisNumber || "-",
+    engineNumber: vehicle?.engineNumber || extractedVehicle?.engineNumber || "-",
+    make: vehicle?.make || extractedVehicle?.make || "-",
+    model: vehicle?.model || extractedVehicle?.model || "-",
+    variant: vehicle?.variant || extractedVehicle?.variant || "-",
+    gvw: vehicle?.gvw || extractedVehicle?.gvw || "-",
+    manufacturingYear: vehicle?.manufacturingYear || extractedVehicle?.manufacturingYear || "-",
+    fuelType: vehicle?.fuelType || extractedVehicle?.fuelType || "-",
+    cubicCapacity: vehicle?.cubicCapacity || extractedVehicle?.cubicCapacity || "-",
+    seatingCapacity: vehicle?.seatingCapacity || extractedVehicle?.seatingCapacity || "-",
+    financierName: vehicle?.financierName || extractedVehicle?.financierName || "-",
+    ncb: vehicle?.ncb || extractedVehicle?.ncb || "0%",
+  };
+
   return (
     <PolicyCardView
       item={item}
@@ -818,7 +853,7 @@ function UnitedPolicyCard({ item }) {
       previousInsurer={previousInsurer}
       previousPolicyNumber={previousPolicyNumber}
       finalPremium={finalPremium}
-      vehicle={vehicle}
+      vehicle={mergedVehicle} 
       extractedVehicle={extractedVehicle}
     />
   );
