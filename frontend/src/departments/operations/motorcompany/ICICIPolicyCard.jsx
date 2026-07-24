@@ -467,18 +467,30 @@ const extractVehicleDetailsFromText = (text = "") => {
     }
   }
 
+  // 1. Set default to "0%"
+  result.ncb = "0%"; 
+
+  // 2. Define standard valid NCB slabs
+  const validNcbSlabs = ["0", "20", "25", "35", "45", "50"];
+
   const ncbPatterns = [
-    /No\s*Claim\s*Bonus(?:[^\d]+)?(\d+(?:\.\d+)?)\s*%?/i,
-    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?(?:[^\d]+)?(\d+(?:\.\d+)?)\s*%?/i,
-    /\bNCB\s*\(\s*%\s*\)(?:[^\d]+)?(\d+(?:\.\d+)?)/i,
-    /Deduct\s*(\d+(?:\.\d+)?)\s*%?\s*for\s*NCB/i
+    /No\s*Claim\s*Bonus[\s:\-%.()]*(\d{1,2}(?:\.\d+)?)\s*%?/i,
+    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?[\s:\-%.()]*(\d{1,2}(?:\.\d+)?)\s*%?/i,
+    /\bNCB\s*\(\s*%\s*\)[\s:\-]*(\d{1,2}(?:\.\d+)?)/i,
+    /Deduct\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*for\s*NCB/i
   ];
   
   for (const pattern of ncbPatterns) {
-    const match = text.match(pattern);
+    const match = text.match(pattern); // Note: use normalizedText if inside United/ICICI
     if (match?.[1]) {
-      result.ncb = `${match[1]}%`; 
-      break;
+      // Parse as integer to safely turn "50.00" into "50"
+      const extractedNum = parseInt(match[1], 10).toString();
+      
+      // 3. Only apply if it matches one of the defined slabs
+      if (validNcbSlabs.includes(extractedNum)) {
+        result.ncb = `${extractedNum}%`; 
+        break;
+      }
     }
   }
   
