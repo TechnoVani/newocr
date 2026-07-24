@@ -144,7 +144,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
     model: "-", variant: "-", manufacturingYear: "-", bodyType: "-",
     cubicCapacity: "-", seatingCapacity: "-", financierName: "-", fuelType: "-", idv: "-",
-    ncb: "-" 
+    ncb: "0%" 
   };
 
   // Helper to remove all non-alphanumeric characters (including spaces)

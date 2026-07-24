@@ -21,10 +21,12 @@ const removeHyphens = (val) => (val && val !== "-" ? String(val).replace(/-/g, "
 
 const formatEngineNumber = (engine) => {
   if (!engine) return "-";
+
   return String(engine)
+    .replace(/\r|\n/g, " ")
     .replace(/\s+/g, "")
     .replace(/MAKE|MODEL|VARIANT$/gi, "")
-    .replace(/[^A-Z0-9]/gi, "")
+    .replace(/[^A-Z0-9./-]/gi, "") // Keep . / -
     .toUpperCase()
     .trim() || "-";
 };
@@ -97,7 +99,7 @@ const formatFinancierName = (financier) => {
 };
 
 // ============================================================
-// EXTRACTION FUNCTIONS (TAILORED FOR TATA AIG)
+// EXTRACTION FUNCTIONS (UNIVERSAL FOR TATA AIG)
 // ============================================================
 
 // ---- Insured Details ----
@@ -142,19 +144,19 @@ const extractPolicyDates = (text = "") => {
   if (!text) return result;
   const txt = normalizeText(text);
 
-  // Commercial policy: single period
-  const commercialPeriod = txt.match(
+  // General Policy Period
+  const generalPeriod = txt.match(
     /Period\s*of\s*Insurance\s*(\d{2}\/\d{2}\/\d{4})\s*[\d:]+?\s*(?:Hours)?\s*To\s*(\d{2}\/\d{2}\/\d{4})\s*(?:Midnight|Hours)?/i
   );
-  if (commercialPeriod) {
-    result.startDate = commercialPeriod[1];
-    result.odExpireDate = commercialPeriod[2];
-    result.tpStartDate = commercialPeriod[1];
-    result.tpExpireDate = commercialPeriod[2];
+  if (generalPeriod) {
+    result.startDate = generalPeriod[1];
+    result.odExpireDate = generalPeriod[2];
+    result.tpStartDate = generalPeriod[1];
+    result.tpExpireDate = generalPeriod[2];
     return result;
   }
 
-  // Private / Package
+  // Segmented (Private / Package)
   const odMatch = txt.match(/Own\s*Damage\s*Cover\s*(\d{2}\/\d{2}\/\d{4}).*?(\d{2}\/\d{2}\/\d{4})/is);
   if (odMatch) {
     result.startDate = odMatch[1];
@@ -178,7 +180,7 @@ const extractPolicyDates = (text = "") => {
     }
   }
 
-  // Fallback
+  // Fallbacks
   if (result.startDate === "-" || result.odExpireDate === "-") {
     const fallback = txt.match(/OD\s*Cover\s*Period\s*:\s*(\d{2}\/\d{2}\/\d{4}).*?to\s*(\d{2}\/\d{2}\/\d{4})/is);
     if (fallback) {
@@ -217,73 +219,125 @@ const extractIDV = (text = "") => {
 // ---- Previous Policy Number ----
 const extractPreviousPolicyNumber = (text = "") => {
   if (!text) return "-";
-  const txt = normalizeText(text);
-  const isCommercial = /Commercial\s*Vehicle|Goods\s*Carrying|Public\s*Carrier|Private\s*Carrier|CV\s*Policy|Goods\s*Carriage|Tipper|Pick\s*Up|Van/i.test(
-    txt
+
+  const txt = String(text)
+    .replace(/\r/g, "\n")
+    .replace(/\t/g, " ")
+    .replace(/[ ]{2,}/g, " ");
+
+  const unavailableValues = new Set([
+    "NA",
+    "N/A",
+    "N.A",
+    "N.A.",
+    "NIL",
+    "NONE",
+    "NOTAVAILABLE",
+    "NOT-AVAILABLE",
+  ]);
+
+  const cleanPolicyNumber = (value) => {
+    if (!value) return "-";
+
+    const cleaned = String(value)
+      .trim()
+      .replace(/[.,;:]+$/, "")
+      .toUpperCase();
+
+    const normalized = cleaned.replace(/\s+/g, "");
+
+    if (!normalized || unavailableValues.has(normalized)) {
+      return "-";
+    }
+
+    return cleaned;
+  };
+
+  // ============================================================
+  // 1. ISOLATE PREVIOUS INSURANCE DETAILS SECTION
+  // ============================================================
+  const previousInsuranceSectionMatch = txt.match(
+    /Previous\s*Insurance\s*(?:Details|Particulars)\s*:?\s*([\s\S]*?)(?=Restriction\s*of\s*Cover|Discounts|Concessions|Extended\s*Covers|Add[- ]?On\s*Covers|$)/i
   );
-  if (isCommercial) {
-    const match = txt.match(/Policy\s*Number\s*\*?\s*[:：]\s*([A-Z0-9/]+)/i);
-    return match ? match[1].trim() : "-";
+
+  const previousInsuranceSection = previousInsuranceSectionMatch?.[1] || "";
+
+  // ============================================================
+  // 2. FIRST NUMBERED POLICY INSIDE PREVIOUS INSURANCE SECTION
+  // Example: 1. Policy Number: 3001/O/388443013/00/000
+  // ============================================================
+  if (previousInsuranceSection) {
+    const numberedPolicyMatch = previousInsuranceSection.match(
+      /\b1\s*[.)]?\s*Policy\s*Number\s*\*?\s*[:：]?\s*([A-Z0-9][A-Z0-9./-]*)/i
+    );
+
+    if (numberedPolicyMatch?.[1]) {
+      return cleanPolicyNumber(numberedPolicyMatch[1]);
+    }
+
+    // Fallback inside only the previous insurance section
+    const sectionPolicyMatch = previousInsuranceSection.match(
+      /Policy\s*Number\s*\*?\s*[:：]?\s*([A-Z0-9][A-Z0-9./-]*)/i
+    );
+
+    if (sectionPolicyMatch?.[1]) {
+      return cleanPolicyNumber(sectionPolicyMatch[1]);
+    }
   }
-  const prevSection = txt.match(/Previous Insurance Details\s*([\s\S]*?)(?=Restriction of Cover|Transcript Of Proposal|$)/i);
-  if (prevSection) {
-    const match = prevSection[1].match(/Policy\s*Number\s*[:]?\s*([0-9]+)/i);
-    if (match) return match[1].trim();
+
+  // ============================================================
+  // 3. OTHER PREVIOUS POLICY FORMATS
+  // ============================================================
+  const patterns = [
+    // Previous Insurance Particulars*: Policy Number*: ...
+    /Previous\s*Insurance\s*Particulars\s*\*?\s*[:：]?\s*Policy\s*Number\s*\*?\s*[:：]?\s*([A-Z0-9][A-Z0-9./-]*)/i,
+
+    // Previous Policy Number: ...
+    /Previous\s*Policy\s*Number\s*\*?\s*[:：]?\s*([A-Z0-9][A-Z0-9./-]*)/i,
+
+    // Previous Policy: NA Accident
+    /Previous\s*Policy\s*\*?\s*[:：]?\s*([A-Z0-9][A-Z0-9./-]*)/i,
+
+    // 1. Policy Number: ...
+    /\b1\s*[.)]?\s*Policy\s*Number\s*\*?\s*[:：]?\s*([A-Z0-9][A-Z0-9./-]*)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = txt.match(pattern);
+    if (!match?.[1]) continue;
+    return cleanPolicyNumber(match[1]);
   }
-  const fallback = txt.match(/Previous\s*Policy\s*Number\s*[:]?\s*([0-9]+)/i);
-  return fallback ? fallback[1].trim() : "-";
+
+  return "-";
 };
 
 // ---- Previous Insurer ----
 const extractPreviousInsurer = (text = "") => {
   if (!text) return "-";
   const txt = normalizeText(text);
-  const isCommercial = /Commercial\s*Vehicle|Goods\s*Carrying|Public\s*Carrier|Private\s*Carrier|CV\s*Policy|Goods\s*Carriage|Tipper|Pick\s*Up|Van/i.test(
-    txt
-  );
-  const stopPattern = /\s+(?:NCB|Policy\s*Number|Date\s*of\s*Expiry|Type\s*of\s*Cover|Address\s*of\s*the\s*Insurer|Claim|Accident|Period\s*of\s*Insurance|Restriction\s*of\s*Cover|Add\s*on\s*Covers|$)/i;
-  let name = "-";
+  
+  // Cleaned up stop pattern using a lookahead
+  const stopPattern = /^(.*?)(?=\s+(?:NCB|Policy\s*Number|Date\s*of\s*Expiry|Type\s*of\s*Cover|Address\s*of\s*the\s*Insurer|Claim|Accident|Period\s*of\s*Insurance|Restriction\s*of\s*Cover|Add\s*on\s*Covers)|$)/i;
 
-  if (isCommercial) {
-    const section = txt.match(
-      /(?:Previous\s*Insurance\s*(?:Details|Particulars)|Transcript\s*Of\s*Proposal)\s*([\s\S]*?)(?=Restriction\s*of\s*Cover|Add\s*on\s*Covers|$)/i
-    );
-    if (section) {
-      const match = section[1].match(/Name\s*of\s*the\s*Insurer\s*\*?\s*[:：]\s*([^\n]+)/i);
-      if (match) {
-        let raw = match[1].trim();
-        const cleanMatch = raw.match(new RegExp(`^(.*?)${stopPattern.source}`));
-        name = cleanMatch ? cleanMatch[1].trim() : raw;
-      }
-    }
-    if (name === "-") {
-      const fallback = txt.match(/Name\s*of\s*the\s*Insurer\s*\*?\s*[:：]\s*([^\n]+)/i);
-      if (fallback) {
-        let raw = fallback[1].trim();
-        const cleanMatch = raw.match(new RegExp(`^(.*?)${stopPattern.source}`));
-        name = cleanMatch ? cleanMatch[1].trim() : raw;
-      }
-    }
-  } else {
-    const prevSection = txt.match(/Previous Insurance Details\s*([\s\S]*?)(?=Restriction of Cover|Transcript Of Proposal|$)/i);
-    if (prevSection) {
-      const match = prevSection[1].match(/Name\s*of\s*the\s*Insurer\s*[:]?\s*(.*?)(?=\s*\d+\.\s*Policy\s*Number|\n|$)/i);
-      if (match) {
-        let raw = match[1].trim();
-        const cleanMatch = raw.match(new RegExp(`^(.*?)${stopPattern.source}`));
-        name = cleanMatch ? cleanMatch[1].trim() : raw;
-      }
-    }
-    if (name === "-") {
-      const fallback = txt.match(/Previous\s*Insurer\s*[:]?\s*(.*?)(?=\s*Policy\s*Number|$)/i);
-      if (fallback) {
-        let raw = fallback[1].trim();
-        const cleanMatch = raw.match(new RegExp(`^(.*?)${stopPattern.source}`));
-        name = cleanMatch ? cleanMatch[1].trim() : raw;
-      }
-    }
+  // Extract section if it exists, otherwise default to empty string
+  const section = txt.match(/(?:Previous\s*Insurance\s*(?:Details|Particulars)|Transcript\s*Of\s*Proposal)\s*([\s\S]*?)(?=Restriction\s*of\s*Cover|Add\s*on\s*Covers|$)/i)?.[1] || "";
+
+  // Chain the matches in the exact priority order
+  const match = section.match(/Name\s*of\s*the\s*Insurer\s*\*?\s*[:：]?\s*([^\n]+)/i) ||
+                section.match(/Previous\s*Insurer\s*[:]?\s*(.*?)(?=\s*\d+\.\s*Policy\s*Number|\n|$)/i) ||
+                txt.match(/Previous\s*Insurer\s*[:]?\s*(.*?)(?=\s*Policy\s*Number|$)/i) ||
+                txt.match(/Name\s*of\s*the\s*Insurer\s*\*?\s*[:：]?\s*([^\n]+)/i);
+
+  // If a match is found in any of the above, clean it up
+  if (match?.[1]) {
+    const raw = match[1].trim();
+    const cleanMatch = raw.match(stopPattern);
+    const name = cleanMatch ? cleanMatch[1].trim() : raw;
+    
+    return name.replace(/\s+\d+\..*$/, "").trim() || "-";
   }
-  return name.replace(/\s+\d+\..*$/, "").trim() || "-";
+
+  return "-";
 };
 
 // ---- Premium Data ----
@@ -305,13 +359,47 @@ const extractPremiumData = (text = "") => {
   if (!premiumSection) return defaultResult;
   const pText = premiumSection[1];
 
-  // OD
+  // OD Net Own damage Premium
   const baseODMatch =
     pText.match(/Basic\s*Own\s*Damage\s*Premium[^0-9]*([\d,.]+)/i) ||
     pText.match(/Own\s*Damage\s*Premium\s*on\s*Vehicle\s*and\s*Accessories[\s\S]{0,50}?([\d,.]+)/i);
-  const totalODMatch =
-    pText.match(/Total\s*Own\s*Damage\s*Premium\s*\(A\)[^0-9]*([\d,.]+)/i) ||
-    pText.match(/Net\s*Own\s*Damage\s*Premium\s*\(A\+C\)[^0-9]*([\d,.]+)/i);
+
+  // ---------- TOTAL OD PREMIUM (Summation Logic) ----------
+  let totalOdPremium = "0";
+  const netOdMatch = pText.match(/Net\s*Own\s*Damage\s*Premium\s*\(A\+C\)[^0-9]*([\d,.]+)/i);
+
+  if (netOdMatch) {
+    totalOdPremium = netOdMatch[1].replace(/,/g, "");
+  } else {
+    // Look for A, C (or B), and D individually
+    const matchA = pText.match(/Total\s*Own\s*Damage\s*Premium\s*\(A\)[^0-9]*([\d,.]+)/i);
+    
+    if (matchA) {
+      let sum = parseFloat(matchA[1].replace(/,/g, ""));
+      
+      // Matches "Total Add on Premium (C)" or "(B)"
+      const matchC = pText.match(/Total\s*Add\s*on\s*Premium\s*(?:\(C\)|\(B\))?[^0-9]*([\d,.]+)/i);
+      if (matchC) {
+        sum += parseFloat(matchC[1].replace(/,/g, ""));
+      }
+
+      // Matches "Total Others (D)"
+      const matchD = pText.match(/Total\s*Others\s*\(D\)[^0-9]*([\d,.]+)/i);     
+      
+      if (matchD) {
+        sum += parseFloat(matchD[1].replace(/,/g, ""));
+      }
+
+       const matchE = pText.match(/Total\s*Others\s*\(C\)[^0-9]*([\d,.]+)/i);     
+      
+      if (matchE) {
+        sum += parseFloat(matchE[1].replace(/,/g, ""));
+      }
+
+      // Keep 2 decimal places if it's a float, otherwise return standard number
+      totalOdPremium = Number.isInteger(sum) ? String(sum) : sum.toFixed(2);
+    }
+  }
 
   // TP
   let totalTpPremium = "0";
@@ -370,7 +458,7 @@ const extractPremiumData = (text = "") => {
   return {
     calculatedOdPremium: baseODMatch ? baseODMatch[1].replace(/,/g, "") : "0",
     calculatedTpPremium,
-    totalOdPremium: totalODMatch ? totalODMatch[1].replace(/,/g, "") : "0",
+    totalOdPremium, 
     totalTpPremium,
     netPremium,
     gst,
@@ -397,28 +485,15 @@ const extractVehicleDetailsFromText = (text = "") => {
   };
   if (!text) return result;
   const txt = normalizeText(text);
-  const isCommercial = /Commercial Vehicle Package Policy|Goods Carrying Vehicle|Public Carrier|GVW/i.test(txt);
 
-  // Extract the relevant vehicle details section
-  let section = "";
-  if (isCommercial) {
-    const commercialSection =
-      txt.match(/Vehicle\s*Details\s*:?\s*([\s\S]*?)(?=Public\s*Carrier|Private\s*Carrier|Insured\s*Declared\s*Value|Schedule\s*of\s*Premium|$)/i) ||
-      txt.match(/Vehicle\s*Details\s*:?\s*([\s\S]*?)(?=RTO\s*Location|Zone|Geographical\s*Area|$)/i);
-    if (commercialSection) {
-      section = commercialSection[1];
-    }
-  } else {
-    const privateSection = txt.match(
-      /Vehicle\s*Details\s*[-–]\s*Accurate\s*Vehicle\s*Details,\s*Custom\s*Insurance\s*([\s\S]*?)(?=Zone\s*Details|Battery\s*Details|Agent|Insured\s*Declared\s*Value|$)/i
-    ) || txt.match(
-      /Vehicle\s*Details\s*([\s\S]*?)(?=Zone\s*Details|Battery\s*Details|Agent|Insured\s*Declared\s*Value|Schedule\s*of\s*Premium|$)/i
-    );
-    if (privateSection) {
-      section = privateSection[1];
-    }
-  }
-
+  // General block isolation
+  // FIX: Added capture group ([\s\S]*?) to the first regex so sectionMatch[1] is always valid
+  const sectionMatch = 
+    txt.match(/Vehicle\s*Details\s*[-–]?\s*Accurate\s*Vehicle\s*Details([\s\S]*?)(?=Zone\s*Details|Battery\s*Details|Agent|Insured\s*Declared\s*Value|Schedule\s*of\s*Premium|$)/i) ||
+    txt.match(/Vehicle\s*Details\s*:?\s*([\s\S]*?)(?=Public\s*Carrier|Private\s*Carrier|RTO\s*Location|Zone|Geographical\s*Area|Battery\s*Details|Agent|Insured\s*Declared\s*Value|Schedule\s*of\s*Premium|$)/i);
+  
+  // FIX: Safe assignment to guarantee `section` is a string, never undefined
+  const section = sectionMatch?.[1] || sectionMatch?.[0] || "";
   const searchText = section || txt;
 
   // ---------- REGISTRATION NUMBER ----------
@@ -427,99 +502,84 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.registrationNumber = regMatch[1].replace(/\s+/g, "").toUpperCase();
   }
 
-  // ---------- FUEL TYPE (IMPROVED FOR RELIABILITY) ----------
-  let fuelMatch = null;
-
-  // 1. Try in the vehicle section first
-  if (section) {
-    fuelMatch = section.match(/Fuel\s*Type\s*[:：]?\s*([A-Za-z0-9\-]+)/i);
-  }
-
-  // 2. If not found, search the entire normalized text
-  if (!fuelMatch) {
-    fuelMatch = txt.match(/Fuel\s*Type\s*[:：]?\s*([A-Za-z0-9\-]+)/i);
-  }
-
-  // 3. Final fallback: look for "Fuel:" alone
-  if (!fuelMatch) {
-    fuelMatch = txt.match(/Fuel\s*[:：]?\s*([A-Za-z0-9\-]+)/i);
-  }
+  // ---------- FUEL TYPE ----------
+  // FIX: Because section is safely a string now, section.match() will not crash
+  let fuelMatch = section.match(/Fuel\s*Type\s*[:：]?\s*([A-Za-z0-9\-]+)/i) || 
+                  txt.match(/Fuel\s*Type\s*[:：]?\s*([A-Za-z0-9\-]+)/i) ||
+                  txt.match(/Fuel\s*[:：]?\s*([A-Za-z0-9\-]+)/i);
 
   if (fuelMatch && fuelMatch[1]) {
-    const rawFuel = fuelMatch[1];
-    const cleanedFuel = formatFuelType(rawFuel);
-    const finalFuel = cleanedFuel.toUpperCase();
-    result.fuelType = finalFuel;
-  } else {
-    result.fuelType = "-";
+    result.fuelType = formatFuelType(fuelMatch[1]).toUpperCase();
   }
 
-  // ---------- OTHER FIELDS (unchanged) ----------
-  // Make / Model / Variant
-  if (isCommercial) {
-    const mmv = searchText.match(/Make\s*\/\s*Model\s*\/\s*Body\s*Type\s*\/\s*Segment\s*([A-Z0-9\/\-\s]+)/i) ||
-                txt.match(/Make\/Model\/Body\s*Type\/Segment\s*:?\s*([A-Z0-9\/\-\s]+)/i);
-    if (mmv) {
-      const parts = mmv[1].split("/").map(v => v.trim()).filter(Boolean);
-      result.make = parts[0] || "-";
-      result.model = parts[1] || "-";
-    }
-  } else {
-    const mmv = searchText.match(/Make\s*\/\s*Model\s*\/\s*Variant\s*([^\n]+)/i);
-    if (mmv) {
-      const parts = mmv[1].split("/").map(v => v.trim());
-      result.make = parts[0] || "-";
-      if (parts[1]) result.model = formatModelName(parts[1]);
-      if (parts[2]) result.variant = formatVariantName(parts[2]);
-    }
+  // ---------- MAKE / MODEL / VARIANT ----------
+  const mmvMatch = searchText.match(/Make\s*\/\s*Model\s*\/\s*(?:Variant|Body\s*Type\s*\/\s*Segment)\s*:?\s*([^\n]+)/i);
+  if (mmvMatch) {
+    const cleanMmv = mmvMatch[1]
+      .replace(/C\s+AMPER/gi, "CAMPER")
+      .replace(/\s{2,}/g, " ");
+        
+    const parts = cleanMmv.split("/").map(v => v.trim()).filter(Boolean);
+    
+    result.make = parts[0] || "-";
+    if (parts[1]) result.model = formatModelName(parts[1]);
+    if (parts[2]) result.variant = formatVariantName(parts[2]);
   }
 
-  // Engine
-  const engineMatch = searchText.match(/Engine\s*(?:No\.?|Number)\s*\/?\s*Motor\s*No\.?\s*(?:\(for EV\))?\s*([A-Z0-9]+)/i) ||
-                      txt.match(/Engine\s*(?:No\.?|Number)\s*\/?\s*Motor\s*No\.?\s*(?:\(for EV\))?\s*([A-Z0-9]+)/i);
-  if (engineMatch) result.engineNumber = formatEngineNumber(engineMatch[1]);
+  // ---------- ENGINE & CHASSIS ----------
+  const engineRegex = /Engine\s*(?:No\.?|Number)?\s*\/?\s*Motor\s*No\.?\s*(?:\(for\s*EV\))?\s*[:\-]?\s*([A-Z0-9][A-Z0-9./-]*)/i;
 
-  // Chassis
+  const engineMatch = searchText.match(engineRegex) || txt.match(engineRegex);
+
+  if (engineMatch) {
+    result.engineNumber = formatEngineNumber(engineMatch[1]);
+  }
+
   const chassisMatch = searchText.match(/Chassis\s*No\.?\s*([A-Z0-9]+)/i) || txt.match(/Chassis\s*No\.?\s*([A-Z0-9]+)/i);
   if (chassisMatch) result.chassisNumber = formatChassisNumber(chassisMatch[1]);
 
-  // CC
+  // ---------- OTHER FIELDS ----------
   const ccMatch = searchText.match(/CC\/KW\s*(\d+)/i) || txt.match(/CC\/KW\s*(\d+)/i);
   if (ccMatch) result.cubicCapacity = `${ccMatch[1]} cc`;
 
-  // Year
   const yearMatch = searchText.match(/Mfg\.\s*Year\s*(\d{4})/i) || txt.match(/Mfg\.\s*Year\s*(\d{4})/i);
   if (yearMatch) result.manufacturingYear = yearMatch[1];
 
-  // Seating
-  if (isCommercial) {
-    const seatMatch = searchText.match(/Licensed\s*Carrying\s*Capacity\s*Including\s*Driver\s*(\d+)/i) ||
-                      txt.match(/Licensed\s*Carrying\s*Capacity\s*Including\s*Driver\s*(\d+)/i);
-    if (seatMatch) result.seatingCapacity = seatMatch[1];
-  } else {
-    const seatMatch = searchText.match(/Seating\s*Capacity\s*\(Including\s*Driver\)\s*(\d+)/i);
-    if (seatMatch) result.seatingCapacity = seatMatch[1];
-  }
+  const seatMatch = searchText.match(/Seating\s*Capacity\s*\(Including\s*Driver\)\s*(\d+)/i) ||
+                    searchText.match(/Licensed\s*Carrying\s*Capacity\s*Including\s*Driver\s*(\d+)/i) ||
+                    txt.match(/Licensed\s*Carrying\s*Capacity\s*Including\s*Driver\s*(\d+)/i);
+  if (seatMatch) result.seatingCapacity = seatMatch[1];
 
-  // GVW
-  if (isCommercial) {
-    const gvwMatch = searchText.match(/GVW\s*(\d+)/i) || txt.match(/GVW\s*(\d+)/i);
-    if (gvwMatch) result.gvw = gvwMatch[1].trim();
-  }
+  const gvwMatch = searchText.match(/GVW\s*(\d+)/i) || txt.match(/GVW\s*(\d+)/i);
+  if (gvwMatch) result.gvw = gvwMatch[1].trim();
 
-  // Financier
-  const finMatch = searchText.match(/Hire\s*Purchase\s*\/\s*Hypothecation\s*\/\s*Lease\s*with\s*([\s\S]{0,100}?)(?=Seating|Licensed|Zone|RTO|$)/i);
+  // ---------- FINANCIER ----------
+  const finMatch = searchText.match(
+    /(?:Hire\s*Purchase\s*\/\s*)?Hypothecation\s*\/\s*Lease\s*with\s*:?\s*([\s\S]{1,100}?)(?=\n|Seating|Licensed|Zone|RTO|CC|Fuel|Engine|Chassis|Contract|Loan|$)/i
+  );
+
   if (finMatch) {
-    const financier = finMatch[1].replace(/\n/g, " ").replace(/\s+/g, " ").trim();
-    if (financier && !/^NA$/i.test(financier) && !/^N\/A$/i.test(financier)) {
-      result.financierName = formatFinancierName(financier);
+    let rawFinancier = finMatch[1]
+      .replace(/\n/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const isNullValue = /^(NA|N\/A|N\.A\.|NIL|NONE|-)$/i.test(rawFinancier);
+
+    if (rawFinancier && !isNullValue) {
+      result.financierName = formatFinancierName(rawFinancier);
+    } else {
+      result.financierName = "-";
     }
   }
 
-  const ncbMatch = text.match(/No\s+Claim\s+Bonus\s*[:]?\s*[-]?\s*(\d+%)/i);
+  // ---------- NCB ----------
+  const ncbMatch = text.match(/No\s+Claim\s+Bonus[\s:\-(]*(\d+%)/i);
+  
   if (ncbMatch) {
     result.ncb = ncbMatch[1];
   }
+  
   return result;
 };
 
@@ -568,7 +628,7 @@ function TATAAIGPolicyCard({ item }) {
 
   const policyNumber =
     policy?.policyNumber ||
-    fullText.match(/Policy\s*No\.\s*([\d\s]+)/i)?.[1]?.trim() ||
+    fullText.match(/Policy\s*No\.\s*([\d\s]+)/i)?.[1]?.replace(/\s+/g, "") ||
     "-";
 
   return (

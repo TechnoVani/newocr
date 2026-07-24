@@ -130,7 +130,7 @@ const extractInsuredDetails = (fullText = "") => {
   result.panNumber = panNumber;
 
   // Contact & Email
-  const contactMatch = text.match(/Mob[- ]?(\*+|\d+)/i);
+  const contactMatch = text.match(/Mob[\s\-:]*([*\d]+)/i);
   result.contactNumber = contactMatch?.[1]?.trim() || "";
 
   const emailMatch = text.match(/Email[- ]?([^\s,]+)/i);

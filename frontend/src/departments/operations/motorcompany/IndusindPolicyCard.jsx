@@ -176,8 +176,7 @@ const extractInsuredDetails = (text = "") => {
     }
   }
   
- let gstin = "-";
-  
+  let gstin = "-";
   
   return { insuredName, insuredAddress, panNumber, contactNumber, email, gstin };
 };
@@ -454,7 +453,7 @@ const extractVehicleDetailsFromText = (text) => {
   const seatPatterns = [
     /Seating\s*Capacity\s*Including\s*Driver\s*[:]?\s*(\d+)/i,
     /Seating\s*Capacity\s*[:]?\s*(\d+)/i,
-    /LCC\s*Including\s*Driver\s*[:]?\s*(\d+)/i // <-- Added new pattern
+    /LCC\s*Including\s*Driver\s*[:]?\s*(\d+)/i
   ];
   
   for (const pattern of seatPatterns) {
@@ -478,19 +477,27 @@ const extractVehicleDetailsFromText = (text) => {
     }
   }
 
-  // No Claim Bonus
+  // ==========================================
+  // UPDATED: No Claim Bonus (Validated Slabs)
+  // ==========================================
+  result.ncb = "0%";
+  const validNcbSlabs = ["0", "20", "25", "35", "45", "50"];
+  
   const ncbPatterns = [
-    /No\s*Claim\s*Bonus(?:\s*\(NCB\))?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%/i,
-    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%/i,
-    /\bNCB\s*\(\s*%\s*\)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i,
-    /Deduct\s*(\d+(?:\.\d+)?)\s*%\s*for\s*NCB/i // <-- Added new pattern
+    /No\s*Claim\s*Bonus[\s:\-%.()]*(\d{1,2}(?:\.\d+)?)\s*%?/i,
+    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?[\s:\-%.()]*(\d{1,2}(?:\.\d+)?)\s*%?/i,
+    /\bNCB\s*\(\s*%\s*\)[\s:\-]*(\d{1,2}(?:\.\d+)?)/i,
+    /Deduct\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*for\s*NCB/i
   ];
   
   for (const pattern of ncbPatterns) {
     const match = text.match(pattern);
     if (match?.[1]) {
-      result.ncb = `${match[1]}%`;
-      break;
+      const extractedNum = parseInt(match[1], 10).toString();
+      if (validNcbSlabs.includes(extractedNum)) {
+        result.ncb = `${extractedNum}%`;
+        break;
+      }
     }
   }
 
@@ -569,6 +576,25 @@ function IndusindPolicyCard({ item }) {
     seatingCapacity: sanitizeValue(extractedVehicle.seatingCapacity),
     financierName: sanitizeValue(extractedFinancier),
     gvw: sanitizeValue(extractedVehicle.gvw),
+    ncb: sanitizeValue(extractedVehicle.ncb), // ADDED NCB HERE
+  };
+
+  // ✅ MERGED VEHICLE PIPELINE FIX
+  // This ensures the extracted values (like NCB) are successfully passed down to the UI
+  const mergedVehicle = {
+    registrationNumber: vehicle?.registrationNumber || sanitizedExtractedVehicle.registrationNumber,
+    chassisNumber: vehicle?.chassisNumber || sanitizedExtractedVehicle.chassisNumber,
+    engineNumber: vehicle?.engineNumber || sanitizedExtractedVehicle.engineNumber,
+    make: vehicle?.make || sanitizedExtractedVehicle.make,
+    model: vehicle?.model || sanitizedExtractedVehicle.model,
+    variant: vehicle?.variant || sanitizedExtractedVehicle.variant,
+    manufacturingYear: vehicle?.manufacturingYear || sanitizedExtractedVehicle.manufacturingYear,
+    fuelType: vehicle?.fuelType || sanitizedExtractedVehicle.fuelType,
+    cubicCapacity: vehicle?.cubicCapacity || sanitizedExtractedVehicle.cubicCapacity,
+    seatingCapacity: vehicle?.seatingCapacity || sanitizedExtractedVehicle.seatingCapacity,
+    financierName: vehicle?.financierName || sanitizedExtractedVehicle.financierName,
+    gvw: vehicle?.gvw || sanitizedExtractedVehicle.gvw,
+    ncb: vehicle?.ncb || sanitizedExtractedVehicle.ncb || "0%",
   };
 
   return (
@@ -591,7 +617,7 @@ function IndusindPolicyCard({ item }) {
       previousInsurer={previousInsurer}
       previousPolicyNumber={previousPolicyNumber}
       finalPremium={finalPremium}
-      vehicle={vehicle}
+      vehicle={mergedVehicle} // ➔ NOW USING mergedVehicle
       extractedVehicle={sanitizedExtractedVehicle}
     />
   );
