@@ -769,7 +769,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     seatingCapacity: "-",
     financierName: "-",
     gvw: "-",
-    ncb: "-"
+    ncb: "0%"
   };
   if (!text) return result;
 
@@ -941,7 +941,6 @@ function GoDigitPolicyCard({ item }) {
     fuelType: extractedVehicle.fuelType !== "-" ? extractedVehicle.fuelType : item?.vehicleDetails?.fuelType,
     financierName: extractedVehicle.financierName !== "-" ? extractedVehicle.financierName : item?.vehicleDetails?.financierName,
     gvw: extractedVehicle.gvw !== "-" ? extractedVehicle.gvw : item?.vehicleDetails?.gvw,
-    ncb: extractedVehicle.ncb !== "-" ? extractedVehicle.ncb : item?.vehicleDetails?.ncb,
   };
 
   const sanitizedPolicyDates = {
@@ -963,7 +962,6 @@ function GoDigitPolicyCard({ item }) {
     seatingCapacity: sanitizeValue(extractedVehicle.seatingCapacity),
     financierName: sanitizeValue(extractedVehicle.financierName),
     gvw: sanitizeValue(extractedVehicle.gvw),
-    ncb: sanitizeValue(extractedVehicle.ncb),
   };
 
   return (

@@ -297,14 +297,6 @@ const extractPreviousInsurer = (text) => {
   return "-";
 };
 
-const extractCurrentNCB = (text) => {
-  if (!text) return "-";
-  const normalized = normalizeText(text);
-  const match = normalized.match(/No Claim Bonus\s*([\d.]+)%/i) ||
-                normalized.match(/NCB\s*:\s*([\d.]+)%/i);
-  return match?.[1]?.trim() || "-";
-};
-
 const extractPremiumData = (text) => {
   const result = {
     totalOdPremium: "-",
@@ -352,13 +344,13 @@ const extractVehicleDetails = (text) => {
     make: "-",
     model: "-",
     variant: "-",
-    manufacturingYear: "-",
-    ncb: "-",
+    manufacturingYear: "-",    
     cubicCapacity: "-",
     seatingCapacity: "-",
     geographicalArea: "-",
     financierName: "-",
-    gvw: "-"
+    gvw: "-",
+    ncb: "0%"
   };
   if (!text) return result;
 
@@ -533,12 +525,27 @@ result.seatingCapacity = seatingCapacity;
   // ----- GVW (unchanged) -----
   const gvwMatch = normalized.match(/CC\/HP\/GVW\s*\/KW\s*[\d]+\s*([\d]+)/i) ||
                    normalized.match(/Gross\s+Vehicle\s+Weight\s*\(GVW\)\s*:\s*([\d]+)/i);
-  if (gvwMatch && gvwMatch[1]) {
-    result.gvw = gvwMatch[1];
+    if (gvwMatch && gvwMatch[1]) {
+      result.gvw = gvwMatch[1];
+    }
+
+    const ncbPatterns = [
+    /No\s*Claim\s*Bonus(?:[^\d]+)?(\d+(?:\.\d+)?)\s*%?/i,
+    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?(?:[^\d]+)?(\d+(?:\.\d+)?)\s*%?/i,
+    /\bNCB\s*\(\s*%\s*\)(?:[^\d]+)?(\d+(?:\.\d+)?)/i,
+    /Deduct\s*(\d+(?:\.\d+)?)\s*%?\s*for\s*NCB/i
+  ];
+  
+  for (const pattern of ncbPatterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      result.ncb = `${match[1]}%`; 
+      break;
+    }
   }
 
-  return result;
-};
+    return result;
+  };  
 
 // ============================================================
 // MAIN COMPONENT
@@ -558,7 +565,6 @@ function LibertyPolicyCard({ item }) {
   const totalValue = extractIDV(fullText);
   const previousPolicyNumber = extractPreviousPolicyNumber(fullText);
   const previousInsurer = extractPreviousInsurer(fullText);
-  const currentNCB = extractCurrentNCB(fullText);
   const premiumData = extractPremiumData(fullText);
   const extractedVehicle = extractVehicleDetails(fullText);
 
@@ -573,7 +579,6 @@ function LibertyPolicyCard({ item }) {
     model: extractedVehicle.model !== "-" ? extractedVehicle.model : sourceVehicle.model,
     variant: extractedVehicle.variant !== "-" ? extractedVehicle.variant : sourceVehicle.variant,
     manufacturingYear: extractedVehicle.manufacturingYear !== "-" ? extractedVehicle.manufacturingYear : sourceVehicle.manufacturingYear,
-    ncb: extractedVehicle.ncb !== "-" ? extractedVehicle.ncb : sourceVehicle.ncb,
     cubicCapacity: extractedVehicle.cubicCapacity !== "-" ? extractedVehicle.cubicCapacity : sourceVehicle.cubicCapacity,
     seatingCapacity: extractedVehicle.seatingCapacity !== "-" ? extractedVehicle.seatingCapacity : sourceVehicle.seatingCapacity,
     geographicalArea: extractedVehicle.geographicalArea !== "-" ? extractedVehicle.geographicalArea : sourceVehicle.geographicalArea,
@@ -600,7 +605,6 @@ function LibertyPolicyCard({ item }) {
       totalValue={totalValue}
       previousInsurer={previousInsurer}
       previousPolicyNumber={previousPolicyNumber}
-      currentNCB={currentNCB}
       finalPremium={premiumData}
       vehicle={vehicle}
       extractedVehicle={extractedVehicle}

@@ -74,7 +74,7 @@ const extractBranchAddress = (fullText = "") => {
 };
 
 const extractInsuredDetails = (text = "") => {
-  const result = { insuredName: "", insuredAddress: "", panNumber: "", contactNumber: "", email: "", gstin: "", ncb: "" };
+  const result = { insuredName: "", insuredAddress: "", panNumber: "", contactNumber: "", email: "", gstin: "" };
   if (!text) return result;
   
   const normalizedText = normalizeText(text);
@@ -257,7 +257,7 @@ const extractPreviousInsurer = (text = "") => {
 
 const extractPremiumData = (text = "") => {
   const result = {
-    basicOdPremium: "", ncbPercentage: "", totalOdPremium: "", totalTpPremium: "", netPremium: "", gst: "", totalPayable: ""
+    basicOdPremium: "", totalOdPremium: "", totalTpPremium: "", netPremium: "", gst: "", totalPayable: ""
   };
   
   if (!text) return result;
@@ -265,7 +265,6 @@ const extractPremiumData = (text = "") => {
   const extractVal = (regex) => text.match(regex)?.[1]?.replace(/,/g, "") || "";
 
   result.basicOdPremium = extractVal(/Basic OD Premium\s*\n?\s*([\d,]+\.?\d*)/i);
-  result.ncbPercentage = text.match(/No Claim Bonus\s*(\d+)%/i)?.[1] || "";
   result.totalOdPremium = extractVal(/Total Own Damage Premium\(A\)\s*\n?\s*([\d,]+\.?\d*)/i);
   result.totalTpPremium = extractVal(/Total Liability Premium\s*\(B\)\s*`?\s*([\d,]+\.?\d*)/i);
   
@@ -314,7 +313,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     geographicalArea: "",
     financierName: "", 
     idv: "",
-    ncb: ""
+    ncb: "0%"
   };
   
   if (!text || typeof text !== "string") return result;
@@ -469,16 +468,16 @@ const extractVehicleDetailsFromText = (text = "") => {
   }
 
   const ncbPatterns = [
-    /No\s*Claim\s*Bonus(?:\s*\(NCB\))?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%/i,
-    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%/i,
-    /\bNCB\s*\(\s*%\s*\)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i,
-    /Deduct\s*(\d+(?:\.\d+)?)\s*%\s*for\s*NCB/i // <-- Added new pattern
+    /No\s*Claim\s*Bonus(?:[^\d]+)?(\d+(?:\.\d+)?)\s*%?/i,
+    /\bNCB(?:\s*(?:Discount|Percentage|Applicable))?(?:[^\d]+)?(\d+(?:\.\d+)?)\s*%?/i,
+    /\bNCB\s*\(\s*%\s*\)(?:[^\d]+)?(\d+(?:\.\d+)?)/i,
+    /Deduct\s*(\d+(?:\.\d+)?)\s*%?\s*for\s*NCB/i
   ];
   
   for (const pattern of ncbPatterns) {
     const match = text.match(pattern);
     if (match?.[1]) {
-      result.ncb = `${match[1]}%`;
+      result.ncb = `${match[1]}%`; 
       break;
     }
   }
@@ -510,12 +509,30 @@ function ICICIPolicyCard({ item }) {
   const extractedVehicle = extractVehicleDetailsFromText(item?.fullText || "");
   const autoPremium = extractPremiumData(item?.fullText || "");
 
+  // Update extracted "New" to "NEW" immediately for consistent debugging and final state
+  if (/^new$/i.test(extractedVehicle.registrationNumber?.trim())) {
+    extractedVehicle.registrationNumber = "NEW";
+  }
+
   const mergedVehicleRaw = { ...vehicle };
   for (const key in extractedVehicle) {
     if (extractedVehicle[key] !== "") mergedVehicleRaw[key] = extractedVehicle[key];
   }
   
+  // Also check merged data just in case the backend sent "New"
+  if (/^new$/i.test(mergedVehicleRaw.registrationNumber?.trim())) {
+    mergedVehicleRaw.registrationNumber = "NEW";
+  }
+
   mergedVehicleRaw.idv = extractedVehicle.idv !== "" ? extractedVehicle.idv : sanitizeValue(extractIDV(item?.fullText));
+
+  // Determine the correct Product Type
+  const isNewVehicle = /^new$/i.test(mergedVehicleRaw.registrationNumber?.trim());
+  const originalProductType = sanitizeValue(getProductType(policy?.policyType, item?.fullText));
+  
+  // Show "Bundle Policy" if registration indicates a new vehicle, else show original product type
+  const finalProductType = isNewVehicle ? "Bundled Policy" : originalProductType;
+
 
   return (
     <PolicyCardView
@@ -523,7 +540,7 @@ function ICICIPolicyCard({ item }) {
       policyNumber={sanitizeValue(policy?.policyNumber || item?.fullText?.match(/Policy No\.?\s*:\s*([0-9\/O]+)/i)?.[1])}
       insuranceCompany={sanitizeValue(extractInsuranceCompanyName(item?.fullText || ""))}
       branchAddress={sanitizeValue(extractBranchAddress(item?.fullText || ""))}
-      productType={sanitizeValue(getProductType(policy?.policyType, item?.fullText))}
+      productType={finalProductType} // THIS WAS UPDATED TO USE finalProductType
       vehicleCategory={sanitizeValue(getVehicleCategory(policy?.policyType, item?.fullText))}
       insuredName={sanitizeValue(insured?.insuredName || autoInsuredDetails?.insuredName)}
       panNumber={sanitizeValue(insured?.panNumber || autoInsuredDetails?.panNumber)}
