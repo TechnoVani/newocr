@@ -2,6 +2,7 @@ import db from "../../config/database.js";
 import DepartmentSchemaModel from "./departmentSchema.model.js";
 import { getDepartmentWorkflow, STATUS_TRANSITIONS, WORKFLOW_STATUSES } from "./departmentWorkflowConfig.js";
 import { departmentWorkScope } from "../../utils/roleAccess.js";
+import { getPolicyReadScope, policyOwnershipFilter } from "../../utils/dataScope.js";
 
 const clean = (value, max = 255) => String(value ?? "").trim().slice(0, max);
 const badRequest = (message) => {
@@ -41,9 +42,11 @@ class DepartmentEntryModel {
         throw badRequest("A valid employee code is required for leave or exit processing");
       }
     } else if (policyNumber) {
+      const ownership = policyOwnershipFilter(getPolicyReadScope(user), "created_by");
       const [policies] = await db.query(
-        "SELECT id, insured_name FROM policies_motor WHERE policy_number = ? LIMIT 1",
-        [policyNumber],
+        `SELECT id, insured_name FROM policies_motor
+         WHERE policy_number = ? AND ${ownership.sql} LIMIT 1`,
+        [policyNumber, ...ownership.params],
       );
       policyId = policies[0]?.id || null;
       insuredName = clean(policies[0]?.insured_name, 255);

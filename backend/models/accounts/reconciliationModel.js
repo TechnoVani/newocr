@@ -1,4 +1,5 @@
 import db from "../../config/database.js";
+import { policyOwnershipFilter } from "../../utils/dataScope.js";
 
 export const INSURER_STATEMENT_UPSERT_QUERY = `
   INSERT INTO insurer_statement_rows (
@@ -66,16 +67,20 @@ export const ReconciliationModel = {
     }
   },
 
-  async findAllStatementRows() {
+  async findAllStatementRows(readScope) {
+    const ownership = policyOwnershipFilter(readScope, "created_by");
     const [rows] = await db.query(
       `SELECT *
        FROM insurer_statement_rows
+       WHERE ${ownership.sql}
        ORDER BY updated_at DESC, id DESC`,
+      ownership.params,
     );
     return rows;
   },
 
-  async findPoliciesForMonth(startDate, endDate) {
+  async findPoliciesForMonth(startDate, endDate, readScope) {
+    const ownership = policyOwnershipFilter(readScope, "p.created_by");
     const [rows] = await db.query(
       `SELECT p.*,
          CASE WHEN pc.id IS NULL THEN 0 ELSE 1 END AS is_cancelled,
@@ -84,14 +89,15 @@ export const ReconciliationModel = {
          pc.cancellation_reason
        FROM policies_motor p
        LEFT JOIN policies_cancelled pc ON pc.policy_id = p.id
-       WHERE p.issue_date >= ? AND p.issue_date < ?
+       WHERE p.issue_date >= ? AND p.issue_date < ? AND ${ownership.sql}
        ORDER BY p.issue_date ASC, p.id ASC`,
-      [startDate, endDate],
+      [startDate, endDate, ...ownership.params],
     );
     return rows;
   },
 
-  async findAllPolicies() {
+  async findAllPolicies(readScope) {
+    const ownership = policyOwnershipFilter(readScope, "p.created_by");
     const [rows] = await db.query(
       `SELECT p.*,
          CASE WHEN pc.id IS NULL THEN 0 ELSE 1 END AS is_cancelled,
@@ -100,38 +106,47 @@ export const ReconciliationModel = {
          pc.cancellation_reason
        FROM policies_motor p
        LEFT JOIN policies_cancelled pc ON pc.policy_id = p.id
+       WHERE ${ownership.sql}
        ORDER BY p.issue_date ASC, p.id ASC`,
+      ownership.params,
     );
     return rows;
   },
 
-  async findAllPolicyNumbers() {
+  async findAllPolicyNumbers(readScope) {
+    const ownership = policyOwnershipFilter(readScope, "created_by");
     const [rows] = await db.query(
-      "SELECT policy_number FROM policies_motor WHERE policy_number IS NOT NULL AND policy_number != ''",
+      `SELECT policy_number FROM policies_motor
+       WHERE ${ownership.sql} AND policy_number IS NOT NULL AND policy_number != ''`,
+      ownership.params,
     );
     return rows.map((row) => row.policy_number);
   },
 
-  async findAllInsuranceCompanies() {
+  async findAllInsuranceCompanies(readScope) {
+    const ownership = policyOwnershipFilter(readScope, "created_by");
     const [rows] = await db.query(
       `SELECT insurance_company
        FROM policies_motor
-       WHERE insurance_company IS NOT NULL AND insurance_company != ''
+       WHERE ${ownership.sql} AND insurance_company IS NOT NULL AND insurance_company != ''
        GROUP BY insurance_company
        ORDER BY insurance_company`,
+      ownership.params,
     );
     return rows.map((row) => row.insurance_company);
   },
 
-  async findPolicyCompanies(policyNumbers) {
+  async findPolicyCompanies(policyNumbers, readScope) {
     if (!policyNumbers.length) return [];
+    const ownership = policyOwnershipFilter(readScope, "created_by");
     const [rows] = await db.query(
       `SELECT policy_number, insurance_company
        FROM policies_motor
        WHERE policy_number IN (?)
+         AND ${ownership.sql}
          AND insurance_company IS NOT NULL
          AND insurance_company != ''`,
-      [policyNumbers],
+      [policyNumbers, ...ownership.params],
     );
     return rows;
   },

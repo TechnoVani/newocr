@@ -6,6 +6,7 @@ export const importReconciliationRows = async (req, res, next) => {
     const result = await ReconciliationService.importRows({
       rows: req.body.rows,
       userId: Number(req.user.id),
+      user: req.user,
     });
     return successResponse(res, "Insurer statement imported successfully", result, 201);
   } catch (error) {
@@ -21,6 +22,7 @@ export const getReconciliationReport = async (req, res, next) => {
       createdYear: req.query.createdYear,
       createdMonth: req.query.createdMonth,
       insuranceCompany: req.query.insurance_company,
+      user: req.user,
     });
     return successResponse(res, "Verification reconciliation retrieved successfully", result);
   } catch (error) {
