@@ -1,7 +1,16 @@
+import { canAccessPortal, hasAllDepartmentAccess, PORTALS } from "../config/departmentAccess.js";
+
+const FULL_POLICY_ACCESS_PORTALS = Object.freeze([
+    PORTALS.ACCOUNTS,
+    PORTALS.RENEWAL
+]);
+
 export const getPolicyReadScope = user => ({
-    // Policy records are owned by policies_motor.created_by.
-    // Every logged-in user reads only their own created policy records.
-    all: false,
+    // Accounts and Renewal need the full policy book for department workflows.
+    // Other departments, including Operations, read policies created by the
+    // logged-in employee only.
+    all: hasAllDepartmentAccess(user) ||
+        FULL_POLICY_ACCESS_PORTALS.some(portal => canAccessPortal(user, portal)),
     userId: Number(user?.id),
     user
 });
