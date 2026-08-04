@@ -11,6 +11,8 @@ const readStoredUser = () => {
   }
 };
 
+const isUnauthorized = (error) => Number(error?.response?.status) === 401;
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem("authToken"));
   const [user, setUser] = useState(readStoredUser);
@@ -46,8 +48,9 @@ export function AuthProvider({ children }) {
           updateUser(response.data.data.user);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!active || requestId !== authRequestIdRef.current || tokenRef.current !== token) return;
+        if (!isUnauthorized(error)) return;
         setAuthToken(null);
         localStorage.removeItem("authToken");
         localStorage.removeItem("user");

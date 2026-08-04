@@ -69,10 +69,14 @@ axiosInstance.interceptors.response.use(
     const requestUrl = String(error.config?.url || '').split('?')[0];
     const isLoginRequest = requestUrl.endsWith('/auth/login');
 
+    const isAuthCheckRequest = requestUrl.endsWith('/auth/me');
+
     if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      window.location.assign(LOGIN_URL);
+      if (!isAuthCheckRequest) {
+        window.location.assign(LOGIN_URL);
+      }
     }
     return Promise.reject(error);
   }
