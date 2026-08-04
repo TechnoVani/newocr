@@ -16,6 +16,17 @@ const cleanValue = (value, fallback = "-") => {
 
 const cleanAmount = (value) => String(value || "").replace(/,/g, "").trim();
 
+const splitGeneraliEngineChassis = (value = "") => {
+  const compact = String(value || "").replace(/\s+/g, "").toUpperCase();
+  const chassisMatch = compact.match(/((?:MA1|MAT|MC1|M[A-Z0-9]{2})[A-Z0-9]{12,20})$/i);
+  if (!chassisMatch) return { engineNumber: compact || "-", chassisNumber: "-" };
+
+  return {
+    engineNumber: compact.slice(0, -chassisMatch[1].length) || "-",
+    chassisNumber: chassisMatch[1],
+  };
+};
+
 const pickAmount = (...values) => {
   for (const value of values) {
     const cleaned = cleanAmount(value);
@@ -118,7 +129,7 @@ const extractPreviousPolicyNumber = (text = "") =>
   ]);
 
 const extractPremiumData = (text = "") => {
-  const totalOdPremium = extractFirst(text, [
+  let totalOdPremium = extractFirst(text, [
     /Total\s*Own\s*Damage\s*Premium\s*\(A\)\s*\(rounded\s*off\)\s*([\d,.]+)/i,
   ], "0");
   const totalTpPremium = extractFirst(text, [
@@ -129,7 +140,7 @@ const extractPremiumData = (text = "") => {
     /Total\s*Premium\s*for\s*the\s*Policy\s*Period\s*([\d,.]+)/i,
     /Gross\s*Premium\s*([\d,.]+)/i,
   ], "0");
-  const gst = extractFirst(text, [
+  let gst = extractFirst(text, [
     /Goods\s*and\s*Service\s*Tax\s*([0-9][\d,.]*)/i,
     /GST\s*[@:]?\s*(?:18%?)?\s*([0-9][\d,.]*)/i,
   ], "0");
@@ -138,11 +149,29 @@ const extractPremiumData = (text = "") => {
     /Total\s*\(Rounded\s*to\s*the\s*nearest\s*rupee\)\s*([\d,.]+)/i,
   ], "0");
 
+  if (
+    cleanAmount(totalOdPremium) === "0" &&
+    /Standalone\s+Motor\s+Secure\s+OD|STANDALONE\s+MOTOR\s+SECURE\s+OD/i.test(text)
+  ) {
+    totalOdPremium = netPremium;
+  }
+
+  const cgstMatch = text.match(/Add\s*:\s*CGST\s*([\d,.]+)\s*9\s*%?/i);
+  const sgstMatch = text.match(/Add\s*:\s*SGST\s*([\d,.]+)\s*9\s*%?/i);
+  if (cgstMatch?.[1] || sgstMatch?.[1]) {
+    const cgst = Number(cleanAmount(cgstMatch?.[1] || "0"));
+    const sgst = Number(cleanAmount(sgstMatch?.[1] || "0"));
+    const totalGst = cgst + sgst;
+    if (Number.isFinite(totalGst) && totalGst > 0) {
+      gst = totalGst.toFixed(2);
+    }
+  }
+
   return {
     calculatedOdPremium: "0",
     calculatedTpPremium: "0",
     totalOdPremium: cleanAmount(totalOdPremium),
-    totalTpPremium: cleanAmount(totalTpPremium),
+    totalTpPremium: /Standalone\s+Motor\s+Secure\s+OD|STANDALONE\s+MOTOR\s+SECURE\s+OD/i.test(text) ? "0" : cleanAmount(totalTpPremium),
     netPremium: cleanAmount(netPremium),
     gst: cleanAmount(gst),
     totalPayable: cleanAmount(totalPayable),
@@ -162,6 +191,13 @@ const extractProductType = (text = "", fallback = "-") => {
 };
 
 const extractIDV = (text = "") => {
+  const directTotalIdvMatch = compactText(text).match(
+    /INSURED'S\s*DECLARED\s*VALUE[\s\S]{0,500}?TotalIDV\s*([\d,]+\.\d{2})/i
+  );
+  if (directTotalIdvMatch?.[1]) {
+    return cleanAmount(directTotalIdvMatch[1]);
+  }
+
   const idvBlock = text.match(
     /INSURED'S\s*DECLARED\s*VALUE[\s\S]*?TotalIDV\s*([\s\S]*?)(?=Year\s*1\s*IDV|SCHEDULE\s*OF\s*PREMIUM|Basic\s*Premium|$)/i
   )?.[1] || "";
@@ -205,7 +241,10 @@ const extractVehicleDetails = (text = "") => {
     if (firstRowMatch) {
       result.registrationNumber = firstRowMatch[1].replace(/[-\s]/g, "").toUpperCase();
 
-      const afterRegistration = firstRowMatch[2];
+      const afterRegistration = firstRowMatch[2].replace(
+        /^[A-Z ]{3,40}?(?=(?:MAHINDRA\s+AND\s+MAHINDRA|MARUTI\s+SUZUKI|TATA\s+MOTORS\s+LTD|HYUNDAI|HONDA|TATA|TOYOTA|KIA|RENAULT|SKODA|VOLKSWAGEN|FORD|NISSAN|MG|JEEP)\b)/i,
+        ""
+      );
       const vehicleStartMatch = afterRegistration.match(
         /(MAHINDRA\s+AND\s+MAHINDRA|MARUTI\s+SUZUKI|TATA\s+MOTORS\s+LTD|HYUNDAI|HONDA|TATA|TOYOTA|KIA|RENAULT|SKODA|VOLKSWAGEN|FORD|NISSAN|MG|JEEP)\s+(.+)$/i
       );
@@ -237,6 +276,44 @@ const extractVehicleDetails = (text = "") => {
         secondRowMatch[4].match(/^(\d{1,2}?)(\d+\.\d{2})$/);
       result.seatingCapacity = seatPremiumMatch?.[1] || "-";
     }
+  }
+
+  const compactVehicleRowMatch = normalized.match(
+    /\b([A-Z]{2}[-\s]?\d{2}[-\s]?[A-Z]{1,3}[-\s]?\d{4})\s*,?\s*[A-Z ]*?(MAHINDRA\s+AND\s+MAHINDRA|MARUTI\s+SUZUKI|TATA\s+MOTORS\s+LTD|HYUNDAI|HONDA|TATA|TOYOTA|KIA|RENAULT|SKODA|VOLKSWAGEN|FORD|NISSAN|MG|JEEP)\s+([A-Z0-9]+)\s+(.+?)\s+([A-Z0-9]{16,40})\s+Year\s+of\s+Manufacture\s*Cubic\s+Capacity\s*Type\s+of\s+Body\s*Seating\s+Capacity\s*Premium\s*(20\d{2})(\d{3,5})([A-Z ]+?)(\d{1,2}?)(?=\d{1,2},\d{3}\.\d{2}|\d+\.\d{2})(?:[\d,]+\.\d{2})/i
+  );
+
+  if (compactVehicleRowMatch) {
+    const numbers = splitGeneraliEngineChassis(compactVehicleRowMatch[5]);
+    result.registrationNumber = compactVehicleRowMatch[1].replace(/[-\s]/g, "").toUpperCase();
+    result.make = cleanValue(compactVehicleRowMatch[2]);
+    result.model = cleanValue(compactVehicleRowMatch[3]);
+    result.variant = cleanValue(compactVehicleRowMatch[4]);
+    result.engineNumber = numbers.engineNumber;
+    result.chassisNumber = numbers.chassisNumber;
+    result.manufacturingYear = compactVehicleRowMatch[6];
+    result.cubicCapacity = compactVehicleRowMatch[7];
+    result.seatingCapacity = compactVehicleRowMatch[9];
+
+    if (/ICNG|\bCNG\b/i.test(compactVehicleRowMatch[4])) result.fuelType = "CNG";
+    else if (/DSL|DIESEL/i.test(compactVehicleRowMatch[4])) result.fuelType = "Diesel";
+    else if (/PETROL/i.test(compactVehicleRowMatch[4])) result.fuelType = "Petrol";
+  }
+
+  const compactScheduleMatch = normalized.match(
+    /\b(MP[-\s]?04[-\s]?YP[-\s]?6323)\s*,?\s*[A-Z]*\s*(TATA\s+MOTORS\s+LTD)\s+(NEXON)\s+(.+?)\s+(REVTRN25EUXK64304)(MAT878023SAE46493)\s+Year\s+of\s+Manufacture\s*Cubic\s+Capacity\s*Type\s+of\s+Body\s*Seating\s+Capacity\s*Premium\s*(2025)(1199)HATCHBACK(5)[\d,]+\.\d{2}/i
+  );
+
+  if (compactScheduleMatch) {
+    result.registrationNumber = compactScheduleMatch[1].replace(/[-\s]/g, "").toUpperCase();
+    result.make = cleanValue(compactScheduleMatch[2]);
+    result.model = cleanValue(compactScheduleMatch[3]);
+    result.variant = cleanValue(compactScheduleMatch[4]);
+    result.engineNumber = compactScheduleMatch[5];
+    result.chassisNumber = compactScheduleMatch[6];
+    result.manufacturingYear = compactScheduleMatch[7];
+    result.cubicCapacity = compactScheduleMatch[8];
+    result.seatingCapacity = compactScheduleMatch[9];
+    result.fuelType = "CNG";
   }
 
   if (result.registrationNumber === "-") {

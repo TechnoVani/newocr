@@ -43,7 +43,7 @@ const formatNationalModelName = (value) => {
 const deriveNationalMakeModel = (description = "") => {
   const rawText = cleanFieldValue(description);
   const categoryMatch = rawText.match(
-    /^(Two\s*Wheeler|Private\s*Car|Commercial\s*Vehicle|Goods\s*Carrying|Passenger\s*Carrying)\s+(.+)$/i
+    /^(Two\s*Wheeler|Four\s*Wheeler|Private\s*Car|Commercial\s*Vehicle|Goods\s*Carrying|Passenger\s*Carrying)\s+(.+)$/i
   );
   const vehicleClass = cleanFieldValue(categoryMatch?.[1] || "");
   const modelText = cleanFieldValue(categoryMatch?.[2] || rawText);
@@ -121,11 +121,12 @@ const deriveNationalMakeModel = (description = "") => {
   );
 
   const limitedIndex = tokens.findIndex((token) => /^Limited$/i.test(token));
+  const isPrivateCarLike = /^(?:Private\s*Car|Four\s*Wheeler)$/i.test(vehicleClass);
   const makeTokenCount = limitedIndex >= 1
     ? limitedIndex + 1
-    : /^Private\s*Car$/i.test(vehicleClass) && tokens.length >= 4 && !isVariantToken(tokens[2])
+    : isPrivateCarLike && tokens.length >= 4 && !isVariantToken(tokens[2])
     ? 2
-    : /^Private\s*Car$/i.test(vehicleClass) && tokens.length >= 3
+    : isPrivateCarLike && tokens.length >= 3
       ? 1
       : 0;
   const make = makeTokenCount ? cleanFieldValue(tokens.slice(0, makeTokenCount).join(" ")) : "-";
@@ -161,14 +162,14 @@ const extractNationalVehicleTable = (text = "") => {
   const capacityType = tableMatch[2].toUpperCase();
   const rowText = tableMatch[3].trim();
   const rowMatch = rowText.match(
-    /([A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{3,4})\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z ]+?)\s+(\d{2,5})\s+(\d{4})\s+([\d+]+)\s+([A-Z ]+)$/i
+    /(NEW|[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{3,4})\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z ]+?)\s+(\d{2,5})\s+(\d{4})\s+([\d+]+)\s+([A-Z ]+)$/i
   );
 
   if (!rowMatch) return { ...modelInfo };
 
   return {
     ...modelInfo,
-    registrationNumber: cleanRegistrationNumber(rowMatch[1]),
+    registrationNumber: /^NEW$/i.test(rowMatch[1]) ? "NEW" : cleanRegistrationNumber(rowMatch[1]),
     engineNumber: cleanFieldValue(rowMatch[2]),
     chassisNumber: cleanFieldValue(rowMatch[3]),
     typeOfBody: cleanFieldValue(rowMatch[4]),
@@ -177,6 +178,56 @@ const extractNationalVehicleTable = (text = "") => {
     manufacturingYear: cleanFieldValue(rowMatch[6]),
     seatingCapacity: cleanFieldValue(rowMatch[7]),
     regDistrict: cleanFieldValue(rowMatch[8]),
+  };
+};
+
+const splitNationalTractorMakeModel = (description = "") => {
+  const rawText = cleanFieldValue(description);
+  if (rawText === "-") return { make: "-", model: "-", variant: "-" };
+
+  const knownMakeMatch = rawText.match(/^(INTERNATIONAL\s+TRACTORS\s+LTD)\s+(.+)$/i);
+  if (knownMakeMatch) {
+    const detail = cleanFieldValue(knownMakeMatch[2]);
+    const modelMatch = detail.match(/^(SONALIKA\s+DI\s+55)\s+(.+)$/i);
+    const model = cleanFieldValue(modelMatch?.[1] || detail).toUpperCase();
+    const rawVariant = cleanFieldValue(modelMatch?.[2] || "-").toUpperCase();
+    const variant = rawVariant.replace(new RegExp(`^${model.replace(/\s+/g, "\\s+")}\\s+`, "i"), "").trim() || rawVariant;
+
+    return {
+      make: knownMakeMatch[1].toUpperCase(),
+      model,
+      variant,
+      fuelType: "DIESEL",
+    };
+  }
+
+  return deriveNationalMakeModel(rawText);
+};
+
+const extractNationalMiscVehicleTable = (text = "") => {
+  const normalizedText = normalizeText(text).replace(/\s+/g, " ");
+  const tableMatch = normalizedText.match(
+    /Vehicle\s+Details\s+Make\s*&\s*Model\s+(.+?)\s+Reg\.\s*No\.\s+Engine\s+No\.\s+Chassis\s+No\.\s+Type\s+of\s+Body\s+Mfg\.\s*Year\s+Seat\s+Cap\.\s+Reg\.\s*District\s+(.+?)\s+Geographical\s+Area\s*:/i
+  );
+
+  if (!tableMatch) return null;
+
+  const modelInfo = splitNationalTractorMakeModel(tableMatch[1]);
+  const rowMatch = tableMatch[2].trim().match(
+    /(NEW|[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{3,4})\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z ]+?)\s+(\d{4})\s+([\d+]+)\s+([A-Z ]+)$/i
+  );
+
+  if (!rowMatch) return { ...modelInfo };
+
+  return {
+    ...modelInfo,
+    registrationNumber: /^NEW$/i.test(rowMatch[1]) ? "NEW" : cleanRegistrationNumber(rowMatch[1]),
+    engineNumber: cleanFieldValue(rowMatch[2]),
+    chassisNumber: cleanFieldValue(rowMatch[3]),
+    typeOfBody: cleanFieldValue(rowMatch[4]),
+    manufacturingYear: cleanFieldValue(rowMatch[5]),
+    seatingCapacity: cleanFieldValue(rowMatch[6]),
+    regDistrict: cleanFieldValue(rowMatch[7]),
   };
 };
 
@@ -197,6 +248,20 @@ const extractInsuranceCompany = (text) => {
   return text.includes("National Insurance Company Ltd.")
     ? "National Insurance Company Ltd."
     : "National Insurance Company Ltd.";
+};
+
+const extractNationalVehicleCategory = (policyType = "", text = "") => {
+  const normalizedText = normalizeText(`${policyType} ${text}`).replace(/\s+/g, " ");
+
+  if (/\bMISC\.\s+\d+\s+Year\s+Package\s+Policy\b/i.test(normalizedText)) {
+    return "Miscellaneous";
+  }
+
+  if (/Class\s+of\s+Vehicle\s+Agricultural\s+Tractors\b/i.test(normalizedText)) {
+    return "Miscellaneous";
+  }
+
+  return getVehicleCategory(policyType, text);
 };
 
 const extractBranchAddress = (text = "") => {
@@ -311,6 +376,13 @@ const extractInsuredDetails = (text = "") => {
     }
   }
 
+  if (panNumber === "-") {
+    const maskedPanMatch = normalizedText.match(/\bPAN\s*[:：]\s*([Xx*]{5,}\d{3,4}[A-Z])\b/i);
+    if (maskedPanMatch?.[1]) {
+      panNumber = maskedPanMatch[1].toUpperCase();
+    }
+  }
+
   let contactMatch = normalizedText.match(/फोन\s*Phone\s*[:：]\s*([*\dXx-]+)/i);
   if (!contactMatch) contactMatch = normalizedText.match(/संपकर\s*संखया\s*\/\s*Contact\s+Number\s*[:：]\s*([*\dXx-]+)/i);
   if (!contactMatch) contactMatch = normalizedText.match(/सेल\s*\/\s*Cell\s*[:：]\s*([*\dXx-]+)/i);
@@ -379,6 +451,13 @@ const extractPolicyDates = (fullText = "") => {
   const text = fullText.replace(/\s+/g, " ");
 
   let match = text.match(
+    /OD\s+Cover\s+Start\s+Date\s*:\s*(\d{2}\/\d{2}\/\d{4})\s+OD\s+Cover\s+End\s+Date\s*:\s*(\d{2}\/\d{2}\/\d{4})\s+TP\s+Cover\s+Start\s+Date\s*:\s*\d{2}\/\d{2}\/\d{4}\s+TP\s+Cover\s+End\s+Date\s*:\s*(\d{2}\/\d{2}\/\d{4})/i
+  );
+  if (match) {
+    return { startDate: match[1], odExpireDate: match[2], tpExpireDate: match[3] };
+  }
+
+  match = text.match(
     /Policy\s+Effective\s+from[\s\S]*?\bon\s+(\d{2}\/\d{2}\/\d{4})[\s\S]*?to\s+midnight\s+of\s+(\d{2}\/\d{2}\/\d{4})/i
   );
   if (match) {
@@ -664,7 +743,7 @@ const extractVehicleDetailsFromText = (text) => {
     }
   }
 
-  const nationalTable = extractNationalVehicleTable(text);
+  const nationalTable = extractNationalVehicleTable(text) || extractNationalMiscVehicleTable(text);
   if (nationalTable) {
     result.registrationNumber = nationalTable.registrationNumber || result.registrationNumber;
     result.engineNumber = nationalTable.engineNumber || result.engineNumber;
@@ -770,7 +849,7 @@ function NationalPolicyCard({ item }) {
   const email = insured?.email || autoInsuredDetails?.email || "-";
   const gstin = autoInsuredDetails?.gstin || "-";
  
-  const vehicleCategory = getVehicleCategory(policy?.policyType, fullText);
+  const vehicleCategory = extractNationalVehicleCategory(policy?.policyType, fullText);
   const productType = getProductType(policy?.policyType, fullText);
 
   const finalPremium = {

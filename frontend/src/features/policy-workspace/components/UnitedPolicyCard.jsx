@@ -288,6 +288,71 @@ const extractTableVehicleDetails = (normalizedText) => {
       }
     }
   }
+
+  const gcvPublicCarrierMatch = normalizedText.match(
+    /Registration\s+No\.\s+Obsolete\s+Vehicle\s+Engine\s+No\.\s+Chassis\s+No\.\s+Make\/Model\s+Type\s+of\s+Body\s+Year\s+of\s+Mfg\s+HP\/Cubic\s+Capacity\s+GVW[\s\S]{0,700}?([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,2})\s*-\s*(\d{3,4})\s+No\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Za-z ]+?)\s*\/\s*([A-Z0-9 ]+?)\s+(PIK[_\s-]?UP|PICK[_\s-]?UP|OPEN\s+BODY|CLOSED\s+BODY|GOODS\s+CARRIER)\s+(20\d{2}|19\d{2})\s+(\d{2,5})\s+(\d{2,6})/i
+  );
+
+  if (gcvPublicCarrierMatch) {
+    const modelTokens = gcvPublicCarrierMatch[8].replace(/\s+/g, " ").trim().split(/\s+/);
+    const knownFuel = ["CNG", "PETROL", "DIESEL", "LPG", "ELECTRIC"];
+    const fuelToken = knownFuel.includes(modelTokens[modelTokens.length - 1]?.toUpperCase())
+      ? modelTokens.pop().toUpperCase()
+      : "-";
+    const variant = modelTokens.length > 2 ? modelTokens.pop() : "-";
+
+    result.registrationNumber = removeHyphens(`${gcvPublicCarrierMatch[1]}-${gcvPublicCarrierMatch[2]}-${gcvPublicCarrierMatch[3]}-${gcvPublicCarrierMatch[4]}`);
+    result.engineNumber = gcvPublicCarrierMatch[5].trim();
+    result.chassisNumber = gcvPublicCarrierMatch[6].trim();
+    result.make = gcvPublicCarrierMatch[7].replace(/\s+/g, " ").trim();
+    result.model = modelTokens.join(" ").trim() || gcvPublicCarrierMatch[8].replace(/\s+/g, " ").trim();
+    result.variant = variant;
+    result.fuelType = fuelToken;
+    result.manufacturingYear = gcvPublicCarrierMatch[10].trim();
+    result.cubicCapacity = gcvPublicCarrierMatch[11].trim();
+    result.gvw = gcvPublicCarrierMatch[12].trim();
+
+    const seatMatch = normalizedText.match(/Registration\s+Authority\s+Geographical\s+Area\s+Financier\s+Seating\s+Capacity\s+Public\s*\/\s*Private\s+[A-Z0-9\s]+?\s+INDIA\s+(\d{1,3})\s+Public/i) ||
+      normalizedText.match(/Cubic\s+Capacity\/Seating\s+Capacity\s+\d+\s*\/\s*(\d{1,3})/i);
+    if (seatMatch?.[1]) result.seatingCapacity = seatMatch[1];
+
+    const gvw = Number(result.gvw);
+    if (Number.isFinite(gvw) && gvw > 0 && gvw <= 2500) {
+      result.commercialVehicleType = "GCV-Public(upto-2.5T)";
+    }
+
+    return result;
+  }
+
+  const pcvThreeWheelerMatch = normalizedText.match(
+    /VEHICLE\s+DETAILS\s+Registration\s+Number\s+([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,3})\s*-\s*(\d{3,4})\s+Obsolete\s+Vehicle\s*&\s+Engine\s+Number\s+No\s*&\s*([A-Z0-9]+)\s+Year\s+Of\s+Manufacture\s+(20\d{2}|19\d{2})[\s\S]{0,250}?Chassis\s+Number\s+([A-Z0-9]+)\s+Cubic\s+Capacity\s+(\d{2,5})[\s\S]{0,250}?Vehicle\s+Make\s*&\s*Model\s+(.+?)\s+Type\s+Of\s+Body\s+([A-Z_ ]+)\s+Carrying\s+Capacity\s+(\d{1,3})\s+GVW\s+(\d{2,6})/i
+  );
+
+  if (pcvThreeWheelerMatch) {
+    const makeModelText = pcvThreeWheelerMatch[9].replace(/\s+/g, " ").trim();
+    const [rawMake, rawModel = ""] = makeModelText.split(/\s*&\s*/);
+    const modelTokens = rawModel.trim().split(/\s+/).filter(Boolean);
+    const knownFuel = ["CNG", "PETROL", "DIESEL", "LPG", "ELECTRIC"];
+    const fuelToken = knownFuel.includes(modelTokens[modelTokens.length - 1]?.toUpperCase())
+      ? modelTokens.pop().toUpperCase()
+      : "-";
+    const variant = modelTokens.length > 2 ? modelTokens.pop() : "-";
+
+    result.registrationNumber = removeHyphens(`${pcvThreeWheelerMatch[1]}-${pcvThreeWheelerMatch[2]}-${pcvThreeWheelerMatch[3]}-${pcvThreeWheelerMatch[4]}`);
+    result.engineNumber = pcvThreeWheelerMatch[5].trim();
+    result.manufacturingYear = pcvThreeWheelerMatch[6].trim();
+    result.chassisNumber = pcvThreeWheelerMatch[7].trim();
+    result.cubicCapacity = pcvThreeWheelerMatch[8].trim();
+    result.make = (rawMake || "-").trim();
+    result.model = modelTokens.join(" ").trim() || rawModel.trim() || "-";
+    result.variant = variant;
+    result.fuelType = fuelToken;
+    result.seatingCapacity = pcvThreeWheelerMatch[11].trim();
+    result.gvw = pcvThreeWheelerMatch[12].trim();
+    result.commercialVehicleType = "Three Wheeler - PCV - UPTO 6 PASS";
+
+    return result;
+  }
   return null;
 };
 
@@ -552,7 +617,7 @@ const extractNcbField = (text) => {
 const extractVehicleDetailsFromText = (text = "") => {
   let result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
-    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-",
+    variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-", commercialVehicleType: "-",
     cubicCapacity: "-", seatingCapacity: "-", financierName: "-", ncb: "0%"
   };
 
@@ -586,6 +651,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     cubicCapacity: tableData?.cubicCapacity || stdCc,
     seatingCapacity: tableData?.seatingCapacity || stdSeats,
     financierName: tableData?.financierName || stdFinancier,
+    commercialVehicleType: tableData?.commercialVehicleType || "-",
     ncb: extractNcbField(text)
   };
 
