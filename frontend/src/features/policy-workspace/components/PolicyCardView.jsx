@@ -129,11 +129,12 @@ const parseSeatingCapacity = (value) => {
 
 const getPolicyCategory = (policyType, truncated = "") => {
   const combined = `${policyType} ${truncated}`.toLowerCase();
+  if (/package\s+policy|total\s+package\s+premium|own\s+damage\s*\(\s*a\s*\).*liability\s*\(\s*b\s*\)/i.test(combined)) return "Package Policy";
   if (combined.includes("comprehensive")) return "Package Policy";
   if (combined.includes("standalone") || combined.includes("own damage") || combined.includes("stand-alone own damage")) return "Standalone OD Policy";
-  if (combined.includes("third party") || combined.includes("liability") || combined.includes("act")) return "Liability Policy";
   if (combined.includes("bundled")) return "Bundled Policy";
   if (combined.includes("package")) return "Package Policy";
+  if (combined.includes("third party") || combined.includes("liability") || combined.includes("act")) return "Liability Policy";
   return policyType || "-";
 };
 

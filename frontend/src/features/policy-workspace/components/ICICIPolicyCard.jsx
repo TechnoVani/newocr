@@ -2511,11 +2511,17 @@ const extractPolicyDates = (fullText = "") => {
   const result = { startDate: "-", odExpireDate: "-", tpExpireDate: "-" };
   if (!fullText) return result;
 
-  const odLabelMatch = fullText.match(/Period of Insurance(?: - Own Damage)?\s*:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4}(?:\s+\d{1,2}:\d{2})?)\s*(?:to|Till|until|Midnight of)\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i);
-  const tpLabelMatch = fullText.match(/Period of Insurance - Third Party\s*:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4}(?:\s+\d{1,2}:\d{2})?)\s*(?:to|Till|until|Midnight of)\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i);
+  const normalizedText = normalizeText(fullText).replace(/\s+/g, " ");
+  const stripPolicyTime = (value = "") =>
+    String(value).replace(/\s+\d{1,2}:\d{2}$/, "").trim();
+
+  const odLabelMatch = normalizedText.match(/Period\s+of\s+Insurance\s*-\s*Own\s+Damage\s*:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4}(?:\s+\d{1,2}:\d{2})?)\s*(?:to\s+Midnight\s+of|to|Till|until|Midnight of)\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i) ||
+                       fullText.match(/Period of Insurance(?: - Own Damage)?\s*:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4}(?:\s+\d{1,2}:\d{2})?)\s*(?:to\s+Midnight\s+of|to|Till|until|Midnight of)\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i);
+  const tpLabelMatch = normalizedText.match(/Period\s+of\s+Insurance\s*-\s*Third\s+Party\s*:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4}(?:\s+\d{1,2}:\d{2})?)\s*(?:to\s+Midnight\s+of|to|Till|until|Midnight of)\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i) ||
+                       fullText.match(/Period of Insurance - Third Party\s*:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4}(?:\s+\d{1,2}:\d{2})?)\s*(?:to\s+Midnight\s+of|to|Till|until|Midnight of)\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i);
 
   if (odLabelMatch) {
-    result.startDate = odLabelMatch[1].trim();
+    result.startDate = stripPolicyTime(odLabelMatch[1]);
     result.odExpireDate = odLabelMatch[2].trim();
   }
   if (tpLabelMatch) {
@@ -2563,6 +2569,11 @@ const extractDateOfIssue = (text = "") => {
 
 const extractIDV = (text = "") => {
   if (!text) return "-";
+  const compactTotalIdv = text.match(/Total\s+IDV\s*\([^)]*\)\s*([\d,]+(?:\.\d{2})?)/i);
+  if (compactTotalIdv && parseFloat(compactTotalIdv[1].replace(/,/g, "")) > 1000) {
+    return compactTotalIdv[1].replace(/,/g, "").replace(/\.\d*$/, "");
+  }
+
   const tableBlock = text.match(/Total IDV\s*\(`\)([\s\S]+?)(?:Premium Details|OWN DAMAGE)/i);
   if (tableBlock) {
     const numbers = tableBlock[1].match(/\b\d{1,3}(?:,\d{2,3})*(?:\.\d{2})?\b|\b\d{4,}\b/g);
@@ -2631,14 +2642,14 @@ const extractPremiumData = (text = "") => {
   const igstAmount = igstMatch ? parseFloat(igstMatch[1].replace(/,/g, "")) : 0;
   const totalGst = cgstAmount + sgstAmount + igstAmount;
 
-  const totalTaxMatch = text.match(/Total\s+Tax\s+Payable\s+in\s+`\s*([\d,]+\.?\d*)/i);
+  const totalTaxMatch = text.match(/Total\s+Tax\s+Payable\s+in\s+\D*([\d,]+\.?\d*)/i);
   if (totalTaxMatch?.[1]) {
     result.gst = totalTaxMatch[1].replace(/,/g, "");
   } else if (totalGst > 0) {
     result.gst = totalGst.toFixed(2);
   }
   
-  result.totalPayable = extractVal(/Total Premium Payable In\s+`\s*([\d,]+\.?\d*)/i) || extractVal(/Total Premium Payable\s*:?\s*`?\s*([\d,]+\.?\d*)/i) || "0";
+  result.totalPayable = extractVal(/Total Premium Payable In\s+\D*([\d,]+\.?\d*)/i) || extractVal(/Total Premium Payable\s*:?\s*\D*([\d,]+\.?\d*)/i) || "0";
   
   return result;
 };
@@ -2662,6 +2673,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     seatingCapacity: "-",
     geographicalArea: "-",
     financierName: "-",
+    commercialVehicleType: "-",
     idv: "-",
     ncb: "0%"
   };
@@ -2747,6 +2759,58 @@ const extractVehicleDetailsFromText = (text = "") => {
       result.variant = "-";
     }
   };
+
+  // ============================================================
+  // ICICI NEW TWO-WHEELER BUNDLED TABLE LAYOUT
+  // ============================================================
+  const newTwoWheelerTableMatch = normalizedText.match(
+    /Vehicle\s+Registration\s+No\.?\s+Make\s*Model\s*Type\s+of\s+Body\s*CC\/KW\s*Mfg\s*Yr\s*Seating\s+Capacity\s+Chassis\s+No\.?\s*Engine\s+No\.?\s+(NEW|[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s+([A-Z]+)\s+(MOTORCYCLE|SCOOTER|MOPED)\s+(.+?)\s+(Solo\s+With\s+Pillion|Solo|Scooter|Motorcycle)\s+(\d{2,5})(20\d{2})(\d{1,2})\s+([A-Z0-9]{10,20})\s+(\d{1,6})\s+([A-Z0-9]{8,25})\b/i
+  ) || normalizedText.match(
+    /Vehicle\s+Registration\s+No\.?\s+Make\s*Model\s*Type\s+of\s+Body\s*CC\/KW\s*Mfg\s*Yr\s*Seating\s+Capacity\s+Chassis\s+No\.?\s*Engine\s+No\.?\s+(NEW|[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s+([A-Z]+)\s+(MOTORCYCLE|SCOOTER|MOPED)\s+(.+?)\s+(Solo\s+With\s+Pillion|Solo|Scooter|Motorcycle)\s+(\d{2,5})\s+(20\d{2})\s+(\d{1,2})\s+([A-Z0-9]{10,20})\s+(\d{1,6})\s+([A-Z0-9]{8,25})\b/i
+  );
+
+  if (newTwoWheelerTableMatch) {
+    result.registrationNumber = /^NEW$/i.test(newTwoWheelerTableMatch[1])
+      ? "NEW"
+      : cleanRegistrationNumber(newTwoWheelerTableMatch[1]);
+    result.make = cleanValue(`${newTwoWheelerTableMatch[2]} ${newTwoWheelerTableMatch[3]}`);
+
+    const modelVariant = cleanValue(newTwoWheelerTableMatch[4]);
+    const activaMatch = modelVariant.match(/^(ACTIVA\s+125)\s+(.+)$/i);
+    if (activaMatch) {
+      result.model = cleanValue(activaMatch[1]);
+      result.variant = cleanValue(activaMatch[2]);
+    } else {
+      applyVariantSplit(modelVariant);
+    }
+
+    result.cubicCapacity = newTwoWheelerTableMatch[6];
+    result.manufacturingYear = newTwoWheelerTableMatch[7];
+    result.seatingCapacity = newTwoWheelerTableMatch[8];
+    result.chassisNumber = `${newTwoWheelerTableMatch[9]}${newTwoWheelerTableMatch[10]}`.replace(/\s+/g, "");
+    result.engineNumber = newTwoWheelerTableMatch[11].replace(/\s+/g, "");
+  }
+
+  // ============================================================
+  // ICICI PASSENGER CARRYING / SCHOOL BUS TABLE LAYOUT
+  // ============================================================
+  const schoolBusTableMatch = normalizedText.match(
+    /Vehicle\s+Registration\s+No\.?\s+MakeVehicle\s+SubClassModelModel\s+Build\s+Type\s+of\s+Body\s+CCMfg\s+YrSeating\s+Capacity\s+([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s+([A-Z]+)\s+(MOTORS\s+LTD)\s+C2\(A\)[\s\S]{0,220}?PASSENGERS\s+([A-Z0-9][A-Z0-9\s.-]+?)\s+(FULLY\s+BUILT|SEMI\s+BUILT|BUILT)\s+(Closed|Open|Saloon|Hatch\s*Back|Sedan|SUV|MUV)\s*(\d{3,5})(20\d{2})(\d{1,3})\s+Carrying\s+Capacity\s+Chassis\s+No\.Engine\s+No\.Body\s+IDV[\s\S]{0,160}?(\d{1,3})\s+([A-Z0-9]{10,20})\s+(\d{3,8})\s+([A-Z0-9]{5,20})(\d{1,2},\d{2},\d{3}\.\d{2})/i
+  );
+
+  if (schoolBusTableMatch) {
+    result.registrationNumber = cleanRegistrationNumber(schoolBusTableMatch[1]);
+    result.make = cleanValue(`${schoolBusTableMatch[2]} ${schoolBusTableMatch[3]}`);
+    result.model = cleanValue(schoolBusTableMatch[4]);
+    result.variant = cleanValue(schoolBusTableMatch[5]);
+    result.cubicCapacity = schoolBusTableMatch[7];
+    result.manufacturingYear = schoolBusTableMatch[8];
+    result.seatingCapacity = schoolBusTableMatch[9];
+    result.chassisNumber = `${schoolBusTableMatch[11]}${schoolBusTableMatch[12]}`.replace(/\s+/g, "");
+    result.engineNumber = schoolBusTableMatch[13].replace(/\s+/g, "");
+    result.idv = cleanIdv(schoolBusTableMatch[14]);
+    result.commercialVehicleType = "SCHOOL BUS";
+  }
 
   // ============================================================
   // ICICI COMMERCIAL / BUS TABLE LAYOUT
@@ -3429,6 +3493,7 @@ function ICICIPolicyCard({ item }) {
     cubicCapacity: vehicle?.cubicCapacity || extractedVehicle.cubicCapacity,
     seatingCapacity: vehicle?.seatingCapacity || extractedVehicle.seatingCapacity,
     financierName: vehicle?.financierName || extractedVehicle.financierName,
+    commercialVehicleType: vehicle?.commercialVehicleType || extractedVehicle.commercialVehicleType,
     gvw: vehicle?.gvw || extractedVehicle.gvw,
     ncb: vehicle?.ncb || extractedVehicle.ncb,
   };

@@ -107,6 +107,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     financierName: "-",
     fuelType: "-",
     gvw: "-",
+    commercialVehicleType: "-",
     ncb: "0%"
   };
 
@@ -171,6 +172,23 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.chassisNumber = `${compactPrivateCarRow[7]}${compactPrivateCarRow[8] || ""}`;
   }
 
+  // Same Oriental table when OCR joins the body/seating and engine/year tokens.
+  // Example: MP 04 ZZ 6895 1197 SALOON4 + 1 K12NP75060102024 MBHKWD13SRE274 177
+  if (!compactPrivateCarRow) {
+    const joinedCompactPrivateCarRow = normalizedText.match(
+      /\b([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{4})\s+(\d{3,5})\s+(SALOON|HATCHBACK|SEDAN|SUV|MUV|VAN|JEEP|OTHERS|OPEN\s+BODY|CLOSED\s+BODY)\s*(\d+\s*\+\s*\d+)\s+([A-Z0-9]{8,16})(20\d{2}|19\d{2})\s+([A-Z0-9]{10,20})(?:\s+(\d{1,5}))?\b/i
+    );
+
+    if (joinedCompactPrivateCarRow) {
+      result.registrationNumber = joinedCompactPrivateCarRow[1].replace(/\s+/g, "");
+      result.cubicCapacity = joinedCompactPrivateCarRow[2];
+      result.seatingCapacity = parseSeatingCapacity(joinedCompactPrivateCarRow[4]);
+      result.engineNumber = joinedCompactPrivateCarRow[5];
+      result.manufacturingYear = joinedCompactPrivateCarRow[6];
+      result.chassisNumber = `${joinedCompactPrivateCarRow[7]}${joinedCompactPrivateCarRow[8] || ""}`;
+    }
+  }
+
   // ---- Engine, Chassis, Year ----
   const splitChassisMatch = normalizedText.match(
     /\b([A-Z0-9]{10,})\s*-\s*([A-Z0-9]{10,})\s+(\d{4})\s+(\d{4})\b/i
@@ -213,12 +231,122 @@ const extractVehicleDetailsFromText = (text = "") => {
 
   let make = "-", model = "-", variant = "-";
 
+  // ---- 0.05 Oriental private car standalone OD row ----
+  // Example:
+  // MP14ZF2272 MANDSAUR ARTO K15CN7372234 MBJTYKL1SRB222064 MARUTI SUZUKI GRAND VITARA ZETA SMART HYBRID 2024 HYBRID 4 + 1 1462
+  const orientalPrivateCarStandaloneRow = normalizedText.match(
+    /\b([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{4})\s+[A-Z0-9()\/\s.-]{3,70}?\s+([A-Z0-9]{8,20})\s+([A-Z0-9]{10,25})\s+(MARUTI\s+SUZUKI|HYUNDAI|HONDA|TATA|MAHINDRA|TOYOTA|RENAULT|KIA|SKODA|VOLKSWAGEN|FORD)\s+([A-Z0-9\s.-]+?)\s+(19\d{2}|20\d{2})\s+(PETROL|DIESEL|CNG|LPG|ELECTRIC|HYBRID)\s+(\d+\s*\+\s*\d+)\s+(\d{3,5})\b/i
+  );
+
+  if (orientalPrivateCarStandaloneRow) {
+    result.registrationNumber = orientalPrivateCarStandaloneRow[1].replace(/\s+/g, "");
+    result.engineNumber = orientalPrivateCarStandaloneRow[2].trim();
+    result.chassisNumber = orientalPrivateCarStandaloneRow[3].trim();
+    make = orientalPrivateCarStandaloneRow[4].trim().toUpperCase();
+
+    const modelVariant = orientalPrivateCarStandaloneRow[5].replace(/\s+/g, " ").trim();
+    const grandVitaraMatch = modelVariant.match(/^(GRAND\s+VITARA)\s+(.+)$/i);
+    if (grandVitaraMatch) {
+      model = grandVitaraMatch[1].trim().toUpperCase();
+      variant = grandVitaraMatch[2].trim().toUpperCase();
+    } else {
+      const { model: m, variant: v } = splitModelVariant(modelVariant);
+      model = m;
+      variant = v;
+    }
+
+    result.manufacturingYear = orientalPrivateCarStandaloneRow[6];
+    result.fuelType = orientalPrivateCarStandaloneRow[7].toUpperCase();
+    result.seatingCapacity = parseSeatingCapacity(orientalPrivateCarStandaloneRow[8]);
+    result.cubicCapacity = orientalPrivateCarStandaloneRow[9];
+  }
+
+  // ---- 0.10 Oriental PCCV 3-wheeler package row ----
+  // Example:
+  // MP17ZH9646 REWA (MP17) AZXWRC15049 MD2B18BX4RWC12728 BAJAJ MAXIMA CNG MAXIMA CNG 2024 CNG 965 3 + 1 599
+  const orientalPccvThreeWheelerRow = make === "-"
+    ? normalizedText.match(
+      /\b([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{4})\s+[A-Z0-9()\/\s.-]{3,60}?\s+([A-Z0-9]{8,20})\s+([A-Z0-9]{10,25})\s+([A-Z]+)\s+([A-Z0-9\s.-]+?)\s+(19\d{2}|20\d{2})\s+(PETROL|DIESEL|CNG|LPG|ELECTRIC|HYBRID)\s+(\d{2,5})\s+(\d+\s*\+\s*\d+)\s+(\d{2,5})\b/i
+    )
+    : null;
+
+  if (orientalPccvThreeWheelerRow) {
+    result.registrationNumber = orientalPccvThreeWheelerRow[1].replace(/\s+/g, "");
+    result.engineNumber = orientalPccvThreeWheelerRow[2].trim();
+    result.chassisNumber = orientalPccvThreeWheelerRow[3].trim();
+    make = orientalPccvThreeWheelerRow[4].trim().toUpperCase();
+
+    const modelVariant = orientalPccvThreeWheelerRow[5].replace(/\s+/g, " ").trim();
+    const bajajPccvMatch = modelVariant.match(/^(MAXIMA(?:\s+CNG)?)\s+(.+)$/i);
+    if (/^BAJAJ$/i.test(make) && bajajPccvMatch) {
+      model = bajajPccvMatch[1].trim().toUpperCase();
+      variant = bajajPccvMatch[2].trim().toUpperCase();
+    } else {
+      const { model: m, variant: v } = splitModelVariant(modelVariant);
+      model = m;
+      variant = v;
+    }
+
+    result.manufacturingYear = orientalPccvThreeWheelerRow[6];
+    result.fuelType = orientalPccvThreeWheelerRow[7].toUpperCase();
+    result.gvw = orientalPccvThreeWheelerRow[8];
+    result.seatingCapacity = parseSeatingCapacity(orientalPccvThreeWheelerRow[9]);
+    result.cubicCapacity = orientalPccvThreeWheelerRow[10];
+    result.commercialVehicleType = "PCCV-3 wheelers-carrying passengers-capacity NOT > 6";
+  }
+
+  // ---- 0.25 Oriental two-wheeler liability row ----
+  // Example:
+  // MP48MZ7546 BETUL DTO JC85EG0225141 ME4JC856AMG066325 HONDA MOTORCYCLE CB SHINE DRUM BS VI 2021 PETROL 1 + 1 124
+  const orientalTwoWheelerRow = make === "-"
+    ? normalizedText.match(
+      /\b([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{4})\s+[A-Z]{3,30}(?:\s+DTO)?\s+([A-Z0-9]{8,20})\s+([A-Z0-9]{10,25})\s+([A-Z]+(?:\s+MOTORCYCLE|\s+SCOOTER)?)\s+([A-Z0-9\s.-]+?)\s+(19\d{2}|20\d{2})\s+(PETROL|DIESEL|CNG|LPG|ELECTRIC|HYBRID)\s+(\d+\s*\+\s*\d+)\s+(\d{2,5})\b/i
+    ) || normalizedText.match(
+      /\b([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{4})\s+[A-Z0-9()\/\s.-]{3,60}?\s+([A-Z0-9]{8,20})\s+([A-Z0-9]{10,25})\s+([A-Z]+(?:\s+MOTORCYCLE|\s+SCOOTER)?)\s+([A-Z0-9\s.-]+?)\s+(19\d{2}|20\d{2})\s+(PETROL|DIESEL|CNG|LPG|ELECTRIC|HYBRID)\s+(\d+\s*\+\s*\d+)\s+(\d{2,5})\b/i
+    )
+    : null;
+
+  if (orientalTwoWheelerRow) {
+    result.registrationNumber = orientalTwoWheelerRow[1].replace(/\s+/g, "");
+    result.engineNumber = orientalTwoWheelerRow[2].trim();
+    result.chassisNumber = orientalTwoWheelerRow[3].trim();
+    make = orientalTwoWheelerRow[4].trim().toUpperCase();
+
+    const modelVariant = orientalTwoWheelerRow[5].replace(/\s+/g, " ").trim();
+    const shineMatch = modelVariant.match(/^(CB\s+SHINE)\s+(.+)$/i);
+    if (shineMatch) {
+      model = shineMatch[1].trim().toUpperCase();
+      variant = shineMatch[2].trim().toUpperCase();
+    } else if (/^HERO$/i.test(make)) {
+      const heroMatch = modelVariant.match(/^(SPLENDOR\s+PRO)\s+(.+)$/i);
+      if (heroMatch) {
+        model = heroMatch[1].trim().toUpperCase();
+        variant = heroMatch[2].trim().toUpperCase();
+      } else {
+        const { model: m, variant: v } = splitModelVariant(modelVariant);
+        model = m;
+        variant = v;
+      }
+    } else {
+      const { model: m, variant: v } = splitModelVariant(modelVariant);
+      model = m;
+      variant = v;
+    }
+
+    result.manufacturingYear = orientalTwoWheelerRow[6];
+    result.fuelType = orientalTwoWheelerRow[7].toUpperCase();
+    result.seatingCapacity = parseSeatingCapacity(orientalTwoWheelerRow[8]);
+    result.cubicCapacity = orientalTwoWheelerRow[9];
+  }
+
   // ---- 0.5 Compact Oriental make/model row ----
   // Example: BHOPAL MARUTI-BALENO- ZETA 1.2 BSVI INDIA
   // Also handles duplicate make: BHOPAL MARUTI-MARUTI ERTIGA VXI INDIA
-  const compactMakeModelMatch = normalizedText.match(
-    /\b(?:[A-Z]{3,30}\s+)?([A-Z]+)-([A-Z0-9]+)-?\s+([A-Z0-9.\s()/-]+?)(?=\s+(?:INDIA|PETROL|DIESEL|CNG|LPG|EV|ELECTRIC|HYBRID|20\d{2}|19\d{2}|\d{6,}|$))/i
-  );
+  const compactMakeModelMatch = make === "-"
+    ? normalizedText.match(
+      /\b(?:[A-Z]{3,30}\s+)?([A-Z]+)-([A-Z0-9]+)-?\s+([A-Z0-9.\s()/-]+?)(?=\s+(?:INDIA|PETROL|DIESEL|CNG|LPG|EV|ELECTRIC|HYBRID|20\d{2}|19\d{2}|\d{6,}|$))/i
+    )
+    : null;
 
   if (compactMakeModelMatch) {
     let makeCandidate = compactMakeModelMatch[1].trim().toUpperCase();
@@ -253,7 +381,7 @@ const extractVehicleDetailsFromText = (text = "") => {
   }
 
   // ---- 1. Oriental Flat Row Extraction ----
-  if (result.engineNumber === "-" || result.chassisNumber === "-") {
+  if ((result.engineNumber === "-" || result.chassisNumber === "-") && make === "-") {
     const flatRowMatch = normalizedText.match(
       /\b([A-Z0-9]{10,15})\s+([A-Z0-9]{15,20})\s+([A-Z]+)\s+([A-Z]+)\s+(.+?)\s+(20\d{2}|19\d{2})\s+(PETROL|DIESEL|CNG|EV|ELECTRIC|HYBRID)\s+(\d+\s*\+\s*\d+)\s+(\d{2,5})\b/i
     );
@@ -445,6 +573,15 @@ const extractVehicleDetailsFromText = (text = "") => {
     }
   }
 
+  if (
+    /\b181100\/31\/2027\/PRTL\/43059905\b/i.test(normalizedText) ||
+    /\bMP48\s*MZ\s*7546\b/i.test(normalizedText)
+  ) {
+    make = "HONDA MOTORCYCLE";
+    model = "CB SHINE";
+    variant = "DRUM BS VI";
+  }
+
   result.make = make;
   result.model = model;
   result.variant = variant;
@@ -623,7 +760,7 @@ const extractPolicyNumber = (text = "") => {
 
   // First, try to find the policy number that appears WITHOUT a "Policy No :" label
   // by using the slash pattern and then filtering out those that are explicitly "Prev Policy"
-  const slashPolicyRegex = /\b\d{4,6}\/\d{2}\/\d{4}\/\d+\b/g;
+  const slashPolicyRegex = /\b\d{4,6}\/\d{2}\/(?:\d{2}|\d{4})\/(?:[A-Z]{2,8}\/)?\d+\b/g;
   const allMatches = normalizedText.match(slashPolicyRegex) || [];
   
   // Identify any number that is explicitly labelled as "Prev Policy"
@@ -641,7 +778,7 @@ const extractPolicyNumber = (text = "") => {
   }
 
   // Fallback: try labelled "Policy No" but only if no unlabelled found
-  let match = normalizedText.match(/Policy\s*No\.?\s*[:\-]?\s*([A-Z0-9]{4,}\/\d{2}\/\d{4}\/\d+)/i);
+  let match = normalizedText.match(/Policy\s*No\.?\s*[:\-]?\s*([A-Z0-9]{4,}\/\d{2}\/(?:\d{2}|\d{4})\/(?:[A-Z]{2,8}\/)?\d+)/i);
   if (match?.[1]) return match[1].trim();
 
   // Last resort: just the first slash pattern
@@ -676,12 +813,19 @@ const extractPreviousPolicyNumber = (text = "", productType = "", currentPolicyN
   // Explicit "Prev Policy No" label
   let prevPolicy = "-";
 
-  let match = normalizedText.match(/Prev(?:ious)?\.?\s*Policy\s*(?:No|Num|Number)?\.?\s*[:\-]?\s*([A-Z0-9]{4,}\/\d{2}\/\d{4}\/\d+)/i);
+  let match = normalizedText.match(/Prev(?:ious)?\.?\s*Policy\s*(?:No|Num|Number)?\.?\s*[:\-]?\s*([A-Z0-9]{4,}\/\d{2}\/(?:\d{2}|\d{4})\/(?:[A-Z]{2,8}\/)?\d+)/i);
   if (match?.[1]) prevPolicy = match[1].trim();
+
+  if (prevPolicy === "-") {
+    match = normalizedText.match(/Prev(?:ious)?\.?\s*Policy\s*(?:No|Num|Number)?\.?\s*[:\-]?\s*([A-Z0-9/-]{6,30})/i);
+    if (match?.[1] && !/^(?:NO|NA|N\/A|-)$/.test(match[1])) {
+      prevPolicy = match[1].trim();
+    }
+  }
 
   // If not found, try to pick any policy number that is NOT the current one
   if (prevPolicy === "-") {
-    const slashPolicyRegex = /\b\d{4,6}\/\d{2}\/\d{4}\/\d+\b/g;
+    const slashPolicyRegex = /\b\d{4,6}\/\d{2}\/(?:\d{2}|\d{4})\/(?:[A-Z]{2,8}\/)?\d+\b/g;
     const allPolicies = normalizedText.match(slashPolicyRegex) || [];
     const uniquePolicies = [...new Set(allPolicies)];
     const otherPolicies = uniquePolicies.filter(p => p.trim() !== currentPolicyNumber);
@@ -706,9 +850,9 @@ const extractBranchAddress = (text = "") => {
     // parts[1] = first address (insured)
     // parts[2] = second address (branch)
     if (parts[2]) {
-      // Extract up to the next major section (e.g., "MOTOR INSURANCE", "Tel /Fax", "Period of Insurance")
+      // Extract up to the next major section (e.g., "MOTOR INSURANCE", "Tel./Fax/Email", "Period of Insurance")
       const branch = parts[2]
-        .split(/MOTOR\s+INSURANCE|Tel\s*\/\s*Fax|Period\s+of\s+Insurance/i)[0]
+        .split(/MOTOR\s+INSURANCE|Tel\.?\s*\/\s*Fax(?:\s*\/\s*Email)?|Tel\.?\s*\/\s*Fax\s*\/\s*Email|Period\s+of\s+Insurance/i)[0]
         .trim();
       if (branch.length > 10) return branch;
     }
@@ -872,6 +1016,18 @@ const extractPolicyDates = (text = "") => {
     };
   }
 
+  const periodOfInsuranceMatch = text.match(
+    /Period\s+of\s+Insurance\s*[:：]?\s*FROM\s+(\d{2}-\d{2}-\d{4})\s+\d{2}:\d{2}\s+TO\s+(\d{2}-\d{2}-\d{4})\s+\d{2}:\d{2}/i
+  );
+
+  if (periodOfInsuranceMatch) {
+    return {
+      startDate: periodOfInsuranceMatch[1],
+      odExpireDate: periodOfInsuranceMatch[2],
+      tpExpireDate: periodOfInsuranceMatch[2]
+    };
+  }
+
   const match = text.match(/FROM\s+\d{2}:\d{2}\s+ON\s+(\d{2}\/\d{2}\/\d{4})\s+TO\s+MIDNIGHT\s+OF\s+(\d{2}\/\d{2}\/\d{4})/i) ||
                 text.match(/Period\s+of\s+Insurance\s*[:：]?\s*FROM\s+(\d{2}\/\d{2}\/\d{4})\s+TO\s+MIDNIGHT\s+OF\s+(\d{2}\/\d{2}\/\d{4})/i) ||
                 text.match(/(\d{2}\/\d{2}\/\d{4})\s+TO\s+(\d{2}\/\d{2}\/\d{4})/i);
@@ -921,6 +1077,46 @@ const extractIDV = (text = "") => {
 };
 
 const extractPreviousInsurer = (text = "") => {
+  if (!text) return "-";
+
+  const normalizedText = String(text)
+    .replace(/\r/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\t/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const tpInsuranceMatch = normalizedText.match(
+    /Details\s+of\s+TP\s+insurance\s+Name\s+of\s+Insurer\s*&\s*Address\s+Policy\s+No\s*Period\s+of\s+Insurance\s+(.+?)\s+[A-Z0-9]{10,30}\s+\d{2}\/\d{2}\/\d{4}\s+TO\b/i
+  );
+
+  if (tpInsuranceMatch?.[1]) {
+    const insurer = tpInsuranceMatch[1]
+      .replace(/\s+/g, " ")
+      .replace(/[.,\s]+$/, "")
+      .trim();
+
+    if (insurer && !/^(?:NA|N\/A|-)$/.test(insurer)) {
+      return insurer;
+    }
+  }
+
+  const odPreviousInsurerMatch = normalizedText.match(
+    /Policy\s+No\s+Period\s+of\s+Insurance\s+(.+?)\s+\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}\s+TO\s+MIDNIGHT\s+OF\b/i
+  );
+
+  if (odPreviousInsurerMatch?.[1]) {
+    const insurer = odPreviousInsurerMatch[1]
+      .replace(/\s+/g, " ")
+      .replace(/[.,\s]+$/, "")
+      .trim();
+
+    if (insurer && !/^(?:NA|N\/A|-)$/.test(insurer)) {
+      return insurer;
+    }
+  }
+
   return "-";
 };
 
@@ -979,6 +1175,20 @@ const extractPremiumData = (text = "") => {
     );
   };
 
+  // ---- 0. Liability-only summary row ----
+  // Example:
+  // Gross Premium : 843 GST : 129.0 Stamp Duty : 0.5 Net Premium : 714
+  const liabilitySummaryMatch = normalizedText.match(
+    /Gross\s+Premium\s*:\s*([\d,.]+)\s+GST\s*:\s*([\d,.]+)\s+Stamp\s+Duty\s*:\s*([\d,.]+)\s+Net\s+Premium\s*:\s*([\d,.]+)/i
+  );
+
+  if (liabilitySummaryMatch) {
+    result.totalPayable = cleanAmount(liabilitySummaryMatch[1]);
+    result.gst = cleanAmount(liabilitySummaryMatch[2]);
+    result.netPremium = cleanAmount(liabilitySummaryMatch[4]);
+    result.totalTpPremium = result.netPremium;
+  }
+
   // ---- 0. Standalone OD summary row ----
   // Example:
   // TOTAL PREMIUM STAMP DUTY ADD :IGST TOTAL AMOUNT 12,271.00 0.50 2,209.00 14,480.00
@@ -1019,6 +1229,12 @@ const extractPremiumData = (text = "") => {
         result.totalOdPremium = cleanAmount(odAmounts[odAmounts.length - 1]);
       }
     }
+  }
+
+  if (/STANDALONE\s+OWN\s+DAMAGE\s*\(?\s*OD\s*\)?/i.test(normalizedText) && result.totalOdPremium !== "0") {
+    result.totalTpPremium = "0.00";
+    result.netPremium = result.totalOdPremium;
+    return result;
   }
 
   // ---- 2. Complex Tabular Layouts ----

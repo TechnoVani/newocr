@@ -18,6 +18,42 @@ const getFirstNWords = (text = "", wordCount = 20) => {
     .join(" ");
 };
 
+const normalizePolicyText = (text = "") =>
+  String(text || "")
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const hasPackagePolicySignal = (text = "") => {
+  const normalized = normalizePolicyText(text);
+  if (!normalized) return false;
+
+  return [
+    /(?:passenger\s+carrying\s+vehicles?|private\s+car|two\s+wheeler|commercial\s+vehicle)?\s*package\s+policy/i,
+    /total\s+package\s+premium\s*\(\s*a\s*\+\s*b\s*\)/i,
+    /total\s+own\s+damage\s+premium\s*\(\s*a\s*\)[\s\S]{0,250}total\s+liability\s+premium\s*\(\s*b\s*\)/i,
+    /own\s+damage\s*\(\s*a\s*\)[\s\S]{0,250}liability\s*\(\s*b\s*\)/i
+  ].some((pattern) => pattern.test(normalized));
+};
+
+const hasActLiabilityOnlySignal = (text = "") => {
+  const normalized = normalizePolicyText(text);
+  if (!normalized) return false;
+
+  return (
+    /act\s+liability\s+insurance/i.test(normalized) &&
+    /total\s+own\s+damage\s+premium\s*0(?:\.00)?/i.test(normalized)
+  );
+};
+
+const hasLongTermOdTpSignal = (text = "") => {
+  const normalized = normalizePolicyText(text);
+  if (!normalized) return false;
+
+  return /long\s+term\s*\(\s*1\s*yr\s*od\s*\+\s*3\s*yr\s*tp\s*\)/i.test(normalized);
+};
+
 // =======================================
 // Helper: Progressive detection
 // Checks small snippets first, checking all categories before expanding.
@@ -60,6 +96,18 @@ export const getProductType = (policyType = "", fullText = "") => {
   if (!policyType && !fullText) return "-";
 
   const combinedText = `${policyType}\n${fullText}`;
+
+  if (hasActLiabilityOnlySignal(combinedText)) {
+    return "Liability Policy";
+  }
+
+  if (hasLongTermOdTpSignal(combinedText)) {
+    return "Bundled Policy";
+  }
+
+  if (hasPackagePolicySignal(combinedText)) {
+    return "Package Policy";
+  }
 
   const productMap = {
     "Standalone OD Policy": [
@@ -136,7 +184,8 @@ export const getVehicleCategory = (policyType = "", fullText = "") => {
   const categoryMap = {
     "Private Car": [
       "private car", 
-      "private vehicle"
+      "private vehicle",
+      "pvt car"
     ],
     "Two Wheeler": [
       "two wheeler",

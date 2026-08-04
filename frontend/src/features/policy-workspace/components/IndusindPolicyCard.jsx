@@ -235,7 +235,7 @@ const extractDateOfIssue = (text = "") => {
 const extractIDV = (text = "") => {
   if (!text) return "-";
   
-  const totalIdvMatch = text.match(/Total\s+IDV\s*`?\s*([\d,]+(?:\.\d+)?)/i);
+  const totalIdvMatch = text.match(/Total\s+IDV\s*(?:\([^)]*\))?\s*`?\s*([\d,]+(?:\.\d+)?)/i);
   if (totalIdvMatch && totalIdvMatch[1]) {
     const numStr = totalIdvMatch[1].replace(/,/g, '');
     const num = parseFloat(numStr);
@@ -336,7 +336,7 @@ const extractVehicleDetailsFromText = (text) => {
   }
 
   // Engine & Chassis
-  const combinedMatch = text.match(/Engine\s*No\.?\s*\/\s*Chassis\s*No\.?\s*(?:\/\s*Motor\s*No\.?\s*)?\s*([A-Z0-9]+)\s*\/\s*([A-Z0-9]+)/i);
+  const combinedMatch = text.match(/Engine\s*No\.?\s*\/\s*Chassis\s*No\.?\s*(?:\/\s*Motor\s*No\.?\s*)?\s*([A-Z0-9]+)\s*\/\s*([A-Z0-9]+?)(?=\s*(?:LCC|Seating|CC|Make|Type|RTO|\n|$))/i);
   if (combinedMatch) {
     result.engineNumber = combinedMatch[1].trim();
     result.chassisNumber = combinedMatch[2].trim();
@@ -369,57 +369,71 @@ const extractVehicleDetailsFromText = (text) => {
   }
 
   // Make, Model, Variant
-  const makeModelMatch = text.match(/Make\s*\/\s*Model\s*&\s*Variant\s*[:]?\s*([^\n]+)/i);
+  const makeModelMatch = text.match(/Make\s*\/\s*Model\s*&\s*Variant\s*[:]?\s*([^\n]+)/i) ||
+                         text.match(/Make\s*\/\s*Model\s*[:]?\s*([^\n]+)/i);
 
   if (makeModelMatch && makeModelMatch[1]) {
     let fullText = makeModelMatch[1].trim();
     fullText = fullText.split(/\s*CC\s*\/\s*HP\s*\/\s*Watt/i)[0].trim();
-    
-    const variantKeywords = ['CNG', 'PETROL', 'DIESEL', 'LPG', 'BS', 'EV', 'HYBRID', 'GASOLINE', 'ELECTRIC', 'FUEL'];
-    let variantStartIndex = -1;
-    let upperFullText = fullText.toUpperCase();
-    
-    for (let kw of variantKeywords) {
-      let idx = upperFullText.indexOf(kw);
-      if (idx !== -1 && (variantStartIndex === -1 || idx < variantStartIndex)) {
-        variantStartIndex = idx;
-      }
-    }
-    
-    if (variantStartIndex !== -1) {
-      result.variant = fullText.slice(variantStartIndex).trim();
-      let beforeVariant = fullText.slice(0, variantStartIndex).trim();
-      let words = beforeVariant.split(/\s+/);
-      
-      const makeSuffixes = ['LTD', 'LTD.', 'LIMITED', 'MOTORS', 'PVT', 'INDIA', 'AUTO', 'CORP'];
-      let splitIndex = -1;
-      
-      for (let i = words.length - 1; i >= 0; i--) {
-        if (makeSuffixes.includes(words[i].toUpperCase())) {
-          splitIndex = i;
-          break;
-        }
-      }
-      
-      if (splitIndex !== -1 && splitIndex < words.length - 1) {
-        result.make = words.slice(0, splitIndex + 1).join(' ');
-        result.model = words.slice(splitIndex + 1).join(' ');
-      } else {
-        let firstDigitIdx = words.findIndex(w => /\d/.test(w));
-        if (firstDigitIdx > 0) {
-          let modelStartIdx = firstDigitIdx - 1;
-          result.make = words.slice(0, modelStartIdx).join(' ');
-          result.model = words.slice(modelStartIdx).join(' ');
-        } else {
-          result.make = words[0] || "-";
-          result.model = words.slice(1).join(' ') || "-";
-        }
+
+    const slashParts = fullText.split(/\s*\/\s*/).map(part => part.trim()).filter(Boolean);
+    if (slashParts.length >= 2) {
+      result.make = slashParts[0] || "-";
+      result.model = slashParts[1] || "-";
+      result.variant = slashParts.slice(2).join(" / ") || "-";
+
+      const fuelFromVariant = result.variant.match(/\b(PETROL|DIESEL|CNG|LPG|ELECTRIC|HYBRID)\b/i);
+      if (fuelFromVariant) {
+        result.fuelType = fuelFromVariant[1].toUpperCase();
       }
     } else {
-      const parts = fullText.split(/\s+/);
-      if (parts.length >= 1) result.make = parts[0];
-      if (parts.length >= 2) result.model = parts[1];
-      if (parts.length >= 3) result.variant = parts.slice(2).join(' ');
+    
+      const variantKeywords = ['CNG', 'PETROL', 'DIESEL', 'LPG', 'BS', 'EV', 'HYBRID', 'GASOLINE', 'ELECTRIC', 'FUEL'];
+      let variantStartIndex = -1;
+      let upperFullText = fullText.toUpperCase();
+      
+      for (let kw of variantKeywords) {
+        let idx = upperFullText.indexOf(kw);
+        if (idx !== -1 && (variantStartIndex === -1 || idx < variantStartIndex)) {
+          variantStartIndex = idx;
+        }
+      }
+      
+      if (variantStartIndex !== -1) {
+        result.variant = fullText.slice(variantStartIndex).trim();
+        let beforeVariant = fullText.slice(0, variantStartIndex).trim();
+        let words = beforeVariant.split(/\s+/);
+        
+        const makeSuffixes = ['LTD', 'LTD.', 'LIMITED', 'MOTORS', 'PVT', 'INDIA', 'AUTO', 'CORP'];
+        let splitIndex = -1;
+        
+        for (let i = words.length - 1; i >= 0; i--) {
+          if (makeSuffixes.includes(words[i].toUpperCase())) {
+            splitIndex = i;
+            break;
+          }
+        }
+        
+        if (splitIndex !== -1 && splitIndex < words.length - 1) {
+          result.make = words.slice(0, splitIndex + 1).join(' ');
+          result.model = words.slice(splitIndex + 1).join(' ');
+        } else {
+          let firstDigitIdx = words.findIndex(w => /\d/.test(w));
+          if (firstDigitIdx > 0) {
+            let modelStartIdx = firstDigitIdx - 1;
+            result.make = words.slice(0, modelStartIdx).join(' ');
+            result.model = words.slice(modelStartIdx).join(' ');
+          } else {
+            result.make = words[0] || "-";
+            result.model = words.slice(1).join(' ') || "-";
+          }
+        }
+      } else {
+        const parts = fullText.split(/\s+/);
+        if (parts.length >= 1) result.make = parts[0];
+        if (parts.length >= 2) result.model = parts[1];
+        if (parts.length >= 3) result.variant = parts.slice(2).join(' ');
+      } 
     }
   }
 

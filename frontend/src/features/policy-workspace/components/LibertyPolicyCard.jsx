@@ -28,6 +28,11 @@ const removeHyphens = (value) => {
   return String(value).replace(/-/g, "");
 };
 
+const cleanRegistrationNumber = (value) => {
+  if (!value || value === "-") return "-";
+  return String(value).replace(/[^A-Z0-9]/gi, "").toUpperCase().trim();
+};
+
 // ============================================================
 // EXTRACTION FUNCTIONS
 // ============================================================
@@ -319,14 +324,27 @@ const extractPremiumData = (text) => {
   };
   if (!text) return result;
   const normalized = normalizeText(text);
+  const addAmounts = (...values) => {
+    const total = values.reduce((sum, value) => {
+      const amount = Number.parseFloat(String(value || "0").replace(/,/g, ""));
+      return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+
+    return total.toFixed(2);
+  };
 
   const odMatch = normalized.match(/TOTAL OWNDAMAGE PREMIUM\s*\(A\)\s*`?\s*([\d,]+\.?\d*)/i) ||
                   normalized.match(/Basic OD\s*`?\s*([\d,]+\.?\d*)/i);
   if (odMatch) result.totalOdPremium = odMatch[1].replace(/,/g, "");
 
-  const tpMatch = normalized.match(/TOTAL LIABILITY PREMIUM\s*\(B\)\s*`?\s*([\d,]+\.?\d*)/i) ||
+  const tpMatch = normalized.match(/TOTAL LIABILITY PREMIUM\s*\(B\)\D*([\d,]+\.?\d*)/i) ||
                   normalized.match(/Basic TP\s*`?\s*([\d,]+\.?\d*)/i);
   if (tpMatch) result.totalTpPremium = tpMatch[1].replace(/,/g, "");
+
+  const ownerDriverPaMatch = normalized.match(/PA\s+to\s+Owner\s+Driver\s*\(D\)\D*([\d,]+\.?\d*)/i);
+  if (tpMatch && ownerDriverPaMatch?.[1]) {
+    result.totalTpPremium = addAmounts(tpMatch[1], ownerDriverPaMatch[1]);
+  }
 
   const netMatch = normalized.match(/Net Premium\s*\(A\+B\+C(?:\+D)?\)Taxable Value\s*`?\s*([\d,]+\.?\d*)/i) ||
                    normalized.match(/Net Premium\s*:\s*([\d,]+\.?\d*)/i);
@@ -493,6 +511,35 @@ if (vehicleBlock) {
     result.variant = cleanValue(vehicleLine[3]);
   }
 }
+
+  const privateCarProposalMatch = normalized.match(
+    /Vehicle\s+Make\s+Model\s+Variant\s+Year\s+of\s+Manufacture\s*\/\s*Invoice\s+Date\s+Cubic\s+Capacity\/KW\s+Gross\s+Vehicle\s+Weight\s*\(GVW\)[\s\S]{0,250}?Body\s+Type\s+([A-Z]+)\s+([A-Z0-9]+)\s+(.+?)\s+(\d{4})\/-\s+(\d{2,5})\s+(\d{1,6})\s+(\d{1,3})\s+(Sedan|Saloon|Hatch\s*Back|SUV|MUV|Jeep|Van)\b/i
+  );
+
+  if (privateCarProposalMatch) {
+    if (result.make === "-") result.make = cleanValue(privateCarProposalMatch[1]);
+    if (result.model === "-") result.model = cleanValue(privateCarProposalMatch[2]);
+    if (result.variant === "-") result.variant = cleanValue(privateCarProposalMatch[3]);
+    if (result.manufacturingYear === "-") result.manufacturingYear = privateCarProposalMatch[4];
+    if (result.cubicCapacity === "-") result.cubicCapacity = privateCarProposalMatch[5];
+    if (result.gvw === "-") result.gvw = privateCarProposalMatch[6];
+    if (result.seatingCapacity === "-") result.seatingCapacity = privateCarProposalMatch[7];
+  }
+
+  if (result.registrationNumber === "-") {
+    const proposalRegMatch = normalized.match(/Vehicle\s+Registration\s+No\.?\s+([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4})/i);
+    if (proposalRegMatch?.[1]) result.registrationNumber = cleanRegistrationNumber(proposalRegMatch[1]);
+  }
+
+  if (result.engineNumber === "-") {
+    const proposalEngineMatch = normalized.match(/Engine\s+No\.?\s+([A-Z0-9]{8,25})\s+Chassis\s+No/i);
+    if (proposalEngineMatch?.[1]) result.engineNumber = proposalEngineMatch[1].toUpperCase();
+  }
+
+  if (result.chassisNumber === "-") {
+    const proposalChassisMatch = normalized.match(/Chassis\s+No\s+([A-Z0-9]{12,30})/i);
+    if (proposalChassisMatch?.[1]) result.chassisNumber = proposalChassisMatch[1].toUpperCase();
+  }
  // ----- Manufacturing Year (improved) -----
 let yearValue = null;
 
