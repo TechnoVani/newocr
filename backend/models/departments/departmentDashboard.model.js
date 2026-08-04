@@ -235,6 +235,7 @@ class DepartmentDashboardModel {
     }
 
     if (department === "renewal") {
+      const ownership = policyOwnershipFilter(getPolicyReadScope(user), "p.created_by");
       const expiryDate = "LEAST(COALESCE(p.od_expiry, '9999-12-31'), COALESCE(p.tp_expiry, '9999-12-31'))";
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
@@ -265,13 +266,14 @@ class DepartmentDashboardModel {
          FROM department_work_items wi
          INNER JOIN policies_motor p ON wi.policy_id = p.id
          LEFT JOIN policy_followup pf ON pf.policy_id = p.id
-         WHERE wi.department_slug = ? AND ${scope.sql}`, [
+         WHERE wi.department_slug = ? AND ${scope.sql} AND ${ownership.sql}`, [
           currentMonthStart,
           currentMonthEnd,
           currentMonthStart,
           currentMonthEnd,
           department,
           ...scope.params,
+          ...ownership.params,
         ]),
         db.query(`SELECT pf.id, CONCAT('Follow-up · ', pf.policy_number) title,
           pf.status, pf.disposition priority, pf.policy_number,
@@ -279,8 +281,9 @@ class DepartmentDashboardModel {
          FROM policy_followup pf
          LEFT JOIN employees e ON e.id = pf.created_by
          INNER JOIN department_work_items wi ON wi.policy_id = pf.policy_id
-         WHERE wi.department_slug = ? AND ${scope.sql}
-         ORDER BY pf.updated_at DESC LIMIT 8`, [department, ...scope.params]),
+         INNER JOIN policies_motor p ON p.id = pf.policy_id
+         WHERE wi.department_slug = ? AND ${scope.sql} AND ${ownership.sql}
+         ORDER BY pf.updated_at DESC LIMIT 8`, [department, ...scope.params, ...ownership.params]),
       ]);
       const row = counts[0] || {};
       return {
@@ -415,6 +418,7 @@ class DepartmentDashboardModel {
     }
     const departmentFilter = department === "administration" ? "1 = 1" : "wi.department_slug = ?";
     const departmentParams = department === "administration" ? [] : [department];
+    const ownership = policyOwnershipFilter(getPolicyReadScope(user), "p.created_by");
     const [policyRows] = await db.query(
       `SELECT DISTINCT CONCAT('policy-', p.id) id,
         DATE_FORMAT(p.issue_date, '%Y-%m-%d') reportDate,
@@ -431,8 +435,9 @@ class DepartmentDashboardModel {
        LEFT JOIN policies_cancelled pc ON pc.policy_id = p.id
        WHERE ${departmentFilter}
          AND ${scope.sql}
+         AND ${ownership.sql}
        ORDER BY p.created_at DESC LIMIT 2000`,
-      [...departmentParams, ...scope.params],
+      [...departmentParams, ...scope.params, ...ownership.params],
     );
     const [cancellationRows] = await db.query(
       `SELECT DISTINCT CONCAT('cancelled-', pc.id) id,
@@ -447,8 +452,9 @@ class DepartmentDashboardModel {
        INNER JOIN policies_cancelled pc ON pc.policy_id = p.id
        WHERE ${departmentFilter}
          AND ${scope.sql}
+         AND ${ownership.sql}
        ORDER BY pc.created_at DESC, pc.id DESC LIMIT 2000`,
-      [...departmentParams, ...scope.params],
+      [...departmentParams, ...scope.params, ...ownership.params],
     );
     return [...policyRows, ...cancellationRows].sort((left, right) =>
       new Date(right.reportDate || 0).getTime() - new Date(left.reportDate || 0).getTime()
@@ -472,6 +478,7 @@ class DepartmentDashboardModel {
     }
     const departmentFilter = department === "administration" ? "1 = 1" : "wi.department_slug = ?";
     const departmentParams = department === "administration" ? [] : [department];
+    const ownership = policyOwnershipFilter(getPolicyReadScope(user), "p.created_by");
     const expiryDate = "LEAST(COALESCE(p.od_expiry, '9999-12-31'), COALESCE(p.tp_expiry, '9999-12-31'))";
     const type = String(filters.type || "").trim().toLowerCase();
     const renewalConditions = [];
@@ -538,9 +545,10 @@ class DepartmentDashboardModel {
        ) latest_followup ON latest_followup.policy_id = p.id
        WHERE ${departmentFilter}
          AND ${scope.sql}
+         AND ${ownership.sql}
          ${renewalConditions.length ? `AND ${renewalConditions.join(" AND ")}` : ""}
        ORDER BY renewalDate LIMIT 1000`,
-      [...departmentParams, ...scope.params, ...renewalParams],
+      [...departmentParams, ...scope.params, ...ownership.params, ...renewalParams],
     );
     const [cancellationRows] = await db.query(
       `SELECT DISTINCT CONCAT('cancelled-renewal-', pc.id) id,
@@ -555,8 +563,9 @@ class DepartmentDashboardModel {
        INNER JOIN policies_cancelled pc ON pc.policy_id = p.id
        WHERE ${departmentFilter}
          AND ${scope.sql}
+         AND ${ownership.sql}
        ORDER BY pc.created_at DESC, pc.id DESC LIMIT 1000`,
-      [...departmentParams, ...scope.params],
+      [...departmentParams, ...scope.params, ...ownership.params],
     );
     const rows = department === "renewal" && type ? renewalRows : [...renewalRows, ...cancellationRows];
     return rows
@@ -599,6 +608,7 @@ class DepartmentDashboardModel {
       throw error;
     }
     const scope = departmentWorkScope(user, "wi");
+    const ownership = policyOwnershipFilter(getPolicyReadScope(user), "p.created_by");
     const lookupWhere = Number.isInteger(policyId) && policyId > 0 ? "p.id = ?" : "p.policy_number = ?";
     const lookupParam = Number.isInteger(policyId) && policyId > 0 ? policyId : policyNumber;
     const [policies] = await db.query(
@@ -606,9 +616,9 @@ class DepartmentDashboardModel {
         LEAST(COALESCE(p.od_expiry, '9999-12-31'), COALESCE(p.tp_expiry, '9999-12-31')) renewal_date
        FROM policies_motor p
        INNER JOIN department_work_items wi ON wi.policy_id = p.id
-       WHERE wi.department_slug = ? AND ${lookupWhere} AND ${scope.sql}
+       WHERE wi.department_slug = ? AND ${lookupWhere} AND ${scope.sql} AND ${ownership.sql}
        LIMIT 1`,
-      [department, lookupParam, ...scope.params],
+      [department, lookupParam, ...scope.params, ...ownership.params],
     );
     if (!policies.length) {
       const error = new Error("Policy was not found in the renewal book");
@@ -641,6 +651,7 @@ class DepartmentDashboardModel {
   static async getPolicyFollowups(department, user) {
     if (department !== "renewal") return [];
     const scope = departmentWorkScope(user, "wi");
+    const ownership = policyOwnershipFilter(getPolicyReadScope(user), "p.created_by");
     const [rows] = await db.query(
       `SELECT pf.id, pf.policy_id policyId, pf.policy_number policyNumber,
         pf.insured_name insuredName, DATE_FORMAT(pf.renewal_date, '%Y-%m-%d') renewalDate,
@@ -651,10 +662,11 @@ class DepartmentDashboardModel {
         DATE_FORMAT(pf.created_at, '%Y-%m-%d') createdAt
        FROM policy_followup pf
        INNER JOIN department_work_items wi ON wi.policy_id = pf.policy_id
+       INNER JOIN policies_motor p ON p.id = pf.policy_id
        LEFT JOIN employees e ON e.id = pf.created_by
-       WHERE wi.department_slug = ? AND ${scope.sql}
+       WHERE wi.department_slug = ? AND ${scope.sql} AND ${ownership.sql}
        ORDER BY pf.created_at DESC, pf.id DESC LIMIT 2000`,
-      [department, ...scope.params],
+      [department, ...scope.params, ...ownership.params],
     );
     return rows;
   }

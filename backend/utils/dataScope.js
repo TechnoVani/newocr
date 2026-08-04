@@ -1,10 +1,7 @@
-import { hasAllDepartmentAccess } from "../config/departmentAccess.js";
-import { employeeVisibilityFilter } from "./roleAccess.js";
-
 export const getPolicyReadScope = user => ({
-    // Super/admin roles can read the whole policy book. Managers read only
-    // their internal team from employees. Employees read only their own entries.
-    all: hasAllDepartmentAccess(user),
+    // Policy records are owned by policies_motor.created_by.
+    // Every logged-in user reads only their own created policy records.
+    all: false,
     userId: Number(user?.id),
     user
 });
@@ -25,6 +22,5 @@ export const policyOwnershipFilter = (scope, column = "created_by") => {
     if (normalized.all) {
         return { sql: "1 = 1", params: [], scope: normalized };
     }
-    const ownership = employeeVisibilityFilter(normalized.user || { id: normalized.userId }, column);
-    return { sql: ownership.sql, params: ownership.params, scope: normalized };
+    return { sql: `${column} = ?`, params: [normalized.userId], scope: normalized };
 };

@@ -1,4 +1,5 @@
 import { ReconciliationModel } from "../../models/accounts/reconciliationModel.js";
+import { getPolicyReadScope } from "../../utils/dataScope.js";
 
 export const RECONCILIATION_FIELDS = [
   { key: "issue_date", label: "Issue Date", type: "date" },
@@ -156,7 +157,7 @@ const createResultRow = (policy, statement, status, mismatches = []) => ({
 });
 
 export const ReconciliationService = {
-  async importRows({ rows, userId }) {
+  async importRows({ rows, userId, user }) {
     if (!Array.isArray(rows) || rows.length === 0) {
       const error = new Error("The Excel file does not contain any policy rows");
       error.statusCode = 400;
@@ -203,6 +204,7 @@ export const ReconciliationService = {
 
     const policyCompanies = await ReconciliationModel.findPolicyCompanies(
       normalizedRows.map((row) => row.policy_number),
+      getPolicyReadScope(user || { id: userId }),
     );
     const policyCompanyByNumber = new Map(
       policyCompanies.map((policy) => [
@@ -220,7 +222,8 @@ export const ReconciliationService = {
     return { imported };
   },
 
-  async getReport({ year, month, createdYear, createdMonth, insuranceCompany }) {
+  async getReport({ year, month, createdYear, createdMonth, insuranceCompany, user }) {
+    const readScope = getPolicyReadScope(user);
     const hasIssueFilter = year !== null && year !== undefined && year !== "" &&
       month !== null && month !== undefined && month !== "";
     const hasCreatedFilter =
@@ -238,16 +241,17 @@ export const ReconciliationService = {
       ? getPeriodDates(createdPeriod.year, createdPeriod.month)
       : null;
     const [allStatementRows, sourcePolicies, insuranceCompanyOptions] = await Promise.all([
-      ReconciliationModel.findAllStatementRows(),
+      ReconciliationModel.findAllStatementRows(readScope),
       hasIssueFilter
         ? ReconciliationModel.findPoliciesForMonth(
             issueDates.startDate,
             issueDates.endDate,
+            readScope,
           )
         : hasCreatedFilter
-          ? ReconciliationModel.findAllPolicies()
+          ? ReconciliationModel.findAllPolicies(readScope)
           : Promise.resolve([]),
-      ReconciliationModel.findAllInsuranceCompanies(),
+      ReconciliationModel.findAllInsuranceCompanies(readScope),
     ]);
     const selectedInsuranceCompany = String(insuranceCompany || "").trim();
     const hasInsuranceCompanyFilter = selectedInsuranceCompany &&
