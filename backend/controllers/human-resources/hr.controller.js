@@ -121,7 +121,7 @@ export default class HrController {
       if (Number(req.params.id) === Number(req.user.id) && status === "Inactive") {
         throw badRequest("You cannot deactivate your own account");
       }
-      return successResponse(res, "Employee status updated", await HrModel.updateStatus(positiveId(req.params.id), status));
+      return successResponse(res, "Employee status updated", await HrModel.updateStatus(positiveId(req.params.id), status, req.user));
     } catch (error) { next(error); }
   }
 
@@ -160,7 +160,7 @@ export default class HrController {
         throw badRequest("Enter valid employee, contact, department, designation and joining details");
       }
       return successResponse(res, "Employee profile updated", await HrModel.updateEmployeeProfile(
-        positiveId(req.params.id), data,
+        positiveId(req.params.id), data, req.user,
       ));
     } catch (error) { next(error); }
   }
@@ -191,7 +191,7 @@ export default class HrController {
           Boolean(data.check_in) !== Boolean(data.check_out)) {
         throw badRequest("Employee, attendance date, status, and a complete valid check-in/check-out pair are required");
       }
-      return successResponse(res, "Attendance saved", await HrModel.saveAttendance(data, Number(req.user.id)), 201);
+      return successResponse(res, "Attendance saved", await HrModel.saveAttendance(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 
@@ -222,7 +222,7 @@ export default class HrController {
           (data.payout_status === "Paid" && !data.payout_date)) {
         throw badRequest("Employee, month, payout type, positive amount and valid payout status are required");
       }
-      return successResponse(res, "Employee payout created", await HrModel.createPayout(data, Number(req.user.id)), 201);
+      return successResponse(res, "Employee payout created", await HrModel.createPayout(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 
@@ -239,20 +239,20 @@ export default class HrController {
         throw badRequest("Valid payout status and payment date for a paid payout are required");
       }
       return successResponse(res, "Employee payout status updated", await HrModel.updatePayoutStatus(
-        positiveId(req.params.id), data,
+        positiveId(req.params.id), data, req.user,
       ));
     } catch (error) { next(error); }
   }
 
   static async reports(req, res, next) {
     try {
-      return successResponse(res, "HR report retrieved", await HrModel.getReports(req.query.month));
+      return successResponse(res, "HR report retrieved", await HrModel.getReports(req.user, req.query.month));
     } catch (error) { next(error); }
   }
 
   static async workforceSetup(req, res, next) {
     try {
-      return successResponse(res, "HR workforce setup retrieved", await HrModel.getWorkforceSetup());
+      return successResponse(res, "HR workforce setup retrieved", await HrModel.getWorkforceSetup(req.user));
     } catch (error) { next(error); }
   }
 
@@ -294,7 +294,7 @@ export default class HrController {
           (data.effective_to && data.effective_to < data.effective_from)) {
         throw badRequest("Employee, active shift and a valid effective date range are required");
       }
-      return successResponse(res, "Employee shift assigned", await HrModel.assignShift(data, Number(req.user.id)), 201);
+      return successResponse(res, "Employee shift assigned", await HrModel.assignShift(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 
@@ -341,7 +341,7 @@ export default class HrController {
         throw badRequest("Employee, review month, rating from 1 to 5 and valid review status are required");
       }
       return successResponse(res, "Performance review saved", await HrModel.savePerformanceReview(
-        data, Number(req.user.id),
+        data, Number(req.user.id), req.user,
       ), 201);
     } catch (error) { next(error); }
   }
@@ -382,7 +382,7 @@ export default class HrController {
           !["Draft", "Issued"].includes(data.status)) {
         throw badRequest("Employee, valid document type, issue date, subject and document body are required");
       }
-      return successResponse(res, "HR document created", await HrModel.createDocument(data, Number(req.user.id)), 201);
+      return successResponse(res, "HR document created", await HrModel.createDocument(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 
@@ -390,7 +390,9 @@ export default class HrController {
     try {
       const status = text(req.body.status);
       if (!["Draft", "Issued", "Acknowledged", "Revoked"].includes(status)) throw badRequest("Invalid document status");
-      return successResponse(res, "Document status updated", await HrModel.updateDocumentStatus(positiveId(req.params.id), status));
+      return successResponse(res, "Document status updated", await HrModel.updateDocumentStatus(
+        positiveId(req.params.id), status, req.user,
+      ));
     } catch (error) { next(error); }
   }
 
@@ -418,7 +420,7 @@ export default class HrController {
           (data.payment_status === "Paid" && !data.payment_date)) {
         throw badRequest("Employee, payroll month and valid non-negative salary values are required");
       }
-      return successResponse(res, "Payroll saved", await HrModel.savePayroll(data, Number(req.user.id)), 201);
+      return successResponse(res, "Payroll saved", await HrModel.savePayroll(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 
@@ -443,7 +445,7 @@ export default class HrController {
           !["Proposed", "Approved", "Effective", "Rejected"].includes(data.status)) {
         throw badRequest("Employee, effective date and a revised CTC not below previous CTC are required");
       }
-      return successResponse(res, "Increment created", await HrModel.createIncrement(data, Number(req.user.id)), 201);
+      return successResponse(res, "Increment created", await HrModel.createIncrement(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 
@@ -480,7 +482,9 @@ export default class HrController {
     try {
       const data = { status: text(req.body.status), note: text(req.body.note) };
       if (!["Approved", "Rejected"].includes(data.status)) throw badRequest("Leave decision must be Approved or Rejected");
-      return successResponse(res, "Leave request updated", await HrModel.decideLeave(positiveId(req.params.id), data, Number(req.user.id)));
+      return successResponse(res, "Leave request updated", await HrModel.decideLeave(
+        positiveId(req.params.id), data, Number(req.user.id), req.user,
+      ));
     } catch (error) { next(error); }
   }
 
@@ -512,7 +516,7 @@ export default class HrController {
           !["Planned", "In Progress", "Completed", "Cancelled"].includes(data.status)) {
         throw badRequest("Employee, lifecycle event, event date and valid status are required");
       }
-      return successResponse(res, "Lifecycle event created", await HrModel.createEvent(data, Number(req.user.id)), 201);
+      return successResponse(res, "Lifecycle event created", await HrModel.createEvent(data, Number(req.user.id), req.user), 201);
     } catch (error) { next(error); }
   }
 }

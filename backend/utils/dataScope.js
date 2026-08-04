@@ -1,30 +1,23 @@
-import { canAccessPortal, hasAllDepartmentAccess } from "../config/departmentAccess.js";
-import { ACCESS_ROLES, hasMinimumRole } from "./roleAccess.js";
+import { hasAllDepartmentAccess } from "../config/departmentAccess.js";
+import { employeeVisibilityFilter } from "./roleAccess.js";
 
 export const getPolicyReadScope = user => ({
-    // Super/admin roles can read the whole policy book. Department managers
-    // in shared policy portals read their reporting branch. Employees read
-    // only their own entries.
+    // Super/admin roles can read the whole policy book. Managers read only
+    // their internal team from employees. Employees read only their own entries.
     all: hasAllDepartmentAccess(user),
-    branch:
-        hasMinimumRole(user, ACCESS_ROLES.MANAGER) &&
-        (canAccessPortal(user, "accounts") || canAccessPortal(user, "pos-management")),
     userId: Number(user?.id),
-    branchId: Number(user?.reporting_branch_id)
+    user
 });
 
 export const normalizePolicyReadScope = scope => {
     const all = Boolean(scope && typeof scope === "object" && scope.all);
-    const branch = Boolean(scope && typeof scope === "object" && scope.branch);
     const userId = Number(scope && typeof scope === "object" ? scope.userId : scope);
-    const branchId = Number(scope && typeof scope === "object" ? scope.branchId : null);
-    const hasBranchScope = branch && Number.isInteger(branchId) && branchId > 0;
-    if (!all && !hasBranchScope && (!Number.isInteger(userId) || userId <= 0)) {
+    if (!all && (!Number.isInteger(userId) || userId <= 0)) {
         const error = new Error("A valid authenticated user is required for policy access");
         error.statusCode = 401;
         throw error;
     }
-    return { all, branch: hasBranchScope, userId, branchId };
+    return { all, userId, user: scope?.user || null };
 };
 
 export const policyOwnershipFilter = (scope, column = "created_by") => {
@@ -32,12 +25,6 @@ export const policyOwnershipFilter = (scope, column = "created_by") => {
     if (normalized.all) {
         return { sql: "1 = 1", params: [], scope: normalized };
     }
-    if (normalized.branch) {
-        return {
-            sql: `${column} IN (SELECT id FROM employees WHERE reporting_branch = ?)`,
-            params: [normalized.branchId],
-            scope: normalized
-        };
-    }
-    return { sql: `${column} = ?`, params: [normalized.userId], scope: normalized };
+    const ownership = employeeVisibilityFilter(normalized.user || { id: normalized.userId }, column);
+    return { sql: ownership.sql, params: ownership.params, scope: normalized };
 };

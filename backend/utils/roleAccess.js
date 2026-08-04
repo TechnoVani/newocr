@@ -37,6 +37,46 @@ export const getAccessRole = user => {
 export const hasMinimumRole = (user, minimumRole) =>
     ROLE_LEVEL[getAccessRole(user)] >= ROLE_LEVEL[minimumRole];
 
+const authenticatedEmployeeId = user => {
+    const userId = Number(user?.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+        const error = new Error("A valid authenticated employee is required");
+        error.statusCode = 401;
+        throw error;
+    }
+    return userId;
+};
+
+const sameDepartmentClause = user => {
+    const departmentId = Number(user?.department_id);
+    return Number.isInteger(departmentId) && departmentId > 0
+        ? { sql: " AND department = ?", params: [departmentId] }
+        : { sql: "", params: [] };
+};
+
+export const employeeVisibilityFilter = (user, column = "id") => {
+    const role = getAccessRole(user);
+    if (ROLE_LEVEL[role] >= ROLE_LEVEL[ACCESS_ROLES.ADMIN]) {
+        return { sql: "1 = 1", params: [], role, visibility: "all" };
+    }
+
+    const userId = authenticatedEmployeeId(user);
+    if (ROLE_LEVEL[role] >= ROLE_LEVEL[ACCESS_ROLES.MANAGER]) {
+        const department = sameDepartmentClause(user);
+        return {
+            sql: `(${column} = ? OR ${column} IN (
+                SELECT id FROM employees
+                WHERE (reporting_manager = ? OR relationship_manager = ?)${department.sql}
+            ))`,
+            params: [userId, userId, userId, ...department.params],
+            role,
+            visibility: "team"
+        };
+    }
+
+    return { sql: `${column} = ?`, params: [userId], role, visibility: "self" };
+};
+
 export const getRoleCapabilities = user => {
     const role = getAccessRole(user);
     return {
@@ -49,20 +89,14 @@ export const getRoleCapabilities = user => {
 };
 
 export const departmentWorkScope = (user, alias = "wi") => {
-    const role = getAccessRole(user);
-    if (ROLE_LEVEL[role] >= ROLE_LEVEL[ACCESS_ROLES.MANAGER]) {
-        return { sql: "1 = 1", params: [], role, visibility: "department" };
-    }
-    const userId = Number(user?.id);
-    if (!Number.isInteger(userId) || userId <= 0) {
-        const error = new Error("A valid authenticated employee is required");
-        error.statusCode = 401;
-        throw error;
-    }
+    const createdBy = employeeVisibilityFilter(user, `${alias}.created_by`);
+    if (createdBy.visibility === "all") return createdBy;
+
+    const assignedTo = employeeVisibilityFilter(user, `${alias}.assigned_to`);
     return {
-        sql: `(${alias}.created_by = ? OR ${alias}.assigned_to = ?)`,
-        params: [userId, userId],
-        role,
-        visibility: "self"
+        sql: `(${createdBy.sql} OR ${assignedTo.sql})`,
+        params: [...createdBy.params, ...assignedTo.params],
+        role: createdBy.role,
+        visibility: createdBy.visibility
     };
 };

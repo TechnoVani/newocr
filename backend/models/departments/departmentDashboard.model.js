@@ -1,6 +1,6 @@
 import db from "../../config/database.js";
 import { STATUS_TRANSITIONS } from "./departmentWorkflowConfig.js";
-import { departmentWorkScope, hasMinimumRole, ACCESS_ROLES } from "../../utils/roleAccess.js";
+import { departmentWorkScope, employeeVisibilityFilter, hasMinimumRole, ACCESS_ROLES } from "../../utils/roleAccess.js";
 import { getPolicyReadScope, policyOwnershipFilter } from "../../utils/dataScope.js";
 import { POLICY_REPORT_JOINS, POLICY_REPORT_SELECT } from "../../utils/policyReportQuery.js";
 
@@ -138,7 +138,9 @@ const getAdministrationBusinessReports = async (user, requestedMonth = "") => {
         COALESCE(NULLIF(TRIM(manager.name), ''), 'Unassigned Relationship Manager') relationship_manager
       FROM employee_pos pos
       LEFT JOIN employees manager ON manager.id = pos.relationship_manager
-      ORDER BY pos.name, pos.pos_code`),
+      ${ownership.scope.all ? "" : `INNER JOIN policies_motor p ON p.pos_id = pos.id AND ${ownership.sql}`}
+      GROUP BY pos.id, pos.name, pos.pos_code, pos.mobile, pos.email, pos.status, manager.name
+      ORDER BY pos.name, pos.pos_code`, ownership.scope.all ? [] : ownership.params),
     db.query(`
       SELECT p.pos_id, DATE_FORMAT(p.issue_date, '%Y-%m') month_key,
         COUNT(*) policy_count,
@@ -204,14 +206,13 @@ class DepartmentDashboardModel {
   static async getDashboard(department, user, filters = {}) {
     const scope = departmentWorkScope(user, "wi");
     if (department === "human-resources") {
-      const employeeWhere = hasMinimumRole(user, ACCESS_ROLES.MANAGER) ? "1 = 1" : "e.id = ?";
-      const employeeParams = hasMinimumRole(user, ACCESS_ROLES.MANAGER) ? [] : [Number(user.id)];
+      const employeeScope = employeeVisibilityFilter(user, "e.id");
       const [[employeeCounts], [caseCounts], [recent]] = await Promise.all([
         db.query(`SELECT COUNT(*) total,
           SUM(e.status = 'Active') active,
           SUM(e.joining_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')) new_joiners,
           SUM(e.status != 'Active' OR e.relieving_date IS NOT NULL) inactive
-          FROM employees e WHERE ${employeeWhere}`, employeeParams),
+          FROM employees e WHERE ${employeeScope.sql}`, employeeScope.params),
         db.query(`SELECT SUM(work_type = 'Leave' AND status IN ('Open','Pending')) pending_leave,
           SUM(work_type = 'Exit' AND status NOT IN ('Completed','Rejected')) pending_exit
           FROM department_work_items wi WHERE department_slug = ? AND ${scope.sql}`, [department, ...scope.params]),
@@ -398,7 +399,7 @@ class DepartmentDashboardModel {
   static async getPolicies(department, user) {
     const scope = departmentWorkScope(user, "wi");
     if (department === "human-resources") {
-      const employeeWhere = hasMinimumRole(user, ACCESS_ROLES.MANAGER) ? "" : "WHERE e.id = ?";
+      const employeeScope = employeeVisibilityFilter(user, "e.id");
       const [rows] = await db.query(
         `SELECT e.id, e.employee_code policyNumber, e.name employeeName,
           COALESCE(dsg.designation_name, 'Unassigned') product,
@@ -406,9 +407,9 @@ class DepartmentDashboardModel {
          FROM employees e
          LEFT JOIN departments dep ON e.department = dep.id
          LEFT JOIN designations dsg ON e.designation = dsg.id
-         ${employeeWhere}
+         WHERE ${employeeScope.sql}
          ORDER BY e.name LIMIT 2000`,
-        hasMinimumRole(user, ACCESS_ROLES.MANAGER) ? [] : [Number(user.id)],
+        employeeScope.params,
       );
       return rows;
     }
@@ -662,11 +663,13 @@ class DepartmentDashboardModel {
     const scope = departmentWorkScope(user, "wi");
     if (department === "human-resources") {
       if (!hasMinimumRole(user, ACCESS_ROLES.MANAGER)) return [];
+      const employeeScope = employeeVisibilityFilter(user, "e.id");
       const [rows] = await db.query(
         `SELECT dep.id, dep.department_name name, COUNT(e.id) count,
           MAX(e.updated_at) updatedAt
-         FROM departments dep LEFT JOIN employees e ON e.department = dep.id
+         FROM departments dep LEFT JOIN employees e ON e.department = dep.id AND ${employeeScope.sql}
          GROUP BY dep.id, dep.department_name ORDER BY dep.department_name`,
+        employeeScope.params,
       );
       return rows.map((row) => ({ ...row, updatedAt: displayDate(row.updatedAt) }));
     }

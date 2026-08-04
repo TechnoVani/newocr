@@ -1,11 +1,11 @@
 import bcrypt from "bcryptjs";
 // Human Resources department model.
 import db from "../../config/database.js";
+import { employeeVisibilityFilter } from "../../utils/roleAccess.js";
 
 export const HrModel = {
   async getOptions(user, managerView = true) {
-    const employeeWhere = managerView ? "" : "WHERE e.id = ?";
-    const employeeParams = managerView ? [] : [Number(user?.id)];
+    const employeeScope = employeeVisibilityFilter(user, "e.id");
     const [[departments], [designations], [employees], [leaveTypes], [managerRows], [nextCodeRows], [shifts]] = await Promise.all([
       db.query("SELECT id, department_name name FROM departments ORDER BY department_name"),
       db.query(`SELECT id, department department_id, designation_name name,
@@ -18,16 +18,16 @@ export const HrModel = {
         LEFT JOIN departments d ON d.id = e.department
         LEFT JOIN designations g ON g.id = e.designation
         LEFT JOIN employees reporting ON reporting.id = e.reporting_manager
-        ${employeeWhere}
-        ORDER BY e.name`, employeeParams),
+        WHERE ${employeeScope.sql}
+        ORDER BY e.name`, employeeScope.params),
       db.query("SELECT id, name, code, annual_quota, paid, carry_forward FROM hr_leave_types WHERE status = 'Active' ORDER BY name"),
       db.query(`SELECT e.id, e.employee_code, e.name, e.department department_id,
         d.department_name department, g.designation_name designation
         FROM employees e
         LEFT JOIN departments d ON d.id = e.department
         LEFT JOIN designations g ON g.id = e.designation
-        WHERE e.status = 'Active'
-        ORDER BY e.name`),
+        WHERE e.status = 'Active' AND ${employeeScope.sql}
+        ORDER BY e.name`, employeeScope.params),
       db.query(`SELECT COALESCE(MAX(CAST(SUBSTRING(employee_code, 4) AS UNSIGNED)), 0) latest_number
         FROM employees WHERE employee_code REGEXP '^NIB[0-9]+$'`),
       db.query(`SELECT id, shift_name name, start_time, end_time, grace_minutes,
@@ -48,33 +48,34 @@ export const HrModel = {
   },
 
   async overview(user, managerView) {
-    const scope = managerView ? "" : " WHERE employee_id = ?";
-    const args = managerView ? [] : [Number(user.id)];
+    const employeeScope = employeeVisibilityFilter(user, "e.id");
+    const recordScope = employeeVisibilityFilter(user, "employee_id");
+    const eventScope = employeeVisibilityFilter(user, "ev.employee_id");
     const [[employeeRows], [leaveRows], [payrollRows], [documentRows], [attendanceRows], [payoutRows], [performanceRows], [recentEvents]] = await Promise.all([
       db.query(`SELECT COUNT(*) total,
         SUM(status = 'Active') active,
         SUM(status = 'Inactive') inactive
-        FROM employees${managerView ? "" : " WHERE id = ?"}`, managerView ? [] : [Number(user.id)]),
+        FROM employees e WHERE ${employeeScope.sql}`, employeeScope.params),
       db.query(`SELECT COUNT(*) total, SUM(status = 'Pending') pending,
-        SUM(status = 'Approved') approved FROM hr_leave_requests${scope}`, args),
+        SUM(status = 'Approved') approved FROM hr_leave_requests WHERE ${recordScope.sql}`, recordScope.params),
       db.query(`SELECT COUNT(*) records, COALESCE(SUM(net_pay),0) net_pay,
-        SUM(payment_status = 'Paid') paid FROM hr_payroll${scope}`, args),
+        SUM(payment_status = 'Paid') paid FROM hr_payroll WHERE ${recordScope.sql}`, recordScope.params),
       db.query(`SELECT COUNT(*) total, SUM(status = 'Draft') drafts,
-        SUM(status = 'Issued') issued FROM hr_documents${scope}`, args),
+        SUM(status = 'Issued') issued FROM hr_documents WHERE ${recordScope.sql}`, recordScope.params),
       db.query(`SELECT COUNT(*) records, SUM(attendance_status = 'Present') present,
         SUM(attendance_status = 'Absent') absent
-        FROM hr_attendance${scope}${scope ? " AND" : " WHERE"} DATE_FORMAT(attendance_date, '%Y-%m') = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`, args),
+        FROM hr_attendance WHERE ${recordScope.sql} AND DATE_FORMAT(attendance_date, '%Y-%m') = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`, recordScope.params),
       db.query(`SELECT COUNT(*) records, COALESCE(SUM(amount),0) amount,
         SUM(payout_status = 'Paid') paid
-        FROM hr_employee_payouts${scope}${scope ? " AND" : " WHERE"} payout_month = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`, args),
+        FROM hr_employee_payouts WHERE ${recordScope.sql} AND payout_month = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`, recordScope.params),
       db.query(`SELECT COUNT(*) records, COALESCE(AVG(rating),0) average_rating,
         SUM(status = 'Submitted') pending_acknowledgement
-        FROM hr_performance_reviews${scope}${scope ? " AND" : " WHERE"} review_period = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`, args),
+        FROM hr_performance_reviews WHERE ${recordScope.sql} AND review_period = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`, recordScope.params),
       db.query(`SELECT ev.id, ev.event_type, ev.event_date, ev.status, ev.notes,
         e.employee_code, e.name employee_name
         FROM hr_employee_events ev JOIN employees e ON e.id = ev.employee_id
-        ${managerView ? "" : "WHERE ev.employee_id = ?"}
-        ORDER BY ev.event_date DESC, ev.id DESC LIMIT 8`, args),
+        WHERE ${eventScope.sql}
+        ORDER BY ev.event_date DESC, ev.id DESC LIMIT 8`, eventScope.params),
     ]);
     return {
       employees: employeeRows[0] || {},
@@ -168,7 +169,7 @@ export const HrModel = {
   },
 
   async getEmployees(user, managerView = true) {
-    const employeeWhere = managerView ? "" : "WHERE e.id = ?";
+    const employeeScope = employeeVisibilityFilter(user, "e.id");
     const [rows] = await db.query(`SELECT e.id, e.employee_code, e.name, e.personal_email, e.mobile,
       e.gender, e.date_of_birth, e.emergency_contact, e.current_address,
       e.state, e.city, e.pin_code, e.joining_date, e.relieving_date, e.status, e.user_type,
@@ -181,8 +182,8 @@ export const HrModel = {
       LEFT JOIN designations g ON g.id = e.designation
       LEFT JOIN employees manager ON manager.id = e.reporting_manager
       LEFT JOIN employees relationship ON relationship.id = e.relationship_manager
-      ${employeeWhere}
-      ORDER BY e.status = 'Active' DESC, e.name`, managerView ? [] : [Number(user.id)]);
+      WHERE ${employeeScope.sql}
+      ORDER BY e.status = 'Active' DESC, e.name`, employeeScope.params);
     return rows;
   },
 
@@ -284,7 +285,17 @@ export const HrModel = {
     }
   },
 
-  async updateStatus(id, status) {
+  async updateStatus(id, status, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
+    const [allowedRows] = await db.query(
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1`,
+      [id, ...employeeScope.params],
+    );
+    if (!allowedRows.length) {
+      const error = new Error("Employee not found");
+      error.statusCode = 404;
+      throw error;
+    }
     const [result] = await db.query(
       `UPDATE employees SET status = ?,
        relieving_date = CASE WHEN ? = 'Inactive' THEN COALESCE(relieving_date, CURRENT_DATE()) ELSE NULL END
@@ -300,18 +311,23 @@ export const HrModel = {
   },
 
   async getDocuments(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "doc.employee_id");
     const [rows] = await db.query(`SELECT doc.*, e.employee_code, e.name employee_name,
       issuer.name issued_by_name
       FROM hr_documents doc
       JOIN employees e ON e.id = doc.employee_id
       LEFT JOIN employees issuer ON issuer.id = doc.issued_by
-      ${managerView ? "" : "WHERE doc.employee_id = ?"}
-      ORDER BY doc.issue_date DESC, doc.id DESC`, managerView ? [] : [Number(user.id)]);
+      WHERE ${employeeScope.sql}
+      ORDER BY doc.issue_date DESC, doc.id DESC`, employeeScope.params);
     return rows;
   },
 
-  async createDocument(data, issuedBy) {
-    const [employees] = await db.query("SELECT id FROM employees WHERE id = ? LIMIT 1", [data.employee_id]);
+  async createDocument(data, issuedBy, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
+    const [employees] = await db.query(
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1`,
+      [data.employee_id, ...employeeScope.params],
+    );
     if (!employees.length) {
       const error = new Error("Employee not found");
       error.statusCode = 404;
@@ -340,12 +356,13 @@ export const HrModel = {
     }
   },
 
-  async updateDocumentStatus(id, status) {
+  async updateDocumentStatus(id, status, user) {
+    const employeeScope = employeeVisibilityFilter(user, "employee_id");
     const [result] = await db.query(
       `UPDATE hr_documents SET status = ?,
        issued_at = CASE WHEN ? = 'Issued' THEN COALESCE(issued_at, NOW()) ELSE issued_at END
-       WHERE id = ?`,
-      [status, status, id],
+       WHERE id = ? AND ${employeeScope.sql}`,
+      [status, status, id, ...employeeScope.params],
     );
     if (!result.affectedRows) {
       const error = new Error("HR document not found");
@@ -356,16 +373,17 @@ export const HrModel = {
   },
 
   async getPayroll(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "p.employee_id");
     const [rows] = await db.query(`SELECT p.*, e.employee_code, e.name employee_name,
       d.department_name department
       FROM hr_payroll p JOIN employees e ON e.id = p.employee_id
       LEFT JOIN departments d ON d.id = e.department
-      ${managerView ? "" : "WHERE p.employee_id = ?"}
-      ORDER BY p.payroll_month DESC, e.name`, managerView ? [] : [Number(user.id)]);
+      WHERE ${employeeScope.sql}
+      ORDER BY p.payroll_month DESC, e.name`, employeeScope.params);
     return rows;
   },
 
-  async savePayroll(data, createdBy) {
+  async savePayroll(data, createdBy, user) {
     const gross = data.basic + data.hra + data.allowances + data.bonus;
     const netPay = gross - data.deductions - data.tax;
     if (netPay < 0) {
@@ -373,7 +391,11 @@ export const HrModel = {
       error.statusCode = 400;
       throw error;
     }
-    const [employees] = await db.query("SELECT id FROM employees WHERE id = ? AND status = 'Active' LIMIT 1", [data.employee_id]);
+    const employeeScope = employeeVisibilityFilter(user, "id");
+    const [employees] = await db.query(
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} AND status = 'Active' LIMIT 1`,
+      [data.employee_id, ...employeeScope.params],
+    );
     if (!employees.length) {
       const error = new Error("Active employee not found");
       error.statusCode = 404;
@@ -397,15 +419,20 @@ export const HrModel = {
   },
 
   async getIncrements(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "i.employee_id");
     const [rows] = await db.query(`SELECT i.*, e.employee_code, e.name employee_name
       FROM hr_increments i JOIN employees e ON e.id = i.employee_id
-      ${managerView ? "" : "WHERE i.employee_id = ?"}
-      ORDER BY i.effective_date DESC, i.id DESC`, managerView ? [] : [Number(user.id)]);
+      WHERE ${employeeScope.sql}
+      ORDER BY i.effective_date DESC, i.id DESC`, employeeScope.params);
     return rows;
   },
 
-  async createIncrement(data, createdBy) {
-    const [employees] = await db.query("SELECT id FROM employees WHERE id = ? LIMIT 1", [data.employee_id]);
+  async createIncrement(data, createdBy, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
+    const [employees] = await db.query(
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1`,
+      [data.employee_id, ...employeeScope.params],
+    );
     if (!employees.length) {
       const error = new Error("Employee not found");
       error.statusCode = 404;
@@ -427,21 +454,21 @@ export const HrModel = {
   },
 
   async getLeaves(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "r.employee_id");
     const [rows] = await db.query(`SELECT r.*, e.employee_code, e.name employee_name,
       t.name leave_type, t.code leave_code, approver.name approver_name
       FROM hr_leave_requests r
       JOIN employees e ON e.id = r.employee_id
       JOIN hr_leave_types t ON t.id = r.leave_type_id
       LEFT JOIN employees approver ON approver.id = r.approver_id
-      ${managerView ? "" : "WHERE r.employee_id = ?"}
-      ORDER BY r.from_date DESC, r.id DESC`, managerView ? [] : [Number(user.id)]);
+      WHERE ${employeeScope.sql}
+      ORDER BY r.from_date DESC, r.id DESC`, employeeScope.params);
     return rows;
   },
 
   async getLeaveBalances(user, managerView, requestedYear) {
     const year = /^\d{4}$/.test(String(requestedYear || "")) ? Number(requestedYear) : new Date().getFullYear();
-    const employeeWhere = managerView ? "e.status = 'Active'" : "e.id = ?";
-    const params = managerView ? [year] : [year, Number(user.id)];
+    const employeeScope = employeeVisibilityFilter(user, "e.id");
     const [rows] = await db.query(`SELECT e.id employee_id, e.employee_code, e.name employee_name,
       t.id leave_type_id, t.name leave_type, t.code leave_code, t.annual_quota,
       COALESCE(SUM(CASE WHEN r.status = 'Approved' THEN r.days ELSE 0 END), 0) approved_days,
@@ -450,14 +477,15 @@ export const HrModel = {
       FROM employees e CROSS JOIN hr_leave_types t
       LEFT JOIN hr_leave_requests r ON r.employee_id = e.id AND r.leave_type_id = t.id
         AND YEAR(r.from_date) = ? AND r.status IN ('Approved','Pending')
-      WHERE ${employeeWhere} AND t.status = 'Active'
+      WHERE ${employeeScope.sql} AND e.status = 'Active' AND t.status = 'Active'
       GROUP BY e.id, e.employee_code, e.name, t.id, t.name, t.code, t.annual_quota
-      ORDER BY e.name, t.name`, params);
+      ORDER BY e.name, t.name`, [year, ...employeeScope.params]);
     return { year, rows };
   },
 
   async createLeave(data, user, managerView) {
     const employeeId = managerView && data.employee_id ? data.employee_id : Number(user.id);
+    const employeeScope = employeeVisibilityFilter(user, "id");
     if (data.from_date.slice(0, 4) !== data.to_date.slice(0, 4)) {
       const error = new Error("A leave request must be within one calendar year");
       error.statusCode = 400;
@@ -467,7 +495,10 @@ export const HrModel = {
     try {
       await connection.beginTransaction();
       const [[employee], [leaveType], [overlaps], [usage]] = await Promise.all([
-        connection.query("SELECT id FROM employees WHERE id = ? AND status = 'Active' LIMIT 1 FOR UPDATE", [employeeId]),
+        connection.query(
+          `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} AND status = 'Active' LIMIT 1 FOR UPDATE`,
+          [employeeId, ...employeeScope.params],
+        ),
         connection.query("SELECT id, annual_quota FROM hr_leave_types WHERE id = ? AND status = 'Active' LIMIT 1 FOR UPDATE", [data.leave_type_id]),
         connection.query(`SELECT id FROM hr_leave_requests
           WHERE employee_id = ? AND status IN ('Pending','Approved')
@@ -514,11 +545,12 @@ export const HrModel = {
     }
   },
 
-  async decideLeave(id, data, approverId) {
+  async decideLeave(id, data, approverId, user) {
+    const employeeScope = employeeVisibilityFilter(user, "employee_id");
     const [result] = await db.query(
       `UPDATE hr_leave_requests SET status = ?, approver_id = ?,
-       approver_note = ?, decided_at = NOW() WHERE id = ? AND status = 'Pending'`,
-      [data.status, approverId, data.note || null, id],
+       approver_note = ?, decided_at = NOW() WHERE id = ? AND ${employeeScope.sql} AND status = 'Pending'`,
+      [data.status, approverId, data.note || null, id, ...employeeScope.params],
     );
     if (!result.affectedRows) {
       const error = new Error("Pending leave request not found");
@@ -529,12 +561,11 @@ export const HrModel = {
   },
 
   async cancelLeave(id, user, managerView) {
-    const conditions = managerView ? "" : "AND employee_id = ?";
-    const params = managerView ? [id] : [id, Number(user.id)];
+    const employeeScope = employeeVisibilityFilter(user, "employee_id");
     const [result] = await db.query(
       `UPDATE hr_leave_requests SET status = 'Cancelled'
-       WHERE id = ? ${conditions} AND status = 'Pending'`,
-      params,
+       WHERE id = ? AND ${employeeScope.sql} AND status = 'Pending'`,
+      [id, ...employeeScope.params],
     );
     if (!result.affectedRows) {
       const error = new Error("Pending leave request not found");
@@ -545,20 +576,25 @@ export const HrModel = {
   },
 
   async getEvents(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "ev.employee_id");
     const [rows] = await db.query(`SELECT ev.*, e.employee_code, e.name employee_name,
       doc.document_number
       FROM hr_employee_events ev JOIN employees e ON e.id = ev.employee_id
       LEFT JOIN hr_documents doc ON doc.id = ev.document_id
-      ${managerView ? "" : "WHERE ev.employee_id = ?"}
-      ORDER BY ev.event_date DESC, ev.id DESC`, managerView ? [] : [Number(user.id)]);
+      WHERE ${employeeScope.sql}
+      ORDER BY ev.event_date DESC, ev.id DESC`, employeeScope.params);
     return rows;
   },
 
-  async createEvent(data, createdBy) {
+  async createEvent(data, createdBy, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
-      const [employees] = await connection.query("SELECT id FROM employees WHERE id = ? LIMIT 1 FOR UPDATE", [data.employee_id]);
+      const [employees] = await connection.query(
+        `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1 FOR UPDATE`,
+        [data.employee_id, ...employeeScope.params],
+      );
       if (!employees.length) {
         const error = new Error("Employee not found");
         error.statusCode = 404;
@@ -600,8 +636,7 @@ export const HrModel = {
   },
 
   async getEmployeeProfile(id, user, managerView) {
-    const conditions = managerView ? "e.id = ?" : "e.id = ? AND e.id = ?";
-    const params = managerView ? [id] : [id, Number(user.id)];
+    const employeeScope = employeeVisibilityFilter(user, "e.id");
     const [rows] = await db.query(`SELECT e.id, e.employee_code, e.name, e.personal_email,
       e.mobile, e.gender, e.date_of_birth, e.emergency_contact, e.current_address,
       e.state, e.city, e.pin_code, e.joining_date, e.relieving_date, e.status,
@@ -614,7 +649,7 @@ export const HrModel = {
       LEFT JOIN designations g ON g.id = e.designation
       LEFT JOIN employees reporting ON reporting.id = e.reporting_manager
       LEFT JOIN employees relationship ON relationship.id = e.relationship_manager
-      WHERE ${conditions} LIMIT 1`, params);
+      WHERE e.id = ? AND ${employeeScope.sql} LIMIT 1`, [id, ...employeeScope.params]);
     if (!rows.length) {
       const error = new Error("Employee profile not found");
       error.statusCode = 404;
@@ -623,7 +658,17 @@ export const HrModel = {
     return rows[0];
   },
 
-  async updateEmployeeProfile(id, data) {
+  async updateEmployeeProfile(id, data, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
+    const [allowedRows] = await db.query(
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1`,
+      [id, ...employeeScope.params],
+    );
+    if (!allowedRows.length) {
+      const error = new Error("Employee profile not found");
+      error.statusCode = 404;
+      throw error;
+    }
     const [duplicateRows] = await db.query(
       `SELECT id FROM employees
        WHERE id != ? AND (LOWER(TRIM(personal_email)) = LOWER(?) OR TRIM(mobile) = ?)
@@ -677,15 +722,14 @@ export const HrModel = {
       error.statusCode = 404;
       throw error;
     }
-    return this.getEmployeeProfile(id, { id }, true);
+    return this.getEmployeeProfile(id, user, true);
   },
 
   async getAttendance(user, managerView, month) {
     const attendanceMonth = /^\d{4}-\d{2}$/.test(String(month || ""))
       ? String(month)
       : new Date().toISOString().slice(0, 7);
-    const employeeCondition = managerView ? "" : "AND a.employee_id = ?";
-    const params = managerView ? [attendanceMonth] : [attendanceMonth, Number(user.id)];
+    const employeeScope = employeeVisibilityFilter(user, "a.employee_id");
     const [rows] = await db.query(`SELECT a.*, e.employee_code, e.name employee_name,
       d.department_name department, marker.name marked_by_name,
       shift.shift_name, shift.start_time shift_start_time, shift.end_time shift_end_time
@@ -702,15 +746,16 @@ export const HrModel = {
         ORDER BY current_assignment.effective_from DESC, current_assignment.id DESC LIMIT 1
       )
       LEFT JOIN hr_shifts shift ON shift.id = assignment.shift_id
-      WHERE DATE_FORMAT(a.attendance_date, '%Y-%m') = ? ${employeeCondition}
-      ORDER BY a.attendance_date DESC, e.name`, params);
+      WHERE DATE_FORMAT(a.attendance_date, '%Y-%m') = ? AND ${employeeScope.sql}
+      ORDER BY a.attendance_date DESC, e.name`, [attendanceMonth, ...employeeScope.params]);
     return { month: attendanceMonth, rows };
   },
 
-  async saveAttendance(data, markedBy) {
+  async saveAttendance(data, markedBy, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
     const [employees] = await db.query(
-      "SELECT id FROM employees WHERE id = ? AND status = 'Active' LIMIT 1",
-      [data.employee_id],
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} AND status = 'Active' LIMIT 1`,
+      [data.employee_id, ...employeeScope.params],
     );
     if (!employees.length) {
       const error = new Error("Active employee not found");
@@ -744,21 +789,23 @@ export const HrModel = {
   },
 
   async getPayouts(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "payout.employee_id");
     const [rows] = await db.query(`SELECT payout.*, e.employee_code, e.name employee_name,
       d.department_name department
       FROM hr_employee_payouts payout
       JOIN employees e ON e.id = payout.employee_id
       LEFT JOIN departments d ON d.id = e.department
-      ${managerView ? "" : "WHERE payout.employee_id = ?"}
+      WHERE ${employeeScope.sql}
       ORDER BY payout.payout_month DESC, payout.id DESC`,
-    managerView ? [] : [Number(user.id)]);
+    employeeScope.params);
     return rows;
   },
 
-  async createPayout(data, createdBy) {
+  async createPayout(data, createdBy, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
     const [employees] = await db.query(
-      "SELECT id FROM employees WHERE id = ? LIMIT 1",
-      [data.employee_id],
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1`,
+      [data.employee_id, ...employeeScope.params],
     );
     if (!employees.length) {
       const error = new Error("Employee not found");
@@ -776,7 +823,8 @@ export const HrModel = {
     return { id: result.insertId };
   },
 
-  async updatePayoutStatus(id, data) {
+  async updatePayoutStatus(id, data, user) {
+    const employeeScope = employeeVisibilityFilter(user, "employee_id");
     const [result] = await db.query(`UPDATE hr_employee_payouts
       SET payout_status = ?, payout_date = CASE
         WHEN ? = 'Paid' THEN ?
@@ -784,10 +832,10 @@ export const HrModel = {
         ELSE payout_date END,
         reference_number = COALESCE(NULLIF(?, ''), reference_number),
         notes = COALESCE(NULLIF(?, ''), notes)
-      WHERE id = ?`, [
+      WHERE id = ? AND ${employeeScope.sql}`, [
       data.payout_status, data.payout_status, data.payout_date || null,
       data.payout_status, data.reference_number || "",
-      data.notes || "", id,
+      data.notes || "", id, ...employeeScope.params,
     ]);
     if (!result.affectedRows) {
       const error = new Error("Employee payout not found");
@@ -797,7 +845,8 @@ export const HrModel = {
     return { id, payout_status: data.payout_status };
   },
 
-  async getWorkforceSetup() {
+  async getWorkforceSetup(user) {
+    const employeeScope = employeeVisibilityFilter(user, "assignment.employee_id");
     const [[shifts], [assignments], [holidays]] = await Promise.all([
       db.query(`SELECT shift.*, creator.name created_by_name
         FROM hr_shifts shift
@@ -810,7 +859,8 @@ export const HrModel = {
         JOIN employees e ON e.id = assignment.employee_id
         JOIN hr_shifts shift ON shift.id = assignment.shift_id
         LEFT JOIN employees assigner ON assigner.id = assignment.assigned_by
-        ORDER BY assignment.effective_from DESC, assignment.id DESC`),
+        WHERE ${employeeScope.sql}
+        ORDER BY assignment.effective_from DESC, assignment.id DESC`, employeeScope.params),
       db.query(`SELECT holiday.*, creator.name created_by_name
         FROM hr_holidays holiday
         LEFT JOIN employees creator ON creator.id = holiday.created_by
@@ -839,12 +889,16 @@ export const HrModel = {
     }
   },
 
-  async assignShift(data, assignedBy) {
+  async assignShift(data, assignedBy, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
       const [[employees], [shifts]] = await Promise.all([
-        connection.query("SELECT id FROM employees WHERE id = ? AND status = 'Active' LIMIT 1 FOR UPDATE", [data.employee_id]),
+        connection.query(
+          `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} AND status = 'Active' LIMIT 1 FOR UPDATE`,
+          [data.employee_id, ...employeeScope.params],
+        ),
         connection.query("SELECT id FROM hr_shifts WHERE id = ? AND status = 'Active' LIMIT 1", [data.shift_id]),
       ]);
       if (!employees.length || !shifts.length) {
@@ -895,6 +949,7 @@ export const HrModel = {
   },
 
   async getPerformanceReviews(user, managerView) {
+    const employeeScope = employeeVisibilityFilter(user, "review.employee_id");
     const [rows] = await db.query(`SELECT review.*, e.employee_code,
       e.name employee_name, d.department_name department,
       reviewer.name reviewer_name
@@ -902,16 +957,17 @@ export const HrModel = {
       JOIN employees e ON e.id = review.employee_id
       LEFT JOIN departments d ON d.id = e.department
       JOIN employees reviewer ON reviewer.id = review.reviewer_id
-      ${managerView ? "" : "WHERE review.employee_id = ?"}
+      WHERE ${employeeScope.sql}
       ORDER BY review.review_period DESC, e.name`,
-    managerView ? [] : [Number(user.id)]);
+    employeeScope.params);
     return rows;
   },
 
-  async savePerformanceReview(data, reviewerId) {
+  async savePerformanceReview(data, reviewerId, user) {
+    const employeeScope = employeeVisibilityFilter(user, "id");
     const [employees] = await db.query(
-      "SELECT id FROM employees WHERE id = ? LIMIT 1",
-      [data.employee_id],
+      `SELECT id FROM employees WHERE id = ? AND ${employeeScope.sql} LIMIT 1`,
+      [data.employee_id, ...employeeScope.params],
     );
     if (!employees.length) {
       const error = new Error("Employee not found");
@@ -939,13 +995,12 @@ export const HrModel = {
   },
 
   async updatePerformanceStatus(id, status, user, managerView) {
-    const employeeCondition = managerView ? "" : "AND employee_id = ?";
+    const employeeScope = employeeVisibilityFilter(user, "employee_id");
     const [result] = await db.query(`UPDATE hr_performance_reviews
       SET status = ?, reviewed_at = CASE WHEN ? IN ('Submitted','Closed')
         THEN COALESCE(reviewed_at, NOW()) ELSE reviewed_at END
-      WHERE id = ? ${employeeCondition}`, managerView
-      ? [status, status, id]
-      : [status, status, id, Number(user.id)]);
+      WHERE id = ? AND ${employeeScope.sql}`,
+      [status, status, id, ...employeeScope.params]);
     if (!result.affectedRows) {
       const error = new Error("Performance review not found");
       error.statusCode = 404;
@@ -954,38 +1009,44 @@ export const HrModel = {
     return { id, status };
   },
 
-  async getReports(month) {
+  async getReports(user, month) {
     const reportMonth = /^\d{4}-\d{2}$/.test(String(month || ""))
       ? String(month)
       : new Date().toISOString().slice(0, 7);
+    const employeeScope = employeeVisibilityFilter(user, "e.id");
+    const attendanceScope = employeeVisibilityFilter(user, "employee_id");
+    const payrollScope = employeeVisibilityFilter(user, "employee_id");
+    const payoutScope = employeeVisibilityFilter(user, "employee_id");
+    const performanceScope = employeeVisibilityFilter(user, "employee_id");
     const [[workforce], [attendance], [payroll], [payouts], [performance], [holidays], [departmentRows]] = await Promise.all([
       db.query(`SELECT COUNT(*) total_employees,
         SUM(status = 'Active') active_employees,
-        SUM(status = 'Inactive') inactive_employees FROM employees`),
+        SUM(status = 'Inactive') inactive_employees FROM employees e WHERE ${employeeScope.sql}`, employeeScope.params),
       db.query(`SELECT COUNT(*) attendance_records,
         SUM(attendance_status = 'Present') present,
         SUM(attendance_status = 'Absent') absent,
         SUM(attendance_status = 'Half Day') half_day,
         SUM(attendance_status = 'Leave') on_leave,
         COALESCE(SUM(work_hours),0) work_hours
-        FROM hr_attendance WHERE DATE_FORMAT(attendance_date, '%Y-%m') = ?`, [reportMonth]),
+        FROM hr_attendance
+        WHERE DATE_FORMAT(attendance_date, '%Y-%m') = ? AND ${attendanceScope.sql}`, [reportMonth, ...attendanceScope.params]),
       db.query(`SELECT COUNT(*) payroll_records, COALESCE(SUM(net_pay),0) net_pay,
         SUM(payment_status = 'Paid') paid_records
-        FROM hr_payroll WHERE payroll_month = ?`, [reportMonth]),
+        FROM hr_payroll WHERE payroll_month = ? AND ${payrollScope.sql}`, [reportMonth, ...payrollScope.params]),
       db.query(`SELECT COUNT(*) payout_records, COALESCE(SUM(amount),0) payout_amount,
         SUM(payout_status = 'Paid') paid_payouts
-        FROM hr_employee_payouts WHERE payout_month = ?`, [reportMonth]),
+        FROM hr_employee_payouts WHERE payout_month = ? AND ${payoutScope.sql}`, [reportMonth, ...payoutScope.params]),
       db.query(`SELECT COUNT(*) review_records, COALESCE(AVG(rating),0) average_rating,
         SUM(status = 'Submitted') submitted_reviews,
         SUM(status = 'Closed') closed_reviews
-        FROM hr_performance_reviews WHERE review_period = ?`, [reportMonth]),
+        FROM hr_performance_reviews WHERE review_period = ? AND ${performanceScope.sql}`, [reportMonth, ...performanceScope.params]),
       db.query(`SELECT COUNT(*) holiday_count FROM hr_holidays
         WHERE status = 'Active' AND DATE_FORMAT(holiday_date, '%Y-%m') = ?`, [reportMonth]),
       db.query(`SELECT d.department_name department, COUNT(e.id) total_employees,
         SUM(e.status = 'Active') active_employees,
         SUM(e.status = 'Inactive') inactive_employees
-        FROM departments d LEFT JOIN employees e ON e.department = d.id
-        GROUP BY d.id, d.department_name ORDER BY d.department_name`),
+        FROM departments d LEFT JOIN employees e ON e.department = d.id AND ${employeeScope.sql}
+        GROUP BY d.id, d.department_name ORDER BY d.department_name`, employeeScope.params),
     ]);
     return {
       month: reportMonth,
