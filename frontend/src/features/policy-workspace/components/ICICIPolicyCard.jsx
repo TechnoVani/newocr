@@ -2597,6 +2597,61 @@ const extractPreviousPolicyNumber = (text = "") => {
   return text?.match(/Previous\s+Policy\s+No\.[\s\S]*?\n?\s*([A-Z0-9/-]{10,})/i)?.[1]?.trim() || "-";
 };
 
+const normalizeICICIPolicyNumber = (value = "") => {
+  return String(value || "")
+    .trim()
+    .replace(/[\\]+/g, "/")
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/[^\w/-]+$/g, "")
+    .toUpperCase();
+};
+
+const extractICICIPolicyNumber = (text = "") => {
+  if (!text) return "-";
+
+  const rawText = String(text);
+  const labelPattern = /(?:^|[^A-Z])Policy\s*(?:No\.?|Number|#)\s*[:.]?\s*/ig;
+  let match;
+
+  while ((match = labelPattern.exec(rawText))) {
+    const labelPrefix = rawText
+      .slice(Math.max(0, match.index - 16), match.index)
+      .toLowerCase();
+
+    if (labelPrefix.includes("previous")) {
+      continue;
+    }
+
+    const valueStart = match.index + match[0].length;
+    const valueWindow = rawText.slice(valueStart, valueStart + 180);
+    const valueMatch = valueWindow.match(/[A-Z0-9]+(?:\s*[\/\\]\s*[A-Z0-9]+){2,4}/i);
+
+    if (valueMatch) {
+      const policyNumber = normalizeICICIPolicyNumber(valueMatch[0]);
+
+      if (policyNumber.includes("/") && !policyNumber.endsWith("/")) {
+        return policyNumber;
+      }
+    }
+  }
+
+  const fallbackMatch = rawText.match(/\b[A-Z0-9]{2,}(?:\s*[\/\\]\s*[A-Z0-9]{2,}){3,4}\b/i);
+  return fallbackMatch ? normalizeICICIPolicyNumber(fallbackMatch[0]) : "-";
+};
+
+const resolveICICIPolicyNumber = (candidate = "", text = "") => {
+  const fromText = extractICICIPolicyNumber(text);
+  const normalizedCandidate = normalizeICICIPolicyNumber(candidate);
+
+  if (fromText !== "-") {
+    if (!normalizedCandidate || normalizedCandidate.endsWith("/") || fromText.startsWith(normalizedCandidate)) {
+      return fromText;
+    }
+  }
+
+  return normalizedCandidate || fromText;
+};
+
 const extractPreviousInsurer = (text = "") => {
   if (!text) return "-";
   return text.match(/\d{2}-\d{2}-\d{4}\s+to\s+\d{2}-\d{2}-\d{4}\s+\d+%\s+\d+\s+([A-Z]+)\s+(?:Comprehensive|Package|Liability|Third|Party|Insurance|Details)/i)?.[1]?.trim() || 
@@ -3463,6 +3518,7 @@ function ICICIPolicyCard({ item }) {
   const extractedVehicle = extractVehicleDetailsFromText(fullText);
   const autoPremium = extractPremiumData(fullText);
   const policyDates = extractPolicyDates(fullText);
+  const policyNumber = resolveICICIPolicyNumber(policy?.policyNumber, fullText);
 
   // Set default missing values gracefully
   const finalPremium = {
@@ -3510,7 +3566,7 @@ function ICICIPolicyCard({ item }) {
   return (
     <PolicyCardView
       item={item}
-      policyNumber={sanitizeValue(policy?.policyNumber || fullText.match(/Policy No\.?\s*:\s*([0-9\/O]+)/i)?.[1])}
+      policyNumber={sanitizeValue(policyNumber)}
       insuranceCompany={sanitizeValue(extractInsuranceCompanyName(fullText))}
       branchAddress={sanitizeValue(extractBranchAddress(fullText))}
       productType={finalProductType}

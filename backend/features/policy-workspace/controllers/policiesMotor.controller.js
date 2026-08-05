@@ -299,6 +299,32 @@ class PoliciesMotorController {
     }
 
     /**
+     * Check whether a policy number already exists.
+     */
+    static async checkPolicyNumber(req, res, next) {
+        try {
+            const policyNumber = String(req.query.policyNumber || req.query.policy_number || "").trim();
+            if (!policyNumber) {
+                return errorResponse(res, "Policy number is required", null, 400);
+            }
+
+            const policy = await PoliciesMotorModel.findByPolicyNumber(policyNumber);
+            return successResponse(res, "Policy number checked successfully", {
+                exists: Boolean(policy),
+                policy: policy ? {
+                    id: policy.id,
+                    policy_number: policy.policy_number,
+                    insured_name: policy.insured_name,
+                    registration_number: policy.registration_number,
+                    issue_date: policy.issue_date
+                } : null
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
      * Update an existing policy
      */
     static async update(req, res, next) {

@@ -4,19 +4,25 @@ import { BarChart3, ChevronDown, FilePlus2, LayoutDashboard, Menu, RefreshCw, Se
 import logo from "../../../assets/logo.png";
 import DepartmentSwitcher from "../../../components/DepartmentSwitcher";
 import ProfileMenu from "../../../components/ProfileMenu";
+import useAuth from "../../../hooks/useAuth";
+import { ACCESS_ROLES, hasMinimumRole } from "../../../config/roleAccess";
 
 const navItems = [
   { name: "Dashboard", path: "/operations", icon: LayoutDashboard },
   { name: "Upcoming Policy", path: "/operations/renewals", icon: RefreshCw },
   { name: "Reports", path: "/operations/report-entry", icon: BarChart3 },
   { name: "Add Reference", path: "/operations/add-ref", icon: UserPlus },
-  { name: "Set Commission", path: "/operations/set-comm", icon: Settings2 },
+  { name: "Set Commission", path: "/set-comm", icon: Settings2 },
 ];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+  const visibleNavItems = navItems.filter((item) =>
+    item.path !== "/set-comm" || hasMinimumRole(user, ACCESS_ROLES.MANAGER)
+  );
   const policyEntryActive = location.pathname.startsWith("/operations/motor-entry");
   
   // Ref for the dropdown timeout
@@ -47,7 +53,7 @@ export default function Navbar() {
 
         {/* Navigation Tabs - Font size increased to text-base */}
         <nav className="hidden lg:flex items-center space-x-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
             <NavLink
@@ -126,7 +132,7 @@ export default function Navbar() {
         <div className="lg:hidden absolute w-full bg-white border-b border-gray-200 px-4 py-4 shadow-lg z-40">
           <DepartmentSwitcher className="mb-3 border-b border-slate-100 pb-3" />
           <nav className="flex flex-col gap-2">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               return (
               <NavLink

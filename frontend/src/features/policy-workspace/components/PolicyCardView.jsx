@@ -12,7 +12,7 @@ import {
   Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { submitPolicyData } from '../../../config/axios';
+import { checkPolicyNumberExists, submitPolicyData } from '../../../config/axios';
 import ReusableForm from '../../../components/reusable/ReusableForm';
 import ReusableSearchSelect from '../../../components/reusable/ReusableSearchSelect';
 import { DROPDOWN_STEPS } from './MotorEntrySection';
@@ -439,6 +439,12 @@ function PolicyCardView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ocrPassword, setOcrPassword] = useState('');
   const [isOcrUnlocked, setIsOcrUnlocked] = useState(false);
+  const [policyNumberCheck, setPolicyNumberCheck] = useState({
+    status: "idle",
+    exists: false,
+    policy: null,
+    message: "",
+  });
 
   const handleUnlockOcr = () => {
     if (ocrPassword.toLowerCase() === 'paas') {
@@ -540,6 +546,47 @@ function PolicyCardView({
     if (item?.id) saveMotorPolicyFormDraft(item.id, formData);
   }, [formData, item?.id]);
 
+  useEffect(() => {
+    const policyNumber = String(formData.policyNumber || "").trim();
+    if (!policyNumber || policyNumber === "-") {
+      setPolicyNumberCheck({ status: "idle", exists: false, policy: null, message: "" });
+      return;
+    }
+
+    const controller = new AbortController();
+    setPolicyNumberCheck((prev) => ({
+      ...prev,
+      status: "checking",
+      message: "Checking policy number...",
+    }));
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await checkPolicyNumberExists(policyNumber, { signal: controller.signal });
+        const exists = Boolean(response?.data?.exists);
+        setPolicyNumberCheck({
+          status: "done",
+          exists,
+          policy: response?.data?.policy || null,
+          message: exists ? "Policy already exists" : "New policy number",
+        });
+      } catch (error) {
+        if (error.name === "CanceledError" || error.code === "ERR_CANCELED") return;
+        setPolicyNumberCheck({
+          status: "error",
+          exists: false,
+          policy: null,
+          message: "Unable to check policy number",
+        });
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [formData.policyNumber]);
+
   const handleFieldChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
   const handleDateChange = (field, value) => setFormData(prev => ({ ...prev, policyDates: { ...prev.policyDates, [field]: value } }));
   const handlePremiumChange = (field, value) => {
@@ -591,6 +638,10 @@ function PolicyCardView({
   }
   if (!String(formData.policyNumber || "").trim()) {
     toast.error("Policy number is required.");
+    return;
+  }
+  if (policyNumberCheck.exists) {
+    toast.error("Policy number already exists.");
     return;
   }
   if (!toDateInputValue(formData.dateOfIssue)) {
@@ -731,6 +782,22 @@ function PolicyCardView({
                     </button>
                   </Tooltip>
                 </div>
+                {policyNumberCheck.status !== "idle" && (
+                  <span
+                    className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                      policyNumberCheck.exists
+                        ? "border-red-100 bg-red-50 text-red-700"
+                        : policyNumberCheck.status === "checking"
+                          ? "border-amber-100 bg-amber-50 text-amber-700"
+                          : policyNumberCheck.status === "error"
+                            ? "border-slate-200 bg-slate-50 text-slate-500"
+                            : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                    }`}
+                    title={policyNumberCheck.policy?.insured_name || policyNumberCheck.message}
+                  >
+                    {policyNumberCheck.message}
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {formData.insuranceCompany && formData.insuranceCompany !== "-" && (

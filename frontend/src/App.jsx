@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import ReportEntry from "./departments/operations/pages/ReportEntry";
 import PrivateRoute from "./components/PrivateRoute";
 import DepartmentRoute from "./components/DepartmentRoute";
+import MinimumRoleRoute from "./components/MinimumRoleRoute";
 import PortalHome from "./components/PortalHome";
 import PortalShell from "./components/PortalShell";
 import AccessDenied from "./components/AccessDenied";
@@ -18,6 +19,7 @@ import OperationsDepartmentApp from "./departments/operations/DepartmentApp";
 import AccountsDepartmentApp from "./departments/accounts/DepartmentApp";
 import HumanResourcesDepartmentApp from "./departments/human-resources/DepartmentApp";
 import { PORTALS } from "./config/departmentPortal";
+import { ACCESS_ROLES } from "./config/roleAccess";
 import { GENERIC_DEPARTMENTS } from "./departments/registry";
 import PublicLayout from "./components/PublicLayout";
 
@@ -35,6 +37,10 @@ export default function App() {
           <Route index element={<PortalHome />} />
           <Route path="no-access" element={<AccessDenied />} />
           <Route path="profile" element={<Profile />} />
+
+          <Route element={<MinimumRoleRoute role={ACCESS_ROLES.MANAGER} />}>
+            <Route path="set-comm" element={<SetComm />} />
+          </Route>
 
           <Route element={<DepartmentRoute portal={PORTALS.OPERATIONS} />}>
             <Route path="operations" element={<OperationsDepartmentApp />}>

@@ -18,6 +18,7 @@ axiosInstance.interceptors.request.use(
     if (
       requestUrl.startsWith("/") &&
       !requestUrl.startsWith("/auth/") &&
+      !requestUrl.startsWith("/setcomm") &&
       !requestUrl.startsWith("/operations/") &&
       !requestUrl.startsWith("/accounts/") &&
       !requestUrl.startsWith("/pos-management/") &&
@@ -157,6 +158,21 @@ export const submitPolicyData = async (file, formDataObject) => {
       response: error.response?.data,
       url: error.config?.url,
     });
+    throw error;
+  }
+};
+
+export const checkPolicyNumberExists = async (policyNumber, options = {}) => {
+  try {
+    const response = await axiosInstance.get('/policies/exists', {
+      params: { policyNumber },
+      signal: options.signal,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.name !== "CanceledError" && error.code !== "ERR_CANCELED") {
+      console.error('Policy Number Check Error:', error);
+    }
     throw error;
   }
 };

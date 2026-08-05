@@ -60,6 +60,12 @@ router.get(
     PoliciesMotorController.getRenewalReport
 );
 
+// Check if a policy number already exists (must be placed before GET /:id)
+router.get(
+    "/exists",
+    PoliciesMotorController.checkPolicyNumber
+);
+
 // Route to get a policy by Reference ID or Policy Number
 router.get(
     "/ref/:refId",
