@@ -22,13 +22,30 @@ const formatFinancierName = (financier) => {
 
 const cleanRegistrationNumber = (regNo) => {
   if (!regNo || regNo === "-") return "-";
-  return String(regNo).replace(/[\s-]/g, "").toUpperCase().trim();
+  const cleaned = String(regNo).replace(/[\s-]/g, "").toUpperCase().trim();
+  return /^NEW0*\d*$/i.test(cleaned) ? "NEW" : cleaned;
 };
 
 const cleanFieldValue = (value) => {
   const cleaned = String(value || "")
     .replace(/\s+/g, " ")
     .replace(/^[\s:,-]+|[\s:,-]+$/g, "")
+    .trim();
+  return cleaned || "-";
+};
+
+const cleanAmount = (value) => {
+  const cleaned = String(value || "")
+    .replace(/[₹,\s]/g, "")
+    .replace(/^[^\d]+|[^\d.]+$/g, "")
+    .trim();
+  return cleaned || "-";
+};
+
+const cleanNationalBranchAddress = (value) => {
+  const cleaned = cleanFieldValue(value)
+    .replace(/\s*(?:रा\s*ज्?\s*य\s*कोड|State\s+Code|जीएसटीआईएन|GSTIN|संप\s*क्क|Contact\s+Number|Mobile\s+Number|RSA\s+Service).*$/i, "")
+    .replace(/\s+,/g, ",")
     .trim();
   return cleaned || "-";
 };
@@ -273,10 +290,7 @@ const extractBranchAddress = (text = "") => {
   );
 
   if (m) {
-    return m[1]
-      .replace(/\s+/g, " ")
-      .replace(/\s+,/g, ",")
-      .trim();
+    return cleanNationalBranchAddress(m[1]);
   }
 
   m = text.match(
@@ -290,11 +304,11 @@ const extractBranchAddress = (text = "") => {
       .replace(/^[\s:]+|[\s:]+$/g, "")
       .trim();
 
-    if (address) return address;
+    if (address) return cleanNationalBranchAddress(address);
   }
 
   m = text.match(
-    /Office\s+Address\s*[:：]\s*([^\n]+)/i
+    /Office\s+Address\s*[:：]\s*([\s\S]+?)(?=\s*(?:रा\s*ज्?\s*य\s*कोड|State\s+Code|जीएसटीआईएन|GSTIN|Contact\s+Number|Mobile\s+Number|RSA\s+Service|$))/i
   );
 
   if (m) {
@@ -303,7 +317,7 @@ const extractBranchAddress = (text = "") => {
       .replace(/\s+/g, " ")
       .trim();
 
-    if (address) return address;
+    if (address) return cleanNationalBranchAddress(address);
   }
 
   m = text.match(
@@ -317,7 +331,7 @@ const extractBranchAddress = (text = "") => {
       .replace(/^[\s:]+|[\s:]+$/g, "")
       .trim();
 
-    if (address) return address;
+    if (address) return cleanNationalBranchAddress(address);
   }
 
   m = text.match(
@@ -331,7 +345,7 @@ const extractBranchAddress = (text = "") => {
       .trim();
 
     if (address) {
-      return `BHOPAL BUSINESS OFFICE I, ${address}`;
+      return cleanNationalBranchAddress(`BHOPAL BUSINESS OFFICE I, ${address}`);
     }
   }
 
@@ -346,8 +360,13 @@ const extractInsuredDetails = (text = "") => {
   let insuredName = "-";
 
   let nameMatch = normalizedText.match(
-    /गाहक\s*का\s*नाम\s*Customer\s*Name\s*[:：]\s*([^\n]+?)\s*(?=गाहक\s+आई\s*\.\s*डी|Customer\s+ID|पता|Address|$)/i
+    /गाहक\s*का\s*नाम\s*Customer\s*Name\s*[:：]\s*([^\n]+?)\s*(?=ग\s*्?\s*र?\s*ा?\s*हक\s+आई\s*\.?\s*डी|Customer\s+ID|पता|Address|$)/i
   );
+  if (!nameMatch) {
+    nameMatch = normalizedText.match(
+      /Customer\s*Name\s*[:：]\s*([^\n]+?)(?=\s*(?:ग\s*्?\s*र?\s*ा?\s*हक|ग्राहक|Customer\s+ID|पैन|PAN|फोन|Phone|परा|पता|Address|$))/i
+    );
+  }
   if (!nameMatch) {
     nameMatch = normalizedText.match(
       /Name\s*[:：]\s*(Mr|Mrs|Ms|Miss|Dr)\.?\s+([A-Z\s]+?)\s*(?=Address\s*:|$)/i
@@ -362,7 +381,7 @@ const extractInsuredDetails = (text = "") => {
     insuredName = nameMatch[1]?.trim() || "-";
     if (nameMatch[2]) insuredName = `${nameMatch[1]} ${nameMatch[2].trim()}`;
     insuredName = insuredName.replace(/\s+/g, " ").trim();
-    insuredName = insuredName.replace(/\s*(गाहक\s+आई\s*\.\s*डी|Customer\s+ID|पता|Address).*$/i, '').trim();
+    insuredName = insuredName.replace(/\s*(ग\s*्?\s*र?\s*ा?\s*हक\s+आई\s*\.?\s*डी|ग्राहक\s+आई\s*\.?\s*डी|Customer\s+ID|पैन|PAN|फोन|Phone|परा|पता|Address).*$/i, '').trim();
   }
 
   let panNumber = "-";
@@ -384,14 +403,17 @@ const extractInsuredDetails = (text = "") => {
   }
 
   let contactMatch = normalizedText.match(/फोन\s*Phone\s*[:：]\s*([*\dXx-]+)/i);
+  if (!contactMatch) contactMatch = normalizedText.match(/Phone\s*[:：]\s*([*\dXx-]+)/i);
   if (!contactMatch) contactMatch = normalizedText.match(/संपकर\s*संखया\s*\/\s*Contact\s+Number\s*[:：]\s*([*\dXx-]+)/i);
   if (!contactMatch) contactMatch = normalizedText.match(/सेल\s*\/\s*Cell\s*[:：]\s*([*\dXx-]+)/i);
+  if (!contactMatch) contactMatch = normalizedText.match(/Cell\s*[:：]\s*([*\dXx-]+)/i);
   if (!contactMatch) contactMatch = normalizedText.match(/Contact\s+Number\s*[:：]\s*([*\dXx-]+)/i);
   if (!contactMatch) contactMatch = normalizedText.match(/Telephone\s*[:：]\s*([*\dXx-]+)/i);
   
   const contactNumber = contactMatch?.[1]?.trim() || "-";
 
   let emailMatch = normalizedText.match(/ई\s*-\s*मेल\s*E-Mail\s*[:：]\s*([^\s]+)/i);
+  if (!emailMatch) emailMatch = normalizedText.match(/E-Mail\s*[:：]\s*([^\s]+@[^\s]+)/i);
   if (!emailMatch) emailMatch = normalizedText.match(/Email\s*[:：]\s*([^\s]+@[^\s]+)/i);
   const email = emailMatch?.[1]?.trim() || "-";
 
@@ -408,7 +430,7 @@ const extractInsuredDetails = (text = "") => {
   }
 
   const addressBlockMatch = insuredAddress === "-" && normalizedText.match(
-    /पता\s*Address\s*[:：]\s*([\s\S]*?)(?=\s*(?:सेल|Cell|फोन|Phone|ई-मेल|E-Mail|Contact\s+Number|$))/i
+    /(?:पता|परा)\s*\/?\s*Address\s*[:：]\s*([\s\S]*?)(?=\s*(?:सेल|सेि|Cell|फोन|Phone|ई-मेल|E-Mail|Contact\s+Number|$))/i
   );
   if (addressBlockMatch) {
     let raw = addressBlockMatch[1]
@@ -417,9 +439,9 @@ const extractInsuredDetails = (text = "") => {
       .trim();
     raw = raw
       .replace(/\s*शहर\s*\/\s*City\s*[:：]\s*/gi, ", ")
-      .replace(/\s*िजला\s*\/\s*District\s*[:：]\s*/gi, ", ")
-      .replace(/\s*राजय\s*\/\s*State\s*[:：]\s*/gi, ", ")
-      .replace(/\s*िपन\s*\/\s*PIN\s*[:：]?\s*/gi, ", ")
+      .replace(/\s*(?:जज\s*िा|िजला|जिला)\s*\/\s*District\s*[:：]\s*/gi, ", ")
+      .replace(/\s*(?:रा\s*ज्?\s*य|राजय|राज्य)\s*\/\s*State\s*[:：]\s*/gi, ", ")
+      .replace(/\s*(?:वप\s*न|िपन|पिन)\s*\/\s*PIN\s*[:：]?\s*/gi, ", ")
       .replace(/\s*पिन\s*[:：]?\s*/gi, ", ")
       .replace(/,\s*,/g, ",")
       .replace(/,\s+/g, ", ")
@@ -458,6 +480,13 @@ const extractPolicyDates = (fullText = "") => {
   }
 
   match = text.match(
+    /Policy\s+Effective\s+from\s+[\d:]+\s*hours,\s*on\s+(\d{2}\/\d{2}\/\d{4})\s*.*?to\s+midnight\s+of\s+(\d{2}\/\d{2}\/\d{4})\s*\(for\s+Own\s+Damage[\s\S]*?Policy\s+Effective\s+from\s+[\d:]+\s*hours,\s*on\s+\d{2}\/\d{2}\/\d{4}\s*.*?to\s+midnight\s+of\s+(\d{2}\/\d{2}\/\d{4})\s*\(Liability\s+to\s+Third\s+Parties/i
+  );
+  if (match) {
+    return { startDate: match[1], odExpireDate: match[2], tpExpireDate: match[3] };
+  }
+
+  match = text.match(
     /Policy\s+Effective\s+from[\s\S]*?\bon\s+(\d{2}\/\d{2}\/\d{4})[\s\S]*?to\s+midnight\s+of\s+(\d{2}\/\d{2}\/\d{4})/i
   );
   if (match) {
@@ -487,10 +516,12 @@ const extractDateOfIssue = (text = "") => {
 };
 
 const extractIDV = (text) => {
-  let m = text.match(/Total\s+IDV\s*Rs\.?\s*([\d,]+)/i);
-  if (m) return m[1].replace(/,/g, "");
-  m = text.match(/IDV\s*Rs\.?\s*([\d,]+)/i);
-  if (m) return m[1].replace(/,/g, "");
+  let m = text.match(/Vehicle\s+IDV\s*₹?\s*([\d,]+(?:\.\d{2})?)/i);
+  if (m) return cleanAmount(m[1]);
+  m = text.match(/Total\s+IDV\s*Rs\.?\s*([\d,]+(?:\.\d{2})?)/i);
+  if (m) return cleanAmount(m[1]);
+  m = text.match(/IDV\s*(?:Rs\.?|₹)?\s*([\d,]+(?:\.\d{2})?)/i);
+  if (m) return cleanAmount(m[1]);
   return "-";
 };
 
@@ -549,19 +580,31 @@ const extractPremiumData = (text) => {
     calculatedOdPremium: "-", 
     calculatedTpPremium: "-" 
   };
-  const cleanNumber = (value) => value ? value.replace(/,/g, "").trim() : "-";
+  const cleanNumber = (value) => cleanAmount(value);
+  const normalizedText = text.replace(/\s+/g, " ");
 
   let match = text.match(/OD\s*Total\s*\(Rounded\s*Off\)\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) match = text.match(/Own\s+Damage\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (!match) {
+    match = normalizedText.match(/Own\s+Damage[\s\S]{0,700}?Total\s*₹?\s*([\d,]+(?:\.\d+)?)[\s\S]{0,160}?Legal\s+Liability/i);
+  }
   if (match) result.totalOdPremium = cleanNumber(match[1]);
+  const nationalOdTotalMatch = normalizedText.match(/Own\s+Damage[\s\S]{0,700}?Total\s*₹?\s*([\d,]+(?:\.\d+)?)[\s\S]{0,160}?Legal\s+Liability/i);
+  if (nationalOdTotalMatch) result.totalOdPremium = cleanNumber(nationalOdTotalMatch[1]);
 
   match = text.match(/TP\s*Total\s*\(Rounded\s*Off\)\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) match = text.match(/Legal\s+Liability\s+to\s+Third\s+Party\s*[-–]?\s*Liability\s+Only\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) match = text.match(/Legal\s+Liability\s+Cover\s*([\d,]+(?:\.\d+)?)/i);
+  if (!match) {
+    match = normalizedText.match(/Legal\s+Liability[\s\S]{0,700}?Total\s*₹?\s*([\d,]+(?:\.\d+)?)[\s\S]{0,180}?Vehicle\s+Own\s+Damage/i);
+  }
   if (match) result.totalTpPremium = cleanNumber(match[1]);
+  const nationalTpTotalMatch = normalizedText.match(/Legal\s+Liability[\s\S]{0,700}?Total\s*₹?\s*([\d,]+(?:\.\d+)?)[\s\S]{0,180}?Vehicle\s+Own\s+Damage/i);
+  if (nationalTpTotalMatch) result.totalTpPremium = cleanNumber(nationalTpTotalMatch[1]);
 
   let netMatch = text.match(/TOTAL\s+PREMIUM\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (!netMatch) netMatch = text.match(/(?:पीिमयम\s+)?Premium\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (!netMatch) netMatch = text.match(/Premium\s*₹\s*([\d,]+(?:\.\d+)?)/i);
   if (!netMatch) netMatch = text.match(/Premium\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (netMatch) result.netPremium = cleanNumber(netMatch[1]);
   if (/Stand\s*Alone\s*OD|OD\s+Only/i.test(text) && result.netPremium !== "-") {
@@ -573,9 +616,9 @@ const extractPremiumData = (text) => {
   if (match) {
     result.gst = cleanNumber(match[1]);
   } else {
-    const cgstMatch = text.match(/(?:सीजीएसटी\s*\/\s*)?CGST\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d{2})?)/i);
-    const sgstMatch = text.match(/(?:एसजीएसटी\s*\/\s*यूटीजीएसटी\s*\/\s*)?SGST(?:\/UTGST)?\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d{2})?)/i);
-    const igstMatch = text.match(/(?:आईजीएसटी\s*\/\s*)?IGST\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d{2})?)/i);
+    const cgstMatch = text.match(/(?:सीजीएसटी\s*\/\s*)?CGST\s*[`]?\s*[:：]?\s*₹?\s*([\d,]+(?:\.\d{2})?)/i);
+    const sgstMatch = text.match(/(?:एसजीएसटी\s*\/\s*यूटीजीएसटी\s*\/\s*)?SGST(?:\s*\/\s*UT\s*GST)?\s*[`]?\s*[:：]?\s*₹?\s*([\d,]+(?:\.\d{2})?)/i);
+    const igstMatch = text.match(/(?:आईजीएसटी\s*\/\s*)?IGST\s*[`]?\s*[:：]?\s*₹?\s*([\d,]+(?:\.\d{2})?)/i);
     if (cgstMatch || sgstMatch || igstMatch) {
       const c = cgstMatch ? parseFloat(cgstMatch[1].replace(/,/g, "")) : 0;
       const s = sgstMatch ? parseFloat(sgstMatch[1].replace(/,/g, "")) : 0;
@@ -585,6 +628,7 @@ const extractPremiumData = (text) => {
   }
 
   match = text.match(/(?:कुल\s+रािश\s+)?Total\s+Amount\s*[`]?\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (!match) match = text.match(/Total\s+Amount\s*₹\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) match = text.match(/NET\s+PAYABLE(?:\s*\([^)]*\))?\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) match = text.match(/Total\s+Invoice\s+Value\s*\(In\s*figures\)\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
   if (match) result.totalPayable = cleanNumber(match[1]);
@@ -743,6 +787,58 @@ const extractVehicleDetailsFromText = (text) => {
     }
   }
 
+  const bilingualBlockText = text.replace(/\s+/g, " ");
+
+  if (result.registrationNumber === "-") {
+    const nationalRegMatch = bilingualBlockText.match(/Regn?\.?\s*Number\s*([A-Z0-9-]+)/i);
+    if (nationalRegMatch) result.registrationNumber = cleanRegistrationNumber(nationalRegMatch[1]);
+  }
+
+  if (result.engineNumber === "-") {
+    const nationalEngineMatch = bilingualBlockText.match(/Engine\s+or\s+M\/c\s+No\.?\s*([A-Z0-9]+)/i);
+    if (nationalEngineMatch) result.engineNumber = cleanFieldValue(nationalEngineMatch[1]).toUpperCase();
+  }
+
+  if (result.chassisNumber === "-") {
+    const nationalChassisMatch = bilingualBlockText.match(/Chassis\s+Number\s*([A-Z0-9]+)/i);
+    if (nationalChassisMatch) result.chassisNumber = cleanFieldValue(nationalChassisMatch[1]).toUpperCase();
+  }
+
+  if (result.make === "-" || /Addl\.|Towing|टाल/i.test(result.make)) {
+    const nationalMakeMatch = bilingualBlockText.match(/Make\s+([A-Z][A-Z0-9 .&-]+?)(?=\s+(?:अलत|Addl\.|मॉड|Model))/i);
+    if (nationalMakeMatch) result.make = cleanFieldValue(nationalMakeMatch[1]).toUpperCase();
+  }
+
+  if (result.model === "-" || /CC\s*\/\s*KW|सीसी|Variant|वेर/i.test(result.model)) {
+    const nationalModelMatch = bilingualBlockText.match(/Model\s+([A-Z0-9][A-Z0-9 .&-]+?)(?=\s+(?:सीसी|CC\s*\/\s*KW|वेर|Variant))/i);
+    if (nationalModelMatch) result.model = cleanFieldValue(nationalModelMatch[1]).toUpperCase();
+  }
+
+  if (result.variant === "-" || /Type\s+of\s+Fuel|Class\s+of\s+Vehicle|ई\s*ं|वाहन/i.test(result.variant)) {
+    const nationalVariantMatch = bilingualBlockText.match(/Variant\s+([A-Z0-9][A-Z0-9 .&-]+?)(?=\s+(?:Type\s+of\s+Fuel|Class\s+of\s+Vehicle|ईंध|ई\s*ं|वाहन))/i);
+    if (nationalVariantMatch) result.variant = cleanFieldValue(nationalVariantMatch[1]).toUpperCase();
+  }
+
+  if (result.cubicCapacity === "-") {
+    const nationalCcMatch = bilingualBlockText.match(/CC\s*\/\s*KW\s*([\d.]+)/i);
+    if (nationalCcMatch) result.cubicCapacity = cleanFieldValue(nationalCcMatch[1]);
+  }
+
+  if (result.fuelType === "-") {
+    const nationalFuelMatch = bilingualBlockText.match(/Type\s+of\s+Fuel\s*([A-Z]+)/i);
+    if (nationalFuelMatch) result.fuelType = cleanFieldValue(nationalFuelMatch[1]).toUpperCase();
+  }
+
+  if (result.manufacturingYear === "-") {
+    const nationalYearMatch = bilingualBlockText.match(/Year\s+of\s+Mfg\.?\s*(\d{4})/i);
+    if (nationalYearMatch) result.manufacturingYear = nationalYearMatch[1];
+  }
+
+  if (result.seatingCapacity === "-") {
+    const nationalSeatMatch = bilingualBlockText.match(/Licensed\s+Seating\s*\/\s*Carrying\s+Capacity\s*(\d+)/i);
+    if (nationalSeatMatch) result.seatingCapacity = nationalSeatMatch[1];
+  }
+
   const nationalTable = extractNationalVehicleTable(text) || extractNationalMiscVehicleTable(text);
   if (nationalTable) {
     result.registrationNumber = nationalTable.registrationNumber || result.registrationNumber;
@@ -775,15 +871,20 @@ const extractVehicleDetailsFromText = (text) => {
   // 4. FINANCIER NAME (YOUR EXACT ORIGINAL CODE)
   let finMatch = text.match(/HYPOTHECATION\s*[:：]?\s*([^\n\r]+)/i) || 
                  text.match(/Hypothecated\s+To\s*[:：]?\s*([^\n\r]+)/i) ||
+                 text.match(/Financier\s+Name\s+and\s+Address\s*[:：]?\s*Hypothecation,\s*([\s\S]+?)(?=\s*(?:प्र\s*ासं|Clauses|Endorsements|Warranties|IRDAI|Limitations\s+as\s+to\s+Use|$))/i) ||
                  text.match(/Financier\s*[:：]?\s*([^\n\r]+)/i);
   if (finMatch) {
     let financier = finMatch[1].trim();
     financier = financier
+      .replace(/^Hypothecation\s*,?/i, "")
       .replace(/Previous\s+Policy.*$/i, "")
       .replace(/Prev\s+Policy.*$/i, "")
       .replace(/TP\/Ref\..*$/i, "")
       .replace(/OD\s+Pol\s+No.*$/i, "")
       .replace(/Nominee.*$/i, "")
+      .replace(/\s*(?:प्र\s*ासं|Clauses|Endorsements|Warranties|Limitations\s+as\s+to\s+Use|IRDAI).*$/i, "")
+      .replace(/\s*,\s*BHOPAL\s*$/i, "")
+      .replace(/^[\s,]+/g, "")
       .replace(/[,;]+$/g, "")
       .trim();
     if (financier && financier !== "-") {

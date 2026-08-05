@@ -5,7 +5,7 @@ import DepartmentSwitcher from "../../components/DepartmentSwitcher";
 import ProfileMenu from "../../components/ProfileMenu";
 import logo from "../../assets/logo.png";
 import useAuth from "../../hooks/useAuth";
-import { ACCESS_ROLES, hasMinimumRole } from "../../config/roleAccess";
+import { ACCESS_ROLES, canAccessSetCommission, hasMinimumRole } from "../../config/roleAccess";
 import { getDepartmentMenu } from "../../config/departmentMenus";
 
 const defaultItems = [
@@ -28,7 +28,10 @@ export default function DepartmentNavbar({ department, items, dense = false }) {
   const location = useLocation();
   const basePath = `/${department.slug}`;
   const allowed = (item) => !item.minimumRole || hasMinimumRole(user, item.minimumRole);
-  const configuredItems = [...(items || getDepartmentMenu(department.slug) || defaultItems), ...sharedItems];
+  const configuredItems = [
+    ...(items || getDepartmentMenu(department.slug) || defaultItems),
+    ...(canAccessSetCommission(user) ? sharedItems : []),
+  ];
   const visibleItems = configuredItems
     .filter(allowed)
     .map((item) => item.children ? { ...item, children: item.children.filter(allowed) } : item)

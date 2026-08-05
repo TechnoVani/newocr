@@ -94,6 +94,19 @@ const cleanNumberInput = (value) => {
   return cleaned;
 };
 
+const normalizeAmountValue = (value) => {
+  if (value === null || value === undefined || value === "" || value === "-") return value;
+  return cleanNumberInput(String(value).replace(/,/g, ""));
+};
+
+const normalizePolicyFormData = (data) => {
+  if (!data) return data;
+  return {
+    ...data,
+    totalValue: normalizeAmountValue(data.totalValue),
+  };
+};
+
 const getPremiumValue = (value) => {
   if (value === null || value === undefined || value === "" || value === "NA") return "";
   return String(value).replace(/,/g, "");
@@ -455,7 +468,7 @@ function PolicyCardView({
     }
   };
 
-  const [formData, setFormData] = useState(() => readMotorPolicyFormDraft(item?.id) || ({
+  const [formData, setFormData] = useState(() => normalizePolicyFormData(readMotorPolicyFormDraft(item?.id)) || ({
     policyNumber: initialPolicyNumber,
     insuranceCompany: initialInsuranceCompany,
     branchAddress: initialBranchAddress,
@@ -473,7 +486,7 @@ function PolicyCardView({
       tpExpireDate: toDisplayDateFormat(initialPolicyDates?.tpExpireDate),
     },
     dateOfIssue: toDisplayDateFormat(initialDateOfIssue),
-    totalValue: initialTotalValue,
+    totalValue: normalizeAmountValue(initialTotalValue),
     previousInsurer: initialPreviousInsurer,
     previousPolicyNumber: initialPreviousPolicyNumber,
     finalPremium: { ...initialFinalPremium },
@@ -500,7 +513,7 @@ function PolicyCardView({
   useEffect(() => {
     // Reload saved motor-entry draft when the selected policy PDF changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData(readMotorPolicyFormDraft(item?.id) || ({
+    setFormData(normalizePolicyFormData(readMotorPolicyFormDraft(item?.id)) || ({
       policyNumber: initialPolicyNumber,
       insuranceCompany: initialInsuranceCompany,
       branchAddress: initialBranchAddress,
@@ -518,7 +531,7 @@ function PolicyCardView({
         tpExpireDate: toDisplayDateFormat(initialPolicyDates?.tpExpireDate),
       },
       dateOfIssue: toDisplayDateFormat(initialDateOfIssue),
-      totalValue: initialTotalValue,
+      totalValue: normalizeAmountValue(initialTotalValue),
       previousInsurer: initialPreviousInsurer,
       previousPolicyNumber: initialPreviousPolicyNumber,
       finalPremium: { ...initialFinalPremium },
@@ -848,7 +861,7 @@ function PolicyCardView({
               <EditableRow label="TP Expiry" value={formData.policyDates?.tpExpireDate} onChange={(val) => handleDateChange("tpExpireDate", val)} isDate />
               <EditableRow label="Issue Date" value={formData.dateOfIssue} onChange={(val) => handleFieldChange("dateOfIssue", val)} isDate />
               {matchedPolicy !== "Liability Policy" && (
-                <EditableRow label="IDV" value={formData.totalValue !== "-" ? formData.totalValue : ""} onChange={(val) => handleFieldChange("totalValue", val)} type="number" />
+                <EditableRow label="IDV" value={formData.totalValue !== "-" ? formData.totalValue : ""} onChange={(val) => handleFieldChange("totalValue", normalizeAmountValue(val))} type="number" />
               )}
               <EditableRow label="Prev Insurer" value={formData.previousInsurer} onChange={(val) => handleFieldChange("previousInsurer", val)} />
               <EditableRow label="Prev Policy" value={formData.previousPolicyNumber} onChange={(val) => handleFieldChange("previousPolicyNumber", val)} />

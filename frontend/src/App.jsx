@@ -36,7 +36,9 @@ export default function App() {
           <Route path="no-access" element={<AccessDenied />} />
           <Route path="profile" element={<Profile />} />
 
-          <Route path="set-comm" element={<SetComm />} />
+          <Route path="set-comm" element={<OperationsDepartmentApp />}>
+            <Route index element={<SetComm />} />
+          </Route>
 
           <Route element={<DepartmentRoute portal={PORTALS.OPERATIONS} />}>
             <Route path="operations" element={<OperationsDepartmentApp />}>
