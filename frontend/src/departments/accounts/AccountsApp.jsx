@@ -8,6 +8,7 @@ import InsurerWiseReport from "./pages/reports/InsurerWiseReport";
 import InsuredWiseReport from "./pages/reports/InsuredWiseReport";
 import VerifyReport from "./pages/reports/VerifyReport";
 import PosWiseReport from "./pages/reports/PosWiseReport";
+import PosWisePolicyDetails from "./pages/reports/PosWisePolicyDetails";
 import CancelledPolicyReport from "./pages/reports/CancelledPolicyReport";
 import PayoutGridUpload from "./pages/payout-grid/PayoutGridUpload";
 import PayoutGridReport from "./pages/payout-grid/PayoutGridReport";
@@ -109,6 +110,7 @@ export default function AccountsApp() {
         <Route path="reports/insurer-wise" element={<InsurerWiseReport />} />
         <Route path="reports/verify" element={<VerifyReport />} />
         <Route path="reports/pos-wise" element={<PosWiseReport />} />
+        <Route path="reports/pos-wise/:posId/policies" element={<PosWisePolicyDetails />} />
         <Route path="reports/cancelled-policies" element={<CancelledPolicyReport />} />
         <Route element={<MinimumRoleRoute role={ACCESS_ROLES.MANAGER} fallback="/accounts" />}>
           <Route path="payout-grid/upload" element={<PayoutGridUpload />} />

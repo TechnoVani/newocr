@@ -80,7 +80,7 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
     }
   };
   const columns = [
-    { key: "insurer_type", label: "Insurer Type" }, { key: "insurer", label: "Insurer" }, { key: "brockercode", label: "Broker Code" }, { key: "gst_no", label: "GST Number" },
+    { key: "insurer_type", label: "Insurer Type" }, { key: "insurer", label: "Insurer" }, { key: "address", label: "Address" }, { key: "brockercode", label: "Broker Code" }, { key: "gst_no", label: "GST Number" },
     { key: "city", label: "City / State", render: (value, row) => [value, row.state].filter(Boolean).join(", ") || "—" }, { key: "contact", label: "Branch Contact" }, { key: "name", label: "Contact Person" }, { key: "mobile", label: "Mobile" },
     { key: "status", label: "Status", render: (value) => <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${value === "Inactive" ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700"}`}>{value || "Active"}</span> },
     { key: "action", label: "Action", render: (_, row) => <div className="flex items-center gap-1">
@@ -93,6 +93,7 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
     const worksheet = XLSX.utils.json_to_sheet(rows.map((branch) => ({
       "Insurer Type": branch.insurer_type || "",
       Insurer: branch.insurer || "",
+      Address: branch.address || "",
       "Broker Code": branch.brockercode || "",
       "GST Number": branch.gst_no || "",
       "Branch Address": branch.address || "",
@@ -123,9 +124,8 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
             required
           >
             <option value="" disabled>Select Insurer Type</option>
-            <option value="Life">Life</option>
             <option value="General">General</option>
-            <option value="Health">Health</option>
+            <option value="Life">Life</option>
           </ReusableSelect>
         </label>
         <label className={formLabelClass}>
@@ -168,7 +168,7 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
             aria-label="City"
           />
         </label>
-        <label className={formLabelClass}>
+        <label className={formLabelClass} hidden>
           <span className={formLabelTextClass}>Status *</span>
           <ReusableSelect value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} required aria-label="Branch Status">
             <option value="Active">Active</option>
@@ -184,7 +184,7 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
           columns={columns}
           pageSize={10}
           filters={[
-            { name: "type", label: "Insurer Type", value: typeFilter, options: ["All", "General", "Life", "Health"], onChange: (event) => { setTypeFilter(event.target.value); setInsurerFilter("All"); } },
+            { name: "type", label: "Insurer Type", value: typeFilter, options: ["All", "General", "Life"], onChange: (event) => { setTypeFilter(event.target.value); setInsurerFilter("All"); } },
             { name: "insurer", label: "Insurer Name", value: insurerFilter, options: branchInsurerOptions, onChange: (event) => setInsurerFilter(event.target.value) },
           ]}
           onResetFilters={() => { setTypeFilter("All"); setInsurerFilter("All"); }}

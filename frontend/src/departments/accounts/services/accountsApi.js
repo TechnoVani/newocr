@@ -5,6 +5,7 @@ const readData = (response) => response.data?.data ?? response.data;
 export const accountsApi = {
   dashboard: async () => readData(await axiosInstance.get("/accounts/dashboard")),
   posWiseReport: async (params = {}) => readData(await axiosInstance.get("/accounts/reports/pos-wise", { params })),
+  posWisePolicies: async (posId, params = {}) => readData(await axiosInstance.get(`/accounts/reports/pos-wise/${posId}/policies`, { params })),
   cancelledPolicies: async (params = {}) => readData(await axiosInstance.get("/accounts/reports/cancelled-policies", { params })),
   saveCancelledPolicy: async (payload) => readData(await axiosInstance.post("/accounts/reports/cancelled-policies", payload)),
   companies: async () => readData(await axiosInstance.get("/accounts/companies")),

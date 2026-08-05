@@ -152,6 +152,146 @@ export const PosWiseReportModel = {
       ORDER BY pos_name ASC, reference_name ASC
     `, baseParams);
 
+    const [policyDetailRows] = await db.query(`
+      SELECT
+        CONCAT('active-', p.id) AS report_row_id,
+        p.id,
+        p.pos_id,
+        p.ref_id,
+        p.policy_number,
+        p.business_type,
+        p.insured_name,
+        p.insurance_company,
+        p.insurer_branch,
+        p.policy_type,
+        p.vehicle_category,
+        p.commercial_vehicle_type,
+        p.idv,
+        p.make_name,
+        p.model_name,
+        p.variant_name,
+        p.registration_number,
+        p.rto,
+        p.manufacturing_year,
+        p.chassis_number,
+        p.engine_number,
+        p.fuel,
+        p.gvw,
+        p.cc,
+        p.seating_capacity,
+        p.issue_date,
+        p.start_date,
+        p.od_expiry,
+        p.tp_expiry,
+        p.first_year_od,
+        p.first_year_tp,
+        p.total_od,
+        p.total_tp,
+        p.net_premium,
+        p.gst,
+        p.total_payable,
+        p.pos_od,
+        p.pos_tp,
+        p.pos_net,
+        p.verify_remark,
+        p.payment_status,
+        p.issue_date AS report_date,
+        'motor' AS policy_source,
+        'Active' AS policy_status,
+        NULL AS cancellation_date,
+        NULL AS cancellation_record_created_at,
+        NULL AS cancellation_reason,
+        COALESCE(
+          NULLIF(CONCAT_WS(' - ', NULLIF(reference.ref_name, ''), NULLIF(reference.ref_mobile, '')), ''),
+          CAST(p.ref_id AS CHAR),
+          '—'
+        ) AS reference_display
+      FROM policies_motor p
+      LEFT JOIN employee_pos pos ON pos.id = p.pos_id
+      LEFT JOIN employee_references reference ON reference.id = p.ref_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY p.issue_date DESC, p.policy_number ASC
+    `, params);
+
+    const [cancelledPolicyDetailRows] = await db.query(`
+      SELECT
+        CONCAT('cancelled-', pc.id) AS report_row_id,
+        p.id,
+        p.pos_id,
+        p.ref_id,
+        p.policy_number,
+        p.business_type,
+        p.insured_name,
+        p.insurance_company,
+        p.insurer_branch,
+        p.policy_type,
+        p.vehicle_category,
+        p.commercial_vehicle_type,
+        p.idv,
+        p.make_name,
+        p.model_name,
+        p.variant_name,
+        p.registration_number,
+        p.rto,
+        p.manufacturing_year,
+        p.chassis_number,
+        p.engine_number,
+        p.fuel,
+        p.gvw,
+        p.cc,
+        p.seating_capacity,
+        p.issue_date,
+        p.start_date,
+        p.od_expiry,
+        p.tp_expiry,
+        -ABS(COALESCE(p.first_year_od, 0)) AS first_year_od,
+        -ABS(COALESCE(p.first_year_tp, 0)) AS first_year_tp,
+        -ABS(COALESCE(p.total_od, 0)) AS total_od,
+        -ABS(COALESCE(p.total_tp, 0)) AS total_tp,
+        -ABS(COALESCE(p.net_premium, 0)) AS net_premium,
+        -ABS(COALESCE(p.gst, 0)) AS gst,
+        -ABS(COALESCE(p.total_payable, 0)) AS total_payable,
+        p.pos_od,
+        p.pos_tp,
+        p.pos_net,
+        p.verify_remark,
+        p.payment_status,
+        pc.created_at AS report_date,
+        'cancelled' AS policy_source,
+        'Cancelled' AS policy_status,
+        pc.cancellation_date,
+        pc.created_at AS cancellation_record_created_at,
+        pc.cancellation_reason,
+        COALESCE(
+          NULLIF(CONCAT_WS(' - ', NULLIF(reference.ref_name, ''), NULLIF(reference.ref_mobile, '')), ''),
+          CAST(p.ref_id AS CHAR),
+          '—'
+        ) AS reference_display
+      FROM policies_cancelled pc
+      INNER JOIN policies_motor p ON pc.policy_id = p.id
+      LEFT JOIN employee_pos pos ON pos.id = p.pos_id
+      LEFT JOIN employee_references reference ON reference.id = p.ref_id
+      WHERE ${cancellationWhere.join(" AND ")}
+      ORDER BY pc.created_at DESC, p.policy_number ASC
+    `, cancellationParams);
+
+    const policyDetailsByPos = new Map();
+    [...policyDetailRows, ...cancelledPolicyDetailRows].forEach(policy => {
+      const key = String(policy.pos_id ?? "unassigned");
+      const current = policyDetailsByPos.get(key) || [];
+      current.push({
+        ...policy,
+        first_year_od: number(policy.first_year_od),
+        first_year_tp: number(policy.first_year_tp),
+        total_od: number(policy.total_od),
+        total_tp: number(policy.total_tp),
+        net_premium: number(policy.net_premium),
+        gst: number(policy.gst),
+        total_payable: number(policy.total_payable),
+      });
+      policyDetailsByPos.set(key, current);
+    });
+
     const posOptions = [...new Map(
       optionRows
         .filter(row => row.pos_id)
@@ -215,6 +355,7 @@ export const PosWiseReportModel = {
       const totalIncome = odIncome + tpIncome + netIncome;
       return {
         ...row,
+        policy_details: policyDetailsByPos.get(String(row.pos_id ?? "unassigned")) || [],
         active_count: number(row.active_count),
         policy_count: number(row.policy_count),
         cancelled_count: number(row.cancelled_count),
@@ -277,6 +418,179 @@ export const PosWiseReportModel = {
         verified_count: 0,
         paid_count: 0,
       }),
+    };
+  },
+
+  async getPolicies({ readScope, startDate, endDate, posId }) {
+    const ownership = policyOwnershipFilter(readScope, "p.created_by");
+    const detailSelect = `
+      p.id,
+      p.pos_id,
+      p.ref_id,
+      p.policy_number,
+      p.business_type,
+      p.insured_name,
+      p.insurance_company,
+      p.insurer_branch,
+      p.policy_type,
+      p.vehicle_category,
+      p.commercial_vehicle_type,
+      p.idv,
+      p.make_name,
+      p.model_name,
+      p.variant_name,
+      p.registration_number,
+      p.rto,
+      p.manufacturing_year,
+      p.chassis_number,
+      p.engine_number,
+      p.fuel,
+      p.gvw,
+      p.cc,
+      p.seating_capacity,
+      p.issue_date,
+      p.start_date,
+      p.od_expiry,
+      p.tp_expiry,
+      p.first_year_od,
+      p.first_year_tp,
+      p.total_od,
+      p.total_tp,
+      p.net_premium,
+      p.gst,
+      p.total_payable,
+      p.pos_od,
+      p.pos_tp,
+      p.pos_net,
+      p.verify_remark,
+      p.payment_status,
+      COALESCE(
+        NULLIF(CONCAT_WS(' - ', NULLIF(reference.ref_name, ''), NULLIF(reference.ref_mobile, '')), ''),
+        CAST(p.ref_id AS CHAR),
+        '—'
+      ) AS reference_display
+    `;
+
+    const [posRows] = await db.query(`
+      SELECT
+        pos.id AS pos_id,
+        COALESCE(NULLIF(TRIM(pos.name), ''), 'Unassigned POS') AS pos_name,
+        COALESCE(NULLIF(TRIM(pos.pos_code), ''), CAST(pos.id AS CHAR)) AS pos_code,
+        COALESCE(NULLIF(TRIM(pos.mobile), ''), '—') AS mobile,
+        COALESCE(NULLIF(TRIM(pos.email), ''), '—') AS email,
+        COALESCE(pos.status, 'Unassigned') AS pos_status
+      FROM employee_pos pos
+      WHERE pos.id = ?
+      LIMIT 1
+    `, [posId]);
+
+    const [activeRows] = await db.query(`
+      SELECT
+        CONCAT('active-', p.id) AS report_row_id,
+        ${detailSelect},
+        p.issue_date AS report_date,
+        'motor' AS policy_source,
+        'Active' AS policy_status,
+        NULL AS cancellation_date,
+        NULL AS cancellation_record_created_at,
+        NULL AS cancellation_reason
+      FROM policies_motor p
+      LEFT JOIN employee_references reference ON reference.id = p.ref_id
+      WHERE ${ownership.sql}
+        AND p.pos_id = ?
+        AND p.issue_date >= ?
+        AND p.issue_date < ?
+      ORDER BY p.issue_date DESC, p.policy_number ASC
+    `, [...ownership.params, posId, startDate, endDate]);
+
+    const [cancelledRows] = await db.query(`
+      SELECT
+        CONCAT('cancelled-', pc.id) AS report_row_id,
+        ${detailSelect},
+        pc.created_at AS report_date,
+        'cancelled' AS policy_source,
+        'Cancelled' AS policy_status,
+        pc.cancellation_date,
+        pc.created_at AS cancellation_record_created_at,
+        pc.cancellation_reason
+      FROM policies_cancelled pc
+      INNER JOIN policies_motor p ON p.id = pc.policy_id
+      LEFT JOIN employee_references reference ON reference.id = p.ref_id
+      WHERE ${ownership.sql}
+        AND p.pos_id = ?
+        AND pc.created_at >= ?
+        AND pc.created_at < ?
+      ORDER BY pc.created_at DESC, p.policy_number ASC
+    `, [...ownership.params, posId, startDate, endDate]);
+
+    const normalizePolicy = policy => {
+      const isCancelled = String(policy.policy_status || "").toLowerCase() === "cancelled";
+      const sign = isCancelled ? -1 : 1;
+      return {
+        ...policy,
+        first_year_od: sign * Math.abs(number(policy.first_year_od)),
+        first_year_tp: sign * Math.abs(number(policy.first_year_tp)),
+        total_od: sign * Math.abs(number(policy.total_od)),
+        total_tp: sign * Math.abs(number(policy.total_tp)),
+        net_premium: sign * Math.abs(number(policy.net_premium)),
+        gst: sign * Math.abs(number(policy.gst)),
+        total_payable: sign * Math.abs(number(policy.total_payable)),
+      };
+    };
+
+    const motorPolicies = activeRows.map(normalizePolicy);
+    const cancelledPolicies = cancelledRows.map(normalizePolicy);
+    const policies = [...motorPolicies, ...cancelledPolicies].sort((left, right) =>
+      new Date(right.report_date || 0).getTime() - new Date(left.report_date || 0).getTime()
+    );
+
+    const summary = policies.reduce((result, policy) => {
+      result.policy_count += 1;
+      if (String(policy.policy_status || "").toLowerCase() === "cancelled") {
+        result.cancelled_count += 1;
+      } else {
+        result.active_count += 1;
+      }
+      result.total_od += number(policy.total_od);
+      result.total_tp += number(policy.total_tp);
+      result.net_premium += number(policy.net_premium);
+      result.gross_premium += number(policy.total_payable);
+      result.od_income += number(policy.total_od) *
+        number(String(policy.pos_od ?? "").replace("%", "")) / 100;
+      result.tp_income += number(policy.total_tp) *
+        number(String(policy.pos_tp ?? "").replace("%", "")) / 100;
+      result.net_income += number(policy.net_premium) *
+        number(String(policy.pos_net ?? "").replace("%", "")) / 100;
+      if (policy.verify_remark && String(policy.verify_remark).trim()) result.verified_count += 1;
+      if (["paid", "completed"].includes(String(policy.payment_status || "").toLowerCase())) result.paid_count += 1;
+      return result;
+    }, {
+      policy_count: 0,
+      active_count: 0,
+      cancelled_count: 0,
+      total_od: 0,
+      total_tp: 0,
+      net_premium: 0,
+      gross_premium: 0,
+      od_income: 0,
+      tp_income: 0,
+      net_income: 0,
+      total_income: 0,
+      verified_count: 0,
+      paid_count: 0,
+    });
+    summary.total_income = summary.od_income + summary.tp_income + summary.net_income;
+
+    const pos = posRows[0]
+      ? { ...posRows[0], policy_details: policies, ...summary }
+      : null;
+
+    return {
+      pos,
+      policies,
+      motor_policies: motorPolicies,
+      cancelled_policies: cancelledPolicies,
+      summary,
     };
   },
 };
