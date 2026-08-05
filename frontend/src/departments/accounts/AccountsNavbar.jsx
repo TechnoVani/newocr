@@ -5,7 +5,7 @@ import DepartmentSwitcher from "../../components/DepartmentSwitcher";
 import ProfileMenu from "../../components/ProfileMenu";
 import logo from "../../assets/logo.png";
 import useAuth from "../../hooks/useAuth";
-import { ACCESS_ROLES, hasMinimumRole } from "../../config/roleAccess";
+import { ACCESS_ROLES, canAccessSetCommission, hasMinimumRole } from "../../config/roleAccess";
 
 const reportLinks = [
   { path: "/accounts/reports/insured-wise", label: "Insured Wise", icon: Users },
@@ -59,6 +59,7 @@ export default function AccountsNavbar() {
   const location = useLocation();
   const { user } = useAuth();
   const canManageAccounts = hasMinimumRole(user, ACCESS_ROLES.MANAGER);
+  const showSetCommission = canAccessSetCommission(user);
   const visiblePayoutGridLinks = canManageAccounts ? payoutGridLinks : payoutGridLinks.filter(({ path }) => !path.endsWith("/upload"));
   const toggleDropdown = (name) => setDropdown((current) => current === name ? "" : name);
 
@@ -73,7 +74,7 @@ export default function AccountsNavbar() {
           <NavLink to="/accounts" end className={navLinkClass}><Home size={17} aria-hidden="true" />Dashboard</NavLink>
           <DesktopDropdown label="Reports" icon={FileText} links={reportLinks} active={location.pathname.startsWith("/accounts/reports/")} open={dropdown === "reports"} onToggle={() => toggleDropdown("reports")} onClose={() => setDropdown("")} />
           <DesktopDropdown label="Payout Grid" icon={FileSpreadsheet} links={visiblePayoutGridLinks} active={location.pathname.startsWith("/accounts/payout-grid/")} open={dropdown === "payout-grid"} onToggle={() => toggleDropdown("payout-grid")} onClose={() => setDropdown("")} />
-          <NavLink to="/set-comm" className={navLinkClass}><Settings2 size={17} aria-hidden="true" />Set Commission</NavLink>
+          {showSetCommission && <NavLink to="/set-comm" className={navLinkClass}><Settings2 size={17} aria-hidden="true" />Set Commission</NavLink>}
           {canManageAccounts && <DesktopDropdown label="Masters" icon={Building2} links={masterLinks} active={location.pathname.startsWith("/accounts/masters/")} open={dropdown === "masters"} onToggle={() => toggleDropdown("masters")} onClose={() => setDropdown("")} />}
         </nav>
         <div className="flex items-center gap-4"><ProfileMenu profilePath="/accounts/profile" /><button type="button" onClick={() => setMobileOpen((value) => !value)} className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden" aria-label="Toggle Accounts navigation" aria-expanded={mobileOpen}>{mobileOpen ? <X size={24} /> : <Menu size={24} />}</button></div>
@@ -83,7 +84,7 @@ export default function AccountsNavbar() {
         <NavLink to="/accounts" end onClick={() => setMobileOpen(false)} className={navLinkClass}><Home size={18} aria-hidden="true" />Dashboard</NavLink>
         <MobileGroup label="Reports" icon={FileText} links={reportLinks} open={dropdown === "reports"} onToggle={() => toggleDropdown("reports")} onSelect={() => setMobileOpen(false)} />
         <MobileGroup label="Payout Grid" icon={FileSpreadsheet} links={visiblePayoutGridLinks} open={dropdown === "payout-grid"} onToggle={() => toggleDropdown("payout-grid")} onSelect={() => setMobileOpen(false)} />
-        <NavLink to="/set-comm" onClick={() => setMobileOpen(false)} className={navLinkClass}><Settings2 size={18} aria-hidden="true" />Set Commission</NavLink>
+        {showSetCommission && <NavLink to="/set-comm" onClick={() => setMobileOpen(false)} className={navLinkClass}><Settings2 size={18} aria-hidden="true" />Set Commission</NavLink>}
         {canManageAccounts && <MobileGroup label="Masters" icon={Building2} links={masterLinks} open={dropdown === "masters"} onToggle={() => toggleDropdown("masters")} onSelect={() => setMobileOpen(false)} />}
       </nav>}
     </header>

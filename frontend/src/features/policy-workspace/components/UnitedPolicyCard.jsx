@@ -117,12 +117,33 @@ const removeHyphens = (value) => {
   return String(value).replace(/-/g, "");
 };
 
+const cleanUnitedRegistrationNumber = (value) => {
+  if (!value || value === "-") return "-";
+  return removeHyphens(String(value).replace(/\s+/g, "")).toUpperCase();
+};
+
 const formatModelName = (model) => {
   let cleaned = formatGenericField(model, [/Registration\s*no\.?/i, /Variant/i, /Colour/i, /Year/i, /Type of body/i]);
   return removeHyphens(cleaned);
 };
 
 const formatVariantName = (variant) => formatGenericField(variant, [/Gvw/i, /GVW/i, /Year of manufacture/i, /Type of body/i, /Colour/i, /Registration/i]);
+
+const splitUnitedModelVariant = (value = "") => {
+  const cleaned = cleanValue(value).replace(/\s+null$/i, "");
+  if (cleaned === "-") return { model: "-", variant: "-" };
+
+  const withoutYearRange = cleaned.replace(/\s*\(\s*(?:19|20)\d{2}\s*-\s*(?:19|20)\d{2}\s*\)\s*/i, " ").replace(/\s+/g, " ").trim();
+  const variantMatch = withoutYearRange.match(/^(.+?)\s+((?:MAGNA|SPORTZ|ASTA|ERA|D-LITE|LXI|VXI|ZXI|STD|DX|LX|LS|VX|GL|GLE|GLS|GX|GXI)\b.*)$/i);
+  if (variantMatch) {
+    return {
+      model: cleanValue(variantMatch[1]).toUpperCase(),
+      variant: cleanValue(variantMatch[2]).toUpperCase(),
+    };
+  }
+
+  return { model: withoutYearRange.toUpperCase(), variant: "-" };
+};
 
 const formatFinancierName = (financier) => {
   if (!financier || financier === "-") return "-";
@@ -204,6 +225,43 @@ const extractTableVehicleDetails = (normalizedText) => {
     result.manufacturingYear = liabilityCarRowMatch[10].trim();
     result.cubicCapacity = liabilityCarRowMatch[11].trim();
     result.seatingCapacity = liabilityCarRowMatch[12].trim();
+    return result;
+  }
+
+  const liabilityCertificateRowMatch = normalizedText.match(
+    /Particulars\s+of\s+Vehicle\s+Insured[\s\S]{0,500}?([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,3})\s*-\s*(\d{3,4})\s+(?:Yes|No)\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z ]+?)\s*\/\s*([A-Z0-9]+)\s+(?:null\s+)?([A-Z]+)\s+(19\d{2}|20\d{2})\s+([\d.]+)\s+(\d+)/i
+  );
+
+  if (liabilityCertificateRowMatch) {
+    result.registrationNumber = cleanUnitedRegistrationNumber(`${liabilityCertificateRowMatch[1]}${liabilityCertificateRowMatch[2]}${liabilityCertificateRowMatch[3]}${liabilityCertificateRowMatch[4]}`);
+    result.engineNumber = liabilityCertificateRowMatch[5].trim();
+    result.chassisNumber = liabilityCertificateRowMatch[6].trim();
+    result.make = liabilityCertificateRowMatch[7].replace(/\s+/g, " ").trim();
+    result.model = liabilityCertificateRowMatch[8].trim();
+    result.variant = "-";
+    result.manufacturingYear = liabilityCertificateRowMatch[10].trim();
+    result.cubicCapacity = liabilityCertificateRowMatch[11].trim();
+    result.seatingCapacity = liabilityCertificateRowMatch[12].trim();
+    result.fuelType = "-";
+    return result;
+  }
+
+  const flexibleLiabilityCertificateRowMatch = normalizedText.match(
+    /Particulars\s+of\s+Vehicle\s+Insured[\s\S]{0,650}?([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,3})\s*-\s*(\d{3,4})\s+(?:Yes|No)\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z ]+?)\s*\/\s*(.+?)\s+(?:null\s+)?(CAR|SUV|MUV|VAN|SEDAN|HATCH\s*BACK)\s+(19\d{2}|20\d{2})\s+([\d.]+)\s+(\d+)/i
+  );
+
+  if (flexibleLiabilityCertificateRowMatch) {
+    const modelVariant = splitUnitedModelVariant(flexibleLiabilityCertificateRowMatch[8]);
+    result.registrationNumber = cleanUnitedRegistrationNumber(`${flexibleLiabilityCertificateRowMatch[1]}${flexibleLiabilityCertificateRowMatch[2]}${flexibleLiabilityCertificateRowMatch[3]}${flexibleLiabilityCertificateRowMatch[4]}`);
+    result.engineNumber = flexibleLiabilityCertificateRowMatch[5].trim();
+    result.chassisNumber = flexibleLiabilityCertificateRowMatch[6].trim();
+    result.make = flexibleLiabilityCertificateRowMatch[7].replace(/\s+/g, " ").trim();
+    result.model = modelVariant.model;
+    result.variant = modelVariant.variant;
+    result.manufacturingYear = flexibleLiabilityCertificateRowMatch[10].trim();
+    result.cubicCapacity = flexibleLiabilityCertificateRowMatch[11].trim();
+    result.seatingCapacity = flexibleLiabilityCertificateRowMatch[12].trim();
+    result.fuelType = "-";
     return result;
   }
 
@@ -524,6 +582,9 @@ const extractSeatingCapacityField = (normalizedText) => {
   const saSeatMatch = normalizedText.match(/Seating Capacity\(Including\s*SideCar\)\s*(\d+)/i);
   if (saSeatMatch) return saSeatMatch[1];
 
+  const unitedSeatMatch = normalizedText.match(/Seating\s+Capacity\s*\(Including\s+Driver\)\s*(\d+)/i);
+  if (unitedSeatMatch) return unitedSeatMatch[1];
+
   return "-";
 };
 
@@ -655,6 +716,48 @@ const extractVehicleDetailsFromText = (text = "") => {
     ncb: extractNcbField(text)
   };
 
+  const unitedScheduleText = normalizedText.replace(/\s+/g, " ");
+  const unitedLiabilityVehicleMatch = unitedScheduleText.match(
+    /Registration\s+Number\s*([A-Z]{2}\s*-\s*\d{2}\s*-\s*[A-Z]{1,3}\s*-\s*\d{3,4})[\s\S]{0,120}?Engine\s+Number\s+(?:Yes|No)?\s*&\s*([A-Z0-9]+)[\s\S]{0,220}?Chassis\s+Number\s+([A-Z0-9]+)[\s\S]{0,220}?Vehicle\s+Make\s*&\s*Model\s+(.+?)\s+Type\s+Of\s+Body\s+([A-Z]+)[\s\S]{0,180}?Year\s+Of\s+Manufacture[\s\S]{0,80}?(\d{4})[\s\S]{0,180}?Cubic\s+Capacity\/KW\s*([\d.]+)[\s\S]{0,220}?Seating\s+Capacity\s*\(Including\s+Driver\)\s*(\d+)/i
+  );
+  if (unitedLiabilityVehicleMatch) {
+    result.registrationNumber = cleanUnitedRegistrationNumber(unitedLiabilityVehicleMatch[1]);
+    result.engineNumber = unitedLiabilityVehicleMatch[2].trim();
+    result.chassisNumber = unitedLiabilityVehicleMatch[3].trim();
+    const makeModelParts = unitedLiabilityVehicleMatch[4].replace(/\s+/g, " ").trim().split(/\s*&\s*/);
+    result.make = makeModelParts[0]?.trim() || result.make;
+    result.model = makeModelParts[1]?.replace(/\s+null$/i, "").trim() || result.model;
+    result.variant = "-";
+    result.manufacturingYear = unitedLiabilityVehicleMatch[6].trim();
+    result.cubicCapacity = unitedLiabilityVehicleMatch[7].trim();
+    result.seatingCapacity = unitedLiabilityVehicleMatch[8].trim();
+    result.fuelType = "-";
+  }
+
+  const unitedMiscScheduleMatch = unitedScheduleText.match(
+    /Registration\s+Number\s*([A-Z]{2}\s*-\s*\d{2}\s*-\s*[A-Z]{1,3}\s*-\s*\d{3,4})[\s\S]{0,160}?Chassis\s+Number\s+(?:Yes|No)?\s*&\s*([A-Z0-9]+)[\s\S]{0,160}?Gross\s+vehicle\s+Weight\s*(\d+)[\s\S]{0,220}?Vehicle\s+Make\s*&\s*Model\s+(.+?)\s+Type\s+Of\s+Body\/Vehicle\s+(.+?)\s+Registration\s+Date[\s\S]{0,120}?Cubic\s+Capacity\/Seating\s+Capacity\s*([\d.]+)\s*\/\s*(\d+)[\s\S]{0,160}?Engine\s+Number\s*([A-Z0-9]+)\s*Year\s+Of\s+Manufacture\s*(\d{4})/i
+  );
+  if (unitedMiscScheduleMatch) {
+    const makeModelParts = unitedMiscScheduleMatch[4]
+      .replace(/\s+null$/i, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(/\s*&\s*/);
+
+    result.registrationNumber = cleanUnitedRegistrationNumber(unitedMiscScheduleMatch[1]);
+    result.chassisNumber = unitedMiscScheduleMatch[2].trim();
+    result.gvw = unitedMiscScheduleMatch[3].trim();
+    result.make = makeModelParts.slice(0, -1).join(" & ").trim() || makeModelParts[0]?.trim() || result.make;
+    result.model = makeModelParts.length > 1 ? makeModelParts[makeModelParts.length - 1].trim() : result.model;
+    result.variant = "-";
+    result.commercialVehicleType = cleanValue(unitedMiscScheduleMatch[5]);
+    result.cubicCapacity = unitedMiscScheduleMatch[6].trim();
+    result.seatingCapacity = unitedMiscScheduleMatch[7].trim();
+    result.engineNumber = unitedMiscScheduleMatch[8].trim();
+    result.manufacturingYear = unitedMiscScheduleMatch[9].trim();
+    result.fuelType = "-";
+  }
+
   if (result.model && result.model !== "-") {
     const seatingVariantMatch = result.model.match(/\s*(?:\(\s*\d{4}\s*-\s*\)\s*)?(\d+\s*STR)\s*$/i);
     if (seatingVariantMatch) {
@@ -694,20 +797,33 @@ const extractBranchAddress = (fullText = "") => {
     return headerBranchMatch[1].replace(/\s+/g, " ").trim();
   }
 
-  let match = fullText.match(/Issuing Office Address\s+Code\s+\d+\s+(.*?\d{6})/i);
+  let match = fullText.match(/Issuing Office Address\s*Code\s+\d+\s+([\s\S]*?\d{6}(?:\s+BHOPAL\s+MADHYA\s+PRADESH)?)(?=\s+Telephone|$)/i);
   if (match) {
     let address = match[1].trim()
       .replace(/\s+/g, ' ')          // collapse multiple spaces
       .replace(/,\s*$/, '');        // remove trailing comma
     return address || "-";
   }
-  
+
   let altMatch = fullText.match(/(?:Mobile\s*:\s*[*0-9]+)\s+([\s\S]*?)(?=\s*,?\s*GST\s*No)/i);
   if (altMatch) {
     let address = altMatch[1].trim()
-      .replace(/\s+/g, ' ')          
-      .replace(/,\s*$/, '');        
+      .replace(/\s+/g, ' ')
+      .replace(/,\s*$/, '');
     return address || "-";
+  }
+
+  match = normalizedText.match(/Policy\s+Issuing\s+Office\s+Address\s*:?\s*(NO\..+?Pincode\s*:\s*\d{6})\s+Telephone/i);
+  if (match?.[1]) {
+    return match[1]
+      .replace(/\s*,?\s*GST\s+No\.?:-.*$/i, "")
+      .replace(/\s*City\s*:/i, ", City:")
+      .replace(/\s*District\s*:/i, ", District:")
+      .replace(/\s*State\s*:/i, ", State:")
+      .replace(/\s*Pincode\s*:/i, ", Pincode:")
+      .replace(/\s+/g, " ")
+      .replace(/,\s*,/g, ",")
+      .trim();
   }
 
   return "-";
@@ -722,6 +838,10 @@ const extractInsuredDetails = (text) => {
   // ----- NAME -----
   let nameMatch = text.match(/Insured Name\/ID\s*:\s*([^\/\n]+)(?:\/|$)/i);
   if (nameMatch && nameMatch[1]) insuredName = nameMatch[1].trim();
+  if (insuredName === "-") {
+    nameMatch = text.match(/Name\s+of\s+the\s+Insured\s*([^\n\r]+)/i);
+    if (nameMatch?.[1]) insuredName = nameMatch[1].replace(/\s+/g, " ").trim();
+  }
   if (insuredName === "-") {
     nameMatch = normalizedText.match(/Insured\s+Details\s+Customer\s+Id\s+\d+\s+Name\s+((?:MR|MRS|MS)\.?\s+[A-Z][A-Z\s]+?)\s+Tel\b/i) ||
                 normalizedText.match(/\bInsured\s+((?:MR|MRS|MS)\.?\s+[A-Z][A-Z\s]+?)\s+(WARD|HOUSE|GRAM|VILLAGE|FLAT|PLOT|H\s*NO|S\/O)\b(.+?)\s+CONTACT\s+NUMBER\s*:/i);
@@ -745,7 +865,7 @@ const extractInsuredDetails = (text) => {
   if (coverPageInsuredMatch?.[2] && coverPageInsuredMatch?.[3]) {
     insuredAddress = `${coverPageInsuredMatch[2]}${coverPageInsuredMatch[3]}`.replace(/\s+/g, " ").trim();
   }
-  
+
   const multilineAddrMatch = insuredAddress === "-" ? text.match(/Insured address\s*:[\s\S]*?(HOUSE NO.*?Pincode:\s*\d{6})/is) : null;
   if (multilineAddrMatch) {
     insuredAddress = multilineAddrMatch[1].replace(/\s+/g, ' ').replace(/,\s*$/, '').trim();
@@ -761,6 +881,19 @@ const extractInsuredDetails = (text) => {
       const simpleMatch = text.match(/Address of the Insured\s*:?\s*([^\n]+)/i);
       if (simpleMatch && simpleMatch[1]) insuredAddress = simpleMatch[1].trim();
     }
+  }
+
+  const unitedScheduleAddrMatch = text.match(/Insured address\s*:?\s*([\s\S]+?Pincode\s*:\s*\d{6})\s+Telephone/i);
+  if (unitedScheduleAddrMatch?.[1]) {
+    insuredAddress = unitedScheduleAddrMatch[1]
+      .replace(/Policy\s+Issuing\s+Office\s+Address\s*:?\s*/i, "")
+      .replace(/\s*City\s*:/i, ", City:")
+      .replace(/\s*District\s*:/i, ", District:")
+      .replace(/\s*State\s*:/i, ", State:")
+      .replace(/\s*Pincode\s*:/i, ", Pincode:")
+      .replace(/\s+/g, " ")
+      .replace(/,\s*,/g, ",")
+      .trim();
   }
 
   // ----- CONTACT -----
@@ -875,7 +1008,7 @@ const extractIDV = (text = "") => {
   const tableVehicleMatch = text.match(/INSURED DECLARED VALUE.*?\n\s*Vehicle\s+Trailer\s+Electrical\/Electronic Accessories\s+Non Electrical Accessories\s+CNG Kit\s+LPG Kit\s+Total\s+Co\s*-\s*Insurance\s+Details\s+([\d,]+)/is);
   if (tableVehicleMatch?.[1]) return tableVehicleMatch[1].replace(/,/g, "");
 
-  if (/LIABILITY\s+ONLY\s+POLICY/i.test(text)) return "-";
+  if (/LIABILITY\s+ONLY\s+POLICY/i.test(text)) return "0";
   
   const totalMatch = text.match(/Total\s+([\d,]+)/i);
   if (totalMatch?.[1]) return totalMatch[1].replace(/,/g, "");
@@ -1037,8 +1170,9 @@ function UnitedPolicyCard({ item }) {
   };
 
   const policyNumber = policy?.policyNumber || 
-                       item?.fullText?.match(/Policy Number\s*:\s*(\S+)/i)?.[1] || 
-                       item?.fullText?.match(/Policy No.\s+(\S+)/i)?.[1] ||
+                       item?.fullText?.match(/Policy Number\s*:?\s*([A-Z0-9]{10,22})(?=Previous|\s|$)/i)?.[1] ||
+                       item?.fullText?.match(/Policy\s+No\.?\s*[\r\n\s]+([A-Z0-9]{10,22})/i)?.[1] ||
+                       item?.fullText?.match(/Policy No\.?\s+([A-Z0-9]{10,22})/i)?.[1] ||
                        item?.fullText?.match(/POLICY\s+NO\.?\s*:\s*([A-Z0-9]+)/i)?.[1] || "-";
 
   return (

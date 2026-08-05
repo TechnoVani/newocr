@@ -27,6 +27,7 @@ export const getAccessRole = (user) => {
 };
 
 export const hasMinimumRole = (user, role) => LEVEL[getAccessRole(user)] >= LEVEL[role];
+export const canAccessSetCommission = (user) => Boolean(user);
 export const roleLabel = (user) => ({
   [ACCESS_ROLES.EMPLOYEE]: "Employee",
   [ACCESS_ROLES.MANAGER]: "Manager",
