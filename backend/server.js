@@ -197,10 +197,9 @@ import humanResourcesRoutes from "./routes/human-resources/index.routes.js";
 import setCommRoutes from "./routes/operations/setcomm.routes.js";
 
 import authMiddleware from "./middleware/auth.middleware.js";
-import requireDepartmentAccess, { requireAnyDepartmentAccess, requireMinimumRole } from "./middleware/departmentAccess.middleware.js";
+import requireDepartmentAccess, { requireAnyDepartmentAccess } from "./middleware/departmentAccess.middleware.js";
 import policyFileAccessMiddleware from "./middleware/policyFileAccess.middleware.js";
 import errorMiddleware from "./middleware/error.middleware.js";
-import { ACCESS_ROLES } from "./utils/roleAccess.js";
 import { getAllowedOrigins, getPublicApiUrl, isAllowedOrigin } from "./config/origins.js";
 import { uploadStoragePath } from "./config/storagePaths.js";
 
@@ -267,7 +266,6 @@ app.use("/api/auth", authRoutes);
 app.use(
     "/api/setcomm",
     authMiddleware,
-    requireMinimumRole(ACCESS_ROLES.MANAGER),
     setCommRoutes
 );
 

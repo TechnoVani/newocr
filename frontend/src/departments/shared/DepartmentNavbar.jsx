@@ -18,7 +18,7 @@ const defaultItems = [
 ];
 
 const sharedItems = [
-  { path: "/set-comm", label: "Set Commission", icon: Settings2, minimumRole: ACCESS_ROLES.MANAGER },
+  { path: "/set-comm", label: "Set Commission", icon: Settings2 },
 ];
 
 export default function DepartmentNavbar({ department, items, dense = false }) {
