@@ -1,8 +1,6 @@
 import express from "express";
 import SetCommController from "../../controllers/operations/setcomm.controller.js";
 import { validateCommissionUpdate } from "../../validation/setcomm.validation.js";
-import { requireMinimumRole } from "../../middleware/departmentAccess.middleware.js";
-import { ACCESS_ROLES } from "../../utils/roleAccess.js";
 
 const router = express.Router();
 
@@ -13,6 +11,6 @@ router.get("/", SetCommController.getAll);
 router.get("/:id", SetCommController.getById);
 
 // PUT /api/setcomm/:id - Update the six commission fields on a policy.
-router.put("/:id", requireMinimumRole(ACCESS_ROLES.MANAGER), validateCommissionUpdate, SetCommController.update);
+router.put("/:id", validateCommissionUpdate, SetCommController.update);
 
 export default router;
