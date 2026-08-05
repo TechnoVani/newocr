@@ -283,14 +283,18 @@ class PoliciesMotorModel {
         return rows[0] || null;
     }
 
-    static async findByPolicyNumber(policyNumber) {
+    static async findByPolicyNumber(policyNumber, readScope = null) {
+        const ownership = readScope
+            ? policyOwnershipFilter(readScope, "created_by")
+            : { sql: "1 = 1", params: [] };
         const query = `
             SELECT *
             FROM policies_motor
-            WHERE UPPER(TRIM(policy_number)) = UPPER(TRIM(?))
+            WHERE ${ownership.sql}
+              AND UPPER(TRIM(policy_number)) = UPPER(TRIM(?))
             LIMIT 1
         `;
-        const [rows] = await db.query(query, [policyNumber]);
+        const [rows] = await db.query(query, [...ownership.params, policyNumber]);
         return rows[0] || null;
     }
 

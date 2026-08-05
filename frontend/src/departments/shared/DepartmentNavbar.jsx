@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, ChevronDown, ClipboardPlus, Database, Files, LayoutDashboard, Menu, RefreshCw, X } from "lucide-react";
+import { BarChart3, ChevronDown, ClipboardPlus, Database, Files, LayoutDashboard, Menu, RefreshCw, Settings2, X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import DepartmentSwitcher from "../../components/DepartmentSwitcher";
 import ProfileMenu from "../../components/ProfileMenu";
@@ -17,6 +17,10 @@ const defaultItems = [
   { path: "form", label: "Add Entry", icon: ClipboardPlus },
 ];
 
+const sharedItems = [
+  { path: "/set-comm", label: "Set Commission", icon: Settings2, minimumRole: ACCESS_ROLES.MANAGER },
+];
+
 export default function DepartmentNavbar({ department, items, dense = false }) {
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState("");
@@ -24,12 +28,15 @@ export default function DepartmentNavbar({ department, items, dense = false }) {
   const location = useLocation();
   const basePath = `/${department.slug}`;
   const allowed = (item) => !item.minimumRole || hasMinimumRole(user, item.minimumRole);
-  const configuredItems = items || getDepartmentMenu(department.slug) || defaultItems;
+  const configuredItems = [...(items || getDepartmentMenu(department.slug) || defaultItems), ...sharedItems];
   const visibleItems = configuredItems
     .filter(allowed)
     .map((item) => item.children ? { ...item, children: item.children.filter(allowed) } : item)
     .filter((item) => !item.children || item.children.length);
-  const toPath = (path) => path ? `${basePath}/${path}` : basePath;
+  const toPath = (path) => {
+    if (!path) return basePath;
+    return String(path).startsWith("/") ? path : `${basePath}/${path}`;
+  };
   const groupActive = (children = []) => children.some(({ path }) => {
     const target = toPath(path);
     return path ? location.pathname.startsWith(target) : location.pathname === target;
@@ -37,7 +44,7 @@ export default function DepartmentNavbar({ department, items, dense = false }) {
   const renderItem = ({ path, label, icon: Icon }, mobile = false) => (
     <NavLink
       key={label}
-      to={path ? `${basePath}/${path}` : basePath}
+      to={toPath(path)}
       end={!path}
       onClick={() => {
         setOpenGroup("");
