@@ -145,6 +145,38 @@ const splitUnitedModelVariant = (value = "") => {
   return { model: withoutYearRange.toUpperCase(), variant: "-" };
 };
 
+const splitUnitedGcvMakeModelVariant = (make = "", modelVariant = "") => {
+  let cleanedMake = cleanValue(make).replace(/^MAHINDRA\s*&\s*/i, "").toUpperCase();
+  let cleanedModelVariant = cleanValue(modelVariant).toUpperCase();
+
+  const boleroPickupMatch = cleanedModelVariant.match(/\b(BOLERO\s+PICKUP)\s+(.+)$/i);
+  if (boleroPickupMatch) {
+    return {
+      make: cleanedMake || "-",
+      model: boleroPickupMatch[1].replace(/\s+/g, " ").trim(),
+      variant: boleroPickupMatch[2].replace(/\s+/g, " ").trim(),
+    };
+  }
+
+  const apeMatch = cleanedModelVariant.match(/\b(APE)\s+(.+)$/i);
+  if (apeMatch) {
+    return {
+      make: cleanedMake || "-",
+      model: apeMatch[1].trim(),
+      variant: apeMatch[2].replace(/\s+/g, " ").trim(),
+    };
+  }
+
+  const modelTokens = cleanedModelVariant.split(/\s+/).filter(Boolean);
+  const variant = modelTokens.length > 2 ? modelTokens.slice(2).join(" ") : "-";
+
+  return {
+    make: cleanedMake || "-",
+    model: modelTokens.slice(0, 2).join(" ") || cleanedModelVariant || "-",
+    variant,
+  };
+};
+
 const formatFinancierName = (financier) => {
   if (!financier || financier === "-") return "-";
   let name = String(financier);
@@ -348,22 +380,23 @@ const extractTableVehicleDetails = (normalizedText) => {
   }
 
   const gcvPublicCarrierMatch = normalizedText.match(
-    /Registration\s+No\.\s+Obsolete\s+Vehicle\s+Engine\s+No\.\s+Chassis\s+No\.\s+Make\/Model\s+Type\s+of\s+Body\s+Year\s+of\s+Mfg\s+HP\/Cubic\s+Capacity\s+GVW[\s\S]{0,700}?([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,2})\s*-\s*(\d{3,4})\s+No\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Za-z ]+?)\s*\/\s*([A-Z0-9 ]+?)\s+(PIK[_\s-]?UP|PICK[_\s-]?UP|OPEN\s+BODY|CLOSED\s+BODY|GOODS\s+CARRIER)\s+(20\d{2}|19\d{2})\s+(\d{2,5})\s+(\d{2,6})/i
+    /Registration\s+No\.\s+Obsolete\s+Vehicle\s+Engine\s+No\.?\s*Chassis\s+No\.?\s*Make\/Model\s*Type\s+of\s+Body\s*Year\s+of\s+Mfg\s*HP\/Cubic\s+Capacity\s*GVW[\s\S]{0,700}?([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,3})\s*-\s*(\d{3,4})\s+No\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Za-z&.\s]+?)\s*\/\s*([A-Z0-9.&\-\s]+?)\s+(PIK[_\s-]?UP|PICK[_\s-]?UP|OPEN|OPEN\s+BODY|CLOSED\s+BODY|GOODS\s+CARRIER)\s+(20\d{2}|19\d{2})\s+(\d{2,5})\s+(\d{2,6})/i
   );
 
   if (gcvPublicCarrierMatch) {
-    const modelTokens = gcvPublicCarrierMatch[8].replace(/\s+/g, " ").trim().split(/\s+/);
+    const splitVehicle = splitUnitedGcvMakeModelVariant(gcvPublicCarrierMatch[7], gcvPublicCarrierMatch[8]);
+    const modelTokens = splitVehicle.variant.replace(/\s+/g, " ").trim().split(/\s+/);
     const knownFuel = ["CNG", "PETROL", "DIESEL", "LPG", "ELECTRIC"];
     const fuelToken = knownFuel.includes(modelTokens[modelTokens.length - 1]?.toUpperCase())
       ? modelTokens.pop().toUpperCase()
       : "-";
-    const variant = modelTokens.length > 2 ? modelTokens.pop() : "-";
+    const variant = modelTokens.join(" ") || splitVehicle.variant;
 
     result.registrationNumber = removeHyphens(`${gcvPublicCarrierMatch[1]}-${gcvPublicCarrierMatch[2]}-${gcvPublicCarrierMatch[3]}-${gcvPublicCarrierMatch[4]}`);
     result.engineNumber = gcvPublicCarrierMatch[5].trim();
     result.chassisNumber = gcvPublicCarrierMatch[6].trim();
-    result.make = gcvPublicCarrierMatch[7].replace(/\s+/g, " ").trim();
-    result.model = modelTokens.join(" ").trim() || gcvPublicCarrierMatch[8].replace(/\s+/g, " ").trim();
+    result.make = splitVehicle.make;
+    result.model = splitVehicle.model;
     result.variant = variant;
     result.fuelType = fuelToken;
     result.manufacturingYear = gcvPublicCarrierMatch[10].trim();
@@ -375,8 +408,16 @@ const extractTableVehicleDetails = (normalizedText) => {
     if (seatMatch?.[1]) result.seatingCapacity = seatMatch[1];
 
     const gvw = Number(result.gvw);
-    if (Number.isFinite(gvw) && gvw > 0 && gvw <= 2500) {
-      result.commercialVehicleType = "GCV-Public(upto-2.5T)";
+    if (/MOTORIZED\s+3\s+WHEELERS/i.test(normalizedText)) {
+      result.commercialVehicleType = "Three Wheeler - GCV - Public";
+    } else if (Number.isFinite(gvw) && gvw > 0) {
+      if (gvw <= 2500) result.commercialVehicleType = "GCV-Public(upto-2.5T)";
+      else if (gvw <= 3500) result.commercialVehicleType = "GCV-Public(2.5T>=3.5T)";
+      else if (gvw <= 7500) result.commercialVehicleType = "GCV-Public(3.5T>=7.5T)";
+      else if (gvw <= 17000) result.commercialVehicleType = "GCV-Public(7.5T-17T)";
+      else if (gvw <= 26000) result.commercialVehicleType = "GCV-Public(17T-26T)";
+      else if (gvw <= 40000) result.commercialVehicleType = "GCV-Public(26T-40T)";
+      else result.commercialVehicleType = "GCV-Public(Above-40T)";
     }
 
     return result;
@@ -735,22 +776,30 @@ const extractVehicleDetailsFromText = (text = "") => {
   }
 
   const unitedMiscScheduleMatch = unitedScheduleText.match(
-    /Registration\s+Number\s*([A-Z]{2}\s*-\s*\d{2}\s*-\s*[A-Z]{1,3}\s*-\s*\d{3,4})[\s\S]{0,160}?Chassis\s+Number\s+(?:Yes|No)?\s*&\s*([A-Z0-9]+)[\s\S]{0,160}?Gross\s+vehicle\s+Weight\s*(\d+)[\s\S]{0,220}?Vehicle\s+Make\s*&\s*Model\s+(.+?)\s+Type\s+Of\s+Body\/Vehicle\s+(.+?)\s+Registration\s+Date[\s\S]{0,120}?Cubic\s+Capacity\/Seating\s+Capacity\s*([\d.]+)\s*\/\s*(\d+)[\s\S]{0,160}?Engine\s+Number\s*([A-Z0-9]+)\s*Year\s+Of\s+Manufacture\s*(\d{4})/i
+    /Registration\s+Number\s*([A-Z]{2}\s*-\s*\d{2}\s*-\s*[A-Z]{1,3}\s*-\s*\d{3,4})[\s\S]{0,160}?Chassis\s+Number\s+(?:Yes|No)?\s*&\s*([A-Z0-9]+)[\s\S]{0,160}?Gross\s+vehicle\s+Weight\s*(\d+)[\s\S]{0,220}?Vehicle\s+Make\s*&\s*Model\s+(.+?)\s+Type\s+Of\s+Body(?:\/Vehicle)?\s*(.+?)\s+Registration\s+Date[\s\S]{0,120}?Cubic\s+Capacity\/Seating\s+Capacity\s*([\d.]+)\s*\/\s*(\d+)[\s\S]{0,160}?Engine\s+Number\s*([A-Z0-9]+)\s*Year\s+Of\s+Manufacture\s*(\d{4})/i
   );
   if (unitedMiscScheduleMatch) {
-    const makeModelParts = unitedMiscScheduleMatch[4]
+    const makeModelText = unitedMiscScheduleMatch[4]
       .replace(/\s+null$/i, "")
       .replace(/\s+/g, " ")
-      .trim()
-      .split(/\s*&\s*/);
+      .trim();
+    const makeModelParts = makeModelText.includes("/")
+      ? makeModelText.split(/\s*\/\s*/)
+      : makeModelText.split(/\s*&\s*/);
+    const splitVehicle = splitUnitedGcvMakeModelVariant(
+      makeModelParts.slice(0, -1).join(" & ").trim() || makeModelParts[0]?.trim(),
+      makeModelParts.length > 1 ? makeModelParts[makeModelParts.length - 1].trim() : ""
+    );
 
     result.registrationNumber = cleanUnitedRegistrationNumber(unitedMiscScheduleMatch[1]);
     result.chassisNumber = unitedMiscScheduleMatch[2].trim();
     result.gvw = unitedMiscScheduleMatch[3].trim();
-    result.make = makeModelParts.slice(0, -1).join(" & ").trim() || makeModelParts[0]?.trim() || result.make;
-    result.model = makeModelParts.length > 1 ? makeModelParts[makeModelParts.length - 1].trim() : result.model;
-    result.variant = "-";
-    result.commercialVehicleType = cleanValue(unitedMiscScheduleMatch[5]);
+    result.make = splitVehicle.make || result.make;
+    result.model = splitVehicle.model || result.model;
+    result.variant = splitVehicle.variant || "-";
+    result.commercialVehicleType = /MOTORIZED\s+3\s+WHEELERS/i.test(unitedScheduleText)
+      ? "Three Wheeler - GCV - Public"
+      : cleanValue(unitedMiscScheduleMatch[5]);
     result.cubicCapacity = unitedMiscScheduleMatch[6].trim();
     result.seatingCapacity = unitedMiscScheduleMatch[7].trim();
     result.engineNumber = unitedMiscScheduleMatch[8].trim();

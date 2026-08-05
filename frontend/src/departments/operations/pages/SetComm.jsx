@@ -132,6 +132,17 @@ export default function SetComm() {
     [selectedMonth, selectedYear]
   );
 
+  const totalGivenSum = useMemo(() =>
+    policies.reduce((sum, policy) => {
+      const draft = drafts[policy.id] || createCommissionDraft(policy);
+      const inputValue = totalGivenInputs[policy.id];
+      const value = inputValue === "" || inputValue === undefined
+        ? calculateTotalGiven(policy, draft)
+        : Number(inputValue);
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0),
+  [drafts, policies, totalGivenInputs]);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -457,6 +468,16 @@ export default function SetComm() {
               setSelectedInsurer(event.target.value);
               setPage(1);
             },
+          },
+          {
+            name: "total-given-sum",
+            className: "order-last w-full sm:ml-auto sm:w-auto",
+            render: (
+              <div className="flex h-9 min-w-56 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 shadow-sm">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Total Given</span>
+                <span className="text-xs font-black text-emerald-900">{formatCurrency(totalGivenSum)}</span>
+              </div>
+            ),
           },
         ]}
         searchConfig={{

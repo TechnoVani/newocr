@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, CircleDollarSign, IndianRupee, TrendingUp, Users } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { BadgeCheck, CircleDollarSign, Eye, IndianRupee, TrendingUp, Users } from "lucide-react";
 import * as XLSX from "xlsx";
 import ReusableTable from "../../../../components/reusable/ReusableTable";
 import MonthYearPicker from "../../../../pages/reusable/MonthYearPicker";
@@ -86,7 +87,8 @@ function SummaryCard({ label, value, detail, icon: Icon, tone }) {
 }
 
 export default function PosWiseReport() {
-  const [month, setMonth] = useState(currentMonth);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [month, setMonth] = useState(searchParams.get("month") || currentMonth());
   const [report, setReport] = useState(emptyReport);
   const [search, setSearch] = useState("");
   const [posId, setPosId] = useState("");
@@ -94,6 +96,10 @@ export default function PosWiseReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showReferences, setShowReferences] = useState(false);
+
+  useEffect(() => {
+    setSearchParams({ month }, { replace: true });
+  }, [month, setSearchParams]);
 
   useEffect(() => {
     let active = true;
@@ -159,7 +165,21 @@ export default function PosWiseReport() {
   }, [referencesByPos, report.rows, search, showReferences]);
 
   const reportColumns = useMemo(() => {
-    if (!showReferences) return columns;
+    const actionColumn = {
+      key: "action",
+      label: "Action",
+      render: (_, row) => row.pos_id ? (
+        <Link
+          to={`/accounts/reports/pos-wise/${row.pos_id}/policies?month=${month}`}
+          state={{ posRow: row }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Eye size={12} />
+          Policies
+        </Link>
+      ) : "—",
+    };
+    if (!showReferences) return [...columns, actionColumn];
     const referenceColumn = {
       key: "reference_details",
       label: "Reference Name & Mobile Number",
@@ -177,8 +197,8 @@ export default function PosWiseReport() {
         </div>
       ) : "—",
     };
-    return [columns[0], referenceColumn, ...columns.slice(1)];
-  }, [showReferences]);
+    return [columns[0], referenceColumn, ...columns.slice(1), actionColumn];
+  }, [month, showReferences]);
 
   const summary = useMemo(() => visibleRows.reduce((result, row) => {
     result.pos_count += 1;
@@ -347,6 +367,7 @@ export default function PosWiseReport() {
         <BadgeCheck size={14} className="text-emerald-500" />
         Total POS Income = OD Income + TP Income + Net Income. All income values use the configured POS percentages only.
       </div>
+
     </main>
   );
 }

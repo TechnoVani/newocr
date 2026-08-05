@@ -58,3 +58,24 @@ export const getPosWiseReport = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getPosWisePolicies = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const period = periodRange(req.query.month || currentMonth);
+    const result = await PosWiseReportModel.getPolicies({
+      readScope: getPolicyReadScope(req.user),
+      startDate: period.startDate,
+      endDate: period.endDate,
+      posId: optionalId(req.params.posId, "POS"),
+    });
+
+    return successResponse(res, "POS policy details retrieved successfully", {
+      ...result,
+      period,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
