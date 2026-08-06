@@ -410,6 +410,13 @@ const cleanValue = (value) => {
     .trim();
 };
 
+const cleanAmount = (value) => {
+  if (!value) return "0";
+  const cleaned = String(value).replace(/[,\s]/g, "");
+  const amount = parseFloat(cleaned);
+  return Number.isFinite(amount) ? amount.toString() : "0";
+};
+
 // =======================================
 // TEXT NORMALIZATION HELPER
 // =======================================
@@ -475,7 +482,13 @@ const extractInsuredDetails = (fullText = "") => {
   const addressMatch = fullText.match(/Address of insured:\s*Insured Name:\s*(.*?)(?=\s*State:|\s*Telephone:|\s*Mobile:|$)/i);
   
   if (addressMatch) {
-    result.insuredAddress = addressMatch[1].trim();
+    let rawAddress = addressMatch[1].trim();
+    if (result.insuredName) {
+      const safeName = result.insuredName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      rawAddress = rawAddress.replace(new RegExp(`^\\s*${safeName}\\s*`, "i"), "").trim();
+    }
+    rawAddress = rawAddress.replace(/^Mr\.?\s*[A-Z\s.]+?(?=\s+\d)/i, "").trim();
+    result.insuredAddress = rawAddress;
   } else {
     // Fallback logic for address
     const dateToPhoneRegex = /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\s+(.*?)\s+(?:Telephone\s*:|Mobile\s*:|NEXT RENEWAL|Intermediary Code)/i;
@@ -540,7 +553,8 @@ const extractPolicyDates = (fullText = "") => {
 const extractDateOfIssue = (text = "") => {
   const match = text.match(/Invoice Date\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (match) return match[1];
-  const altMatch = text.match(/Date of Issue\s*[:]?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const altMatch = text.match(/Date of Issue\s*[:]?\s*(\d{2}\/\d{2}\/\d{4})/i) ||
+                   text.match(/signed at Chennai on\s*(\d{2}\/\d{2}\/\d{4})/i);
   return altMatch?.[1] || "-";
 };
 
@@ -587,6 +601,7 @@ const extractPremiumData = (text = "") => {
   if (!text) return defaultResult;
   
   const result = {};
+  const normalizedText = text.replace(/\s+/g, " ").trim();
   
   const netMatch = text.match(/Total\s+Premium\s*\(A\s*\+\s*B\)\s*([\d,]+\.?\d*)/i);
   if (netMatch) result.netPremium = netMatch[1];
@@ -596,6 +611,12 @@ const extractPremiumData = (text = "") => {
   
   const tpMatch = text.match(/TOTAL LIABILITY PREMIUM\s*\(B\)\s*([\d,]+\.?\d*)/i);
   if (tpMatch) result.totalTpPremium = tpMatch[1].replace(/,/g, "");
+
+  const royalLiabilityMatch = normalizedText.match(/TOTAL\s+LIABILITY\s+PREMIUM\s*\(B\)\s*([\d,]+(?:\.\d+)?)/i);
+  if (royalLiabilityMatch) {
+    result.totalTpPremium = cleanAmount(royalLiabilityMatch[1]);
+    result.netPremium = cleanAmount(royalLiabilityMatch[1]);
+  }
   
   const sgstMatch = text.match(/SGST\s+([\d,]+\.?\d*)/i);
   const cgstMatch = text.match(/CGST\s+([\d,]+\.?\d*)/i);
@@ -604,9 +625,21 @@ const extractPremiumData = (text = "") => {
     const cgst = parseFloat(cgstMatch[1].replace(/,/g, "")) || 0;
     result.gst = (sgst + cgst).toString();
   }
+
+  const addSgstMatch = normalizedText.match(/ADD\s*:\s*SGST\s*([\d,]+(?:\.\d+)?)/i);
+  const addCgstMatch = normalizedText.match(/ADD\s*:\s*CGST\s*([\d,]+(?:\.\d+)?)/i);
+  if (addSgstMatch && addCgstMatch) {
+    const sgst = parseFloat(cleanAmount(addSgstMatch[1])) || 0;
+    const cgst = parseFloat(cleanAmount(addCgstMatch[1])) || 0;
+    result.gst = (sgst + cgst).toString();
+  }
   
   const totalMatch = text.match(/TOTAL PREMIUM PAYABLE\s*([\d,]+\.?\d*)/i);
   if (totalMatch) result.totalPayable = totalMatch[1].replace(/,/g, "");
+
+  const compactTotalMatch = normalizedText.match(/TOTAL\s+PREMIUM\s*([\d,]+(?:\.\d+)?)/i) ||
+                            normalizedText.match(/Total\s+Premium\s*\(in\s*Rs\.\)\s*([\d,]+(?:\.\d+)?)/i);
+  if (compactTotalMatch) result.totalPayable = cleanAmount(compactTotalMatch[1]);
   
   const invoiceMatch = text.match(/Taxable Premium\s*([\d,]+\.?\d*).*?SGST\s*[\d.]+\%\s*([\d,]+\.?\d*).*?CGST\s*[\d.]+\%\s*([\d,]+\.?\d*).*?Gross Premium\s*([\d,]+\.?\d*)/is);
   if (invoiceMatch) {
@@ -630,6 +663,10 @@ const extractVehicleDetailsFromText = (text = "") => {
 
   const normalizedText = text.replace(/\s+/g, " ").trim();
 
+  if (/Goods\s+Carrying\s+Vehicle\s+Policy\s*[–-]\s*Liability\s+only/i.test(normalizedText)) {
+    result.commercialVehicleType = "GCV-Public(Above-40T)";
+  }
+
   const regMatch = normalizedText.match(/Registration\s*Number\s+([A-Z0-9\-]+)/i);
   if (regMatch) result.registrationNumber = regMatch[1];
 
@@ -652,14 +689,24 @@ const extractVehicleDetailsFromText = (text = "") => {
 
   // --- UPDATED MODEL & VARIANT LOGIC ---
   const modelMatch = normalizedText.match(
-    /Model\s*Description\s+([A-Za-z0-9\s\-+.&]+?)(?=\s+Engine\s+Number|\s+Total\s+Premium|\s+Gross\s+Vehicle|\s+Fuel\s+Type|\s+Year\s+of|\s+Type\s+of\s+Body|\s+Chassis\s+Number|\s+Cubic\s+Capacity|\s+BatterySerial\s+Number|\s+Seating\s+Capacity|\s+Maximum\s+Licensed\s+carrying\s+capacity\s+including\s+driver|$)/
+    /Model\s*Description\s+([A-Za-z0-9\s\-+.&/]+?)(?=\s+Engine\s+Number|\s+Total\s+Premium|\s+Gross\s+Vehicle|\s+Fuel\s+Type|\s+Year\s+of|\s+Type\s+of\s+Body|\s+Chassis\s+Number|\s+Cubic\s+Capacity|\s+BatterySerial\s+Number|\s+Seating\s+Capacity|\s+Maximum\s+Licensed\s+carrying\s+capacity\s+including\s+driver|$)/
   );
   
   if (modelMatch) {
     const fullModelString = modelMatch[1].trim();
+    const isRoyalGoodsLiability = /Goods\s+Carrying\s+Vehicle\s+Policy\s*[–-]\s*Liability\s+only/i.test(normalizedText);
     const parts = fullModelString.split(/\s+/);
 
-    if (parts.length > 1) {
+    if (isRoyalGoodsLiability) {
+      const slashModelMatch = fullModelString.match(/^(.+?)\s*\/\s*(.+)$/);
+      if (slashModelMatch) {
+        result.model = slashModelMatch[1].trim();
+        result.variant = slashModelMatch[2].trim();
+      } else {
+        result.model = fullModelString;
+        result.variant = "-";
+      }
+    } else if (parts.length > 1) {
       if (parts.length >= 3) {
         // If the first word is short (e.g., 'U') OR the second word contains a number (e.g., '3118' or '407'),
         // we group the first two words as the Model and the rest as the Variant.
@@ -776,7 +823,9 @@ function RoyalSundaramPolicyCard({ item }) {
   const previousPolicyNumber = extractPreviousPolicyNumber(item?.fullText);
   const previousInsurer = extractPreviousInsurer(item?.fullText);
 
-  const policyNumber = cleanValue(policy?.policyNumber || item?.fullText?.match(/Policy No\.?\s*([A-Z0-9]+)/i)?.[1]);  
+  const policyNumberMatch = item?.fullText?.match(/Policy\s+No\.?\s*[:.]?\s*([A-Z0-9]+)/i) ||
+                            item?.fullText?.match(/Policy\s+Number\s*:\s*([A-Z0-9]+)/i);
+  const policyNumber = cleanValue(policy?.policyNumber || policyNumberMatch?.[1]);  
   
   return (
     <PolicyCardView
@@ -798,7 +847,7 @@ function RoyalSundaramPolicyCard({ item }) {
       previousInsurer={previousInsurer}
       previousPolicyNumber={previousPolicyNumber}
       finalPremium={finalPremium}
-      vehicle={vehicle}
+      vehicle={{ ...vehicle, ...extractedVehicle }}
       extractedVehicle={extractedVehicle}
     />
   );
