@@ -101,7 +101,10 @@ export const validateCommissionUpdate = (req, res, next) => {
 
     fields.forEach(field => {
         const value = req.body[field];
-        const amount = Number(value);
+        const normalizedValue = typeof value === "string"
+            ? value.trim().replace("%", "")
+            : value;
+        const amount = Number(normalizedValue);
         if (value === "" || value === null || value === undefined || !Number.isFinite(amount)) {
             errors[field] = `${field.replaceAll("_", " ")} must be a valid number`;
         } else if (amount < 0) {

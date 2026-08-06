@@ -85,8 +85,13 @@ const COMMISSION_FIELDS = new Set([
 
 const createCommissionDraft = (policy) =>
   Object.fromEntries(
-    [...COMMISSION_FIELDS].map((field) => [field, policy[field] ?? "0.00"]),
+    [...COMMISSION_FIELDS].map((field) => [field, formatPercentDraft(policy[field])]),
   );
+
+const formatPercentDraft = (value) => {
+  const amount = Number(String(value ?? "0").replace("%", ""));
+  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+};
 
 const calculateTotalGiven = (policy, commission = policy) =>
   (Number(policy.total_od || 0) * Number(commission.pos_od || 0)) / 100 +
@@ -123,6 +128,7 @@ export default function SetComm() {
   const saveTimers = useRef({});
   const pendingDrafts = useRef({});
   const lastSavedDrafts = useRef({});
+  const saveVersions = useRef({});
 
   const monthTitle = useMemo(
     () =>
@@ -220,7 +226,7 @@ export default function SetComm() {
 
   // Handle commission input change
   const handleCommissionChange = (policyId, field, value, { syncTotalGiven = true } = {}) => {
-    const nextDraft = { ...drafts[policyId], [field]: value };
+    const nextDraft = { ...(drafts[policyId] || {}), [field]: value };
     pendingDrafts.current[policyId] = nextDraft;
     setDrafts((current) => ({ ...current, [policyId]: nextDraft }));
     if (syncTotalGiven) {
@@ -280,32 +286,49 @@ export default function SetComm() {
     if (!draft) return;
     const signature = JSON.stringify(draft);
     if (lastSavedDrafts.current[policyId] === signature) {
-      setSaveStatus((current) => ({ ...current, [policyId]: "saved" }));
+      setSaveStatus((current) => ({ ...current, [policyId]: "ready" }));
       return;
     }
 
     const payload = {};
     for (const field of COMMISSION_FIELDS) {
-      const amount = Number(draft[field]);
+      const amount = Number(String(draft[field] ?? "").replace("%", ""));
       if (!Number.isFinite(amount) || amount < 0) {
         setSaveStatus((current) => ({ ...current, [policyId]: "error" }));
-        toast.error(`${field.replaceAll("_", " ").toUpperCase()} must be a positive number.`);
+        toast.error(`${field.replaceAll("_", " ").toUpperCase()} must be zero or a positive number.`);
         return;
       }
       payload[field] = Number(amount.toFixed(2));
     }
 
+    const version = (saveVersions.current[policyId] || 0) + 1;
+    saveVersions.current[policyId] = version;
     setSaveStatus((current) => ({ ...current, [policyId]: "saving" }));
     try {
-      await axiosInstance.put(`/setcomm/${policyId}`, payload);
+      const response = await axiosInstance.put(`/setcomm/${policyId}`, payload);
+      if (saveVersions.current[policyId] !== version) return;
+
+      const savedRecord = response.data?.data?.record;
+      const savedDraft = createCommissionDraft(savedRecord || payload);
+      const savedSignature = JSON.stringify(savedDraft);
       setPolicies((current) =>
         current.map((policy) =>
-          policy.id === policyId ? { ...policy, ...payload } : policy
+          policy.id === policyId ? { ...policy, ...(savedRecord || payload) } : policy
         )
       );
-      lastSavedDrafts.current[policyId] = signature;
+      setDrafts((current) => ({ ...current, [policyId]: savedDraft }));
+      const savedPolicy = policies.find((item) => item.id === policyId);
+      if (savedPolicy) {
+        setTotalGivenInputs((current) => ({
+          ...current,
+          [policyId]: calculateTotalGiven({ ...savedPolicy, ...(savedRecord || payload) }, savedDraft).toFixed(2),
+        }));
+      }
+      lastSavedDrafts.current[policyId] = savedSignature;
+      pendingDrafts.current[policyId] = savedDraft;
       setSaveStatus((current) => ({ ...current, [policyId]: "saved" }));
     } catch (requestError) {
+      if (saveVersions.current[policyId] !== version) return;
       setSaveStatus((current) => ({ ...current, [policyId]: "error" }));
       toast.error(requestError.response?.data?.message || "Unable to save policy commission.");
     }
