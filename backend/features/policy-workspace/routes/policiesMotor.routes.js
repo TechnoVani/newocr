@@ -14,6 +14,7 @@ export const POLICY_UPLOAD_FIELDS = Object.freeze([
     { name: "rc_front", maxCount: 1 },
     { name: "rc_back", maxCount: 1 },
     { name: "previous_policy", maxCount: 1 },
+    { name: "invoice", maxCount: 1 },
     { name: "survey_report", maxCount: 1 },
     { name: "gst_certificate", maxCount: 1 }
 ]);

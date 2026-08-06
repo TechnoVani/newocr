@@ -61,6 +61,10 @@ class DocumentController {
         await DocumentController.sendFile(req, res, next, "previous_policy");
     }
 
+    static async invoice(req, res, next) {
+        await DocumentController.sendFile(req, res, next, "invoice");
+    }
+
     static async surveyReport(req, res, next) {
         await DocumentController.sendFile(req, res, next, "survey_report");
     }

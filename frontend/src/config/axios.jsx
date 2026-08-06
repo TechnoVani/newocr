@@ -133,6 +133,9 @@ export const submitPolicyData = async (file, formDataObject) => {
       if (formDataObject.vehicle.previousPolicyDocument instanceof File) {
         data.append('previous_policy', formDataObject.vehicle.previousPolicyDocument);
       }
+      if (formDataObject.vehicle.invoiceDocument instanceof File) {
+        data.append('invoice', formDataObject.vehicle.invoiceDocument);
+      }
       if (formDataObject.vehicle.surveyReport instanceof File) {
         data.append('survey_report', formDataObject.vehicle.surveyReport);
       }
