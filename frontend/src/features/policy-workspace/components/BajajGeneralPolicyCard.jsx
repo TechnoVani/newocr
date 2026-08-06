@@ -10,11 +10,18 @@ import { getProductType, getVehicleCategory } from "./PolicyClassification";
 
 const cleanValue = (value) => {
   if (!value) return "-";
-  return String(value).replace(/\s+/g, " ").replace(/[\n\r]+/g, " ").trim();
+  return String(value)
+    .replace(/([A-Za-z])-\s+([A-Za-z])/g, "$1$2")
+    .replace(/\s+/g, " ")
+    .replace(/[\n\r]+/g, " ")
+    .trim();
 };
 
 const cleanBajajInsuredName = (value) => {
-  const cleaned = cleanValue(value).replace(/\s+Insured\s*$/i, "").trim();
+  const cleaned = cleanValue(value)
+    .replace(/\s+Insured\s*$/i, "")
+    .replace(/\s*Zone\s*[A-Z]\s*$/i, "")
+    .trim();
   return cleaned || "-";
 };
 
@@ -28,9 +35,31 @@ const cleanAlphaNumeric = (val) => {
   return String(val).replace(/[^a-zA-Z0-9]/g, "").toUpperCase().trim();
 };
 
+const cleanPolicyCode = (val) => {
+  if (!val || val === "-") return "-";
+  return String(val).replace(/[^a-zA-Z0-9/-]/g, "").toUpperCase().trim();
+};
+
 const cleanAmount = (value) => {
   if (!value || value === "-") return "-";
   const cleaned = String(value).replace(/[,\s]/g, "");
+  return cleaned || "-";
+};
+
+const cleanBajajCommercialVariant = (value) => {
+  const cleaned = cleanValue(value)
+    .replace(/\(\s*/g, "(")
+    .replace(/\s*\)/g, ")")
+    .replace(/\)+$/g, ")")
+    .toUpperCase();
+  if (!cleaned || cleaned === "-") return "-";
+  if (/^SCHOOL\s*BUS\b/i.test(cleaned)) return "SCHOOL BUS";
+  return cleaned.replace(/\s*SCHOOL\s*BUS\s*\(\d+\+\d+\)\s*$/i, "").trim() || cleaned;
+};
+
+const normalizeBajajModel = (value) => {
+  const cleaned = cleanValue(value).toUpperCase();
+  if (cleaned === "TRAVEER") return "TRAVELLER";
   return cleaned || "-";
 };
 
@@ -54,6 +83,9 @@ const splitCompactBajajModelVariant = (modelVariant = "") => {
 };
 
 const extractBajajVehicleIdv = (text = "") => {
+  const commercialPackageIdvMatch = text.match(/(?:DIESEL|PETROL|CNG|EV|ELECTRIC|LPG|BATTERY)\s*(\d{1,3}(?:,\d{2})*,\d{3}|\d{4,8})(?=0{2,}[\d,]+\b|[\s\S]{0,80}?Current\s+Policy\s+Period)/i);
+  if (commercialPackageIdvMatch) return cleanAmount(commercialPackageIdvMatch[1]);
+
   const vehicleBlockMatch = text.match(/Engine\s+Number\s*Chassis\s+Number\s*Vehicle\s+IDV[\s\S]{0,260}?[A-Z0-9]{8,15}\s+\d?\s+[A-Z0-9]{8,15}\s+[A-Z0-9]{5,10}\s+([\d,]+(?:\.\d{2})?)/i);
   if (vehicleBlockMatch) return cleanAmount(vehicleBlockMatch[1]);
 
@@ -64,6 +96,128 @@ const extractBajajVehicleIdv = (text = "") => {
   return "-";
 };
 
+const extractBajajCommercialPackageVehicle = (text = "") => {
+  const result = {
+    registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
+    model: "-", variant: "-", manufacturingYear: "-",
+    cubicCapacity: "-", seatingCapacity: "-", financierName: "NA", fuelType: "-", idv: "-",
+    commercialVehicleType: "-", ncb: "0%"
+  };
+
+  const normalizedText = cleanValue(text).replace(/\u00a0/g, " ");
+  if (!/Commercial\s+Vehicle\s+Package\s+Policy/i.test(normalizedText)) return result;
+
+  const vehicleTypeMatch = normalizedText.match(/Vehicle\s+Type\s*([A-Za-z0-9\s:>&/-]+?)\s+Period\s+Of\s+Insurance/i);
+  if (vehicleTypeMatch?.[1]) result.commercialVehicleType = cleanValue(vehicleTypeMatch[1]);
+
+  const scheduleMatch = normalizedText.match(
+    /(?:Registration\s+Number\s+Vehicle\s+Make\s+Vehicle\s+SubType\s+Vehicle\s+Model[\s\S]*?Vehicle\s+Engine\s+Number|Registration\s+No\.\s+MakeSubTypeModelCC\/KWMfg\s+year\s+Seat\s+CapVehicle\/\s+Trailer\s+Chassis\s+No\s+Engine\s+Number)\s+([\s\S]{0,420}?)\s+Fuel\s+Type/i
+  );
+  const row = cleanValue(scheduleMatch?.[1] || "");
+  const compactRow = row.replace(/\s+/g, "").toUpperCase();
+  if (!compactRow) return result;
+
+  const spacedScheduleMatch = row.match(
+    /^(NEW|[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s+(FORCE\s+MOTORS|SML\s+ISUZU|EICHER|TATA|MAHINDRA|ASHOK\s+LEYLAND|MARUTI|HYUNDAI|BAJAJ)\s+(.+?)\s+(TRAVELLER|TRAVEER|SUPREME|STARLINE)\s+(\d+)\s+(20\d{2})\s+(\d{1,3})\s+([A-Z0-9]{4,})\s+([A-Z0-9]{4,})$/i
+  ) || row.match(
+    /^(NEW|[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s+(FORCE\s+MOTORS|SML\s+ISUZU|EICHER|TATA|MAHINDRA|ASHOK\s+LEYLAND|MARUTI|HYUNDAI|BAJAJ)\s+(SCHOOL\s*BUS\s*\(\s*\d+\s*\+\s*\d+\s*\)+)\s+([A-Z0-9.]+(?:\s+[A-Z])?)\s+(\d+)\s+(20\d{2})\s+(\d{1,3})\s+([A-Z0-9]{4,})\s+([A-Z0-9]{4,})$/i
+  );
+  if (spacedScheduleMatch) {
+    result.registrationNumber = spacedScheduleMatch[1].toUpperCase() === "NEW"
+      ? "NEW"
+      : cleanAlphaNumeric(spacedScheduleMatch[1]);
+    result.make = cleanValue(spacedScheduleMatch[2]).toUpperCase();
+    result.variant = cleanBajajCommercialVariant(spacedScheduleMatch[3]);
+    result.model = normalizeBajajModel(spacedScheduleMatch[4]);
+    result.cubicCapacity = spacedScheduleMatch[5];
+    result.manufacturingYear = spacedScheduleMatch[6];
+    result.seatingCapacity = spacedScheduleMatch[7];
+    result.chassisNumber = cleanAlphaNumeric(spacedScheduleMatch[8]);
+    result.engineNumber = cleanAlphaNumeric(spacedScheduleMatch[9]);
+
+    const fuelMatch = normalizedText.match(/Fuel\s+Type[\s\S]{0,80}?\b(DIESEL|PETROL|CNG|EV|ELECTRIC|LPG|BATTERY)\b/i);
+    if (fuelMatch) result.fuelType = fuelMatch[1].toUpperCase() === "BATTERY" ? "Electric" : fuelMatch[1].toUpperCase();
+
+    const idv = extractBajajVehicleIdv(normalizedText);
+    if (idv !== "-") result.idv = idv;
+
+    const vehicleTypeMatch = normalizedText.match(/Vehicle\s+Type\s*([A-Za-z0-9\s:>&/-]+?)\s+Period\s+Of\s+Insurance/i);
+    if (vehicleTypeMatch?.[1]) result.commercialVehicleType = cleanValue(vehicleTypeMatch[1]);
+
+    const ncbMatch = normalizedText.match(/No\s+Claim\s+Bonus\s*:?\s*(-?\d+%|NA)/i);
+    if (ncbMatch) result.ncb = ncbMatch[1].toUpperCase() === "NA" ? "0%" : ncbMatch[1];
+
+    const hypMatch = normalizedText.match(/HYPOTHECATED\s+WITH\s*:\s*([A-Z0-9 .&-]+?)(?=\s+Policy\s+Status|\s+\d+\.\s*Add\s+on|$)/i);
+    if (hypMatch) result.financierName = formatFinancierName(hypMatch[1]);
+
+    return result;
+  }
+
+  const regMatch = compactRow.match(/^(NEW|[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})/);
+  if (regMatch) result.registrationNumber = regMatch[1] === "NEW" ? "NEW" : cleanAlphaNumeric(regMatch[1]);
+
+  const knownMakes = [
+    { compact: "FORCEMOTORS", display: "FORCE MOTORS" },
+    { compact: "SMLISUZU", display: "SML ISUZU" },
+    { compact: "EICHER", display: "EICHER" },
+    { compact: "TATA", display: "TATA" },
+    { compact: "MAHINDRA", display: "MAHINDRA" },
+    { compact: "ASHOKLEYLAND", display: "ASHOK LEYLAND" },
+    { compact: "MARUTI", display: "MARUTI" },
+    { compact: "HYUNDAI", display: "HYUNDAI" },
+    { compact: "BAJAJ", display: "BAJAJ" }
+  ];
+  const afterRegistration = compactRow.slice(result.registrationNumber === "NEW" ? 3 : cleanAlphaNumeric(result.registrationNumber).length);
+  const make = knownMakes.find(item => afterRegistration.startsWith(item.compact));
+  if (make) result.make = make.display;
+
+  const seatMatch = row.match(/\((\d+\+\d+)\)/);
+  if (seatMatch) result.seatingCapacity = seatMatch[1];
+
+  const yearMatches = compactRow.match(/20\d{2}/g) || [];
+  const manufacturingYear = yearMatches.length ? yearMatches[yearMatches.length - 1] : "";
+  if (manufacturingYear) result.manufacturingYear = manufacturingYear;
+
+  const fuelMatch = normalizedText.match(/Fuel\s+Type[\s\S]{0,80}?\b(DIESEL|PETROL|CNG|EV|ELECTRIC|LPG|BATTERY)\b/i);
+  if (fuelMatch) result.fuelType = fuelMatch[1].toUpperCase() === "BATTERY" ? "Electric" : fuelMatch[1].toUpperCase();
+
+  const idv = extractBajajVehicleIdv(normalizedText);
+  if (idv !== "-") result.idv = idv;
+
+  const knownModels = ["TRAVELLER", "SUPREME", "STARLINE"];
+  const model = knownModels.find(item => compactRow.includes(item));
+  if (model) result.model = model;
+
+  const subtypeMatch = row.match(/(?:FORCE\s*MOTORS|SML\s*ISUZU|EICHER|TATA|MAHINDRA|ASHOK\s*LEYLAND|MARUTI|HYUNDAI|BAJAJ)\s*([A-Z0-9]+(?:\s+[A-Z0-9]+)?)\s*SCHOOL\s*BUS/i);
+  if (subtypeMatch?.[1]) {
+    result.variant = cleanBajajCommercialVariant(subtypeMatch[1]);
+  }
+
+  const ccKwMatch = model ? compactRow.match(new RegExp(`${model}(\\d+)(20\\d{2})`)) : null;
+  if (ccKwMatch?.[1]) result.cubicCapacity = ccKwMatch[1];
+
+  const possibleEngine = row.match(/\b([A-Z]{2,}\d[A-Z0-9]{6,})\s*$/i)?.[1] || "";
+  const engineNumber = possibleEngine && !knownModels.some(item => possibleEngine.toUpperCase().startsWith(item))
+    ? cleanAlphaNumeric(possibleEngine)
+    : "";
+  if (engineNumber) result.engineNumber = engineNumber;
+
+  const yearIndex = manufacturingYear ? compactRow.lastIndexOf(manufacturingYear) : -1;
+  let tailAfterYear = yearIndex >= 0 ? compactRow.slice(yearIndex + 4) : "";
+  const seatDigits = result.seatingCapacity !== "-" ? result.seatingCapacity.split("+")[0] : "";
+  if (seatDigits && tailAfterYear.startsWith(seatDigits)) tailAfterYear = tailAfterYear.slice(seatDigits.length);
+  if (engineNumber && tailAfterYear.endsWith(engineNumber)) tailAfterYear = tailAfterYear.slice(0, -engineNumber.length);
+  if (tailAfterYear.length >= 10) result.chassisNumber = cleanAlphaNumeric(tailAfterYear);
+
+  const ncbMatch = normalizedText.match(/No\s+Claim\s+Bonus\s*:?\s*(-?\d+%|NA)/i);
+  if (ncbMatch) result.ncb = ncbMatch[1].toUpperCase() === "NA" ? "0%" : ncbMatch[1];
+
+  const hypMatch = normalizedText.match(/HYPOTHECATED\s+WITH\s*:\s*([A-Z0-9 .&-]+?)(?=\s+Policy\s+Status|\s+\d+\.\s*Add\s+on|$)/i);
+  if (hypMatch) result.financierName = formatFinancierName(hypMatch[1]);
+
+  return result;
+};
+
 // =======================================
 // EXTRACTION FUNCTIONS
 // =======================================
@@ -72,9 +226,10 @@ const extractInsuranceCompany = (text = "") => "Bajaj General Insurance Limited"
 
 const extractPolicyNumber = (text = "") => {
   let m = text.match(/Policy\s*Number\s*[']?\s*([A-Z0-9-]+)/i);
+  if (!m) m = text.match(/Policy\s*Number\s*([A-Z]{2}-\d{2}-\d{4}-\d{4}-\d{8})\s*Product/i);
   if (!m) m = text.match(/Policy\s+No\s*\.?\s*[:\-]?\s*([A-Z0-9-]+)/i);
   if (!m) m = text.match(/OG-\d{2}-\d{4}-\d{4}-\d+/i);
-  return m ? m[1].replace(/[']/g, '') : "-";
+  return m ? (m[1] || m[0]).replace(/[']/g, '') : "-";
 };
 
 const extractBranchAddress = (text = "") => {
@@ -106,11 +261,21 @@ const extractInsuredDetails = (text = "") => {
   const scheduleNameMatch = text.match(/Insured\s+Name\s*[:\-]?\s*(.+?)(?=\s*Address|Application\s+No|Policy\s+Number)/is);
   if (result.insuredName === "-" && scheduleNameMatch) result.insuredName = cleanBajajInsuredName(scheduleNameMatch[1]);
 
+  const compactScheduleNameMatch = text.match(/Insured\s+Name\s*([A-Za-z][A-Za-z\s.]+?)\s*Zone[A-Z]\b/i);
+  if (result.insuredName === "-" && compactScheduleNameMatch) {
+    result.insuredName = cleanBajajInsuredName(compactScheduleNameMatch[1]);
+  }
+
   const nameMatch = text.match(/1\.\s*Proposer\s*Name\s*[:]\s*(.+?)(?=\s*2\.\s*Proposer\s*Address)/is);
   if (result.insuredName === "-" && nameMatch) result.insuredName = cleanBajajInsuredName(nameMatch[1]);
 
   const scheduleAddrMatch = text.match(/Insured\s+Name\s*[:\-]?.+?Address\s*[:\-]?\s*([\s\S]+?)(?=Application\s+No|Policy\s+Number|Policy\s+Issued|Geographical\s+Area)/i);
   if (result.insuredAddress === "-" && scheduleAddrMatch) result.insuredAddress = cleanValue(scheduleAddrMatch[1]).replace(/\s*,\s*,/g, ",");
+
+  const compactScheduleAddressMatch = text.match(/Insured\s+Address\s*([\s\S]+?)\s*Customer\s+ID/i);
+  if (result.insuredAddress === "-" && compactScheduleAddressMatch) {
+    result.insuredAddress = cleanValue(compactScheduleAddressMatch[1]).replace(/\s*,\s*,/g, ",");
+  }
 
   const addrMatch = text.match(/2\.\s*Proposer\s*Address\s*[:]\s*(.+?)(?=\s*3\.\s*Proposer\s*Mobile\s*Number)/is);
   if (result.insuredAddress === "-" && addrMatch) result.insuredAddress = addrMatch[1].replace(/\s+/g, " ").trim();
@@ -165,7 +330,7 @@ const extractPreviousPolicyData = (text = "") => {
   const polMatch = text.match(/Previous Policy No\s*-\s*([0-9A-Z\/\-]+)/i) ||
                    text.match(/Previous\s+Policy\s+No\s*[:\-]?\s*([0-9A-Z\/\-\s]+?)(?=\s*Previous\s+Policy\s+Expiry|$)/i) ||
                    text.match(/Previous\s+Policy\s+Expiry\s+Date\s+Previous\s+Policy\s+No\s+Insurance\s+Provider\s+\d{2}\/\d{2}\/\d{4}\s+([0-9A-Z\s]+?)\s+[A-Z][a-z]+/i);
-  if (polMatch) result.previousPolicyNumber = cleanAlphaNumeric(polMatch[1]);
+  if (polMatch) result.previousPolicyNumber = cleanPolicyCode(polMatch[1]);
 
   const previousRowMatch = text.match(/Previous\s+Policy\s+Expiry\s+Date\s+Previous\s+Policy\s+No\s+Insurance\s+Provider\s+\d{2}\/\d{2}\/\d{4}\s+[0-9A-Z\s]+?\s+([A-Z][A-Za-z\s]+?Limited)/i);
   if (previousRowMatch) result.previousInsurer = cleanValue(previousRowMatch[1]);
@@ -173,7 +338,7 @@ const extractPreviousPolicyData = (text = "") => {
   const transcriptPreviousMatch = text.match(/Insurance\s+Provider\s+ii\.\s+Previous\s+Policy\s+No\s+iii\.\s+Previous\s+Policy\s+Expiry\s+Date\s+([A-Z][A-Za-z\s]+?Limited)\s+([0-9\s]+)\s+\d{2}\/\d{2}\/\d{4}/i);
   if (transcriptPreviousMatch) {
     result.previousInsurer = cleanValue(transcriptPreviousMatch[1]);
-    result.previousPolicyNumber = cleanAlphaNumeric(transcriptPreviousMatch[2]);
+    result.previousPolicyNumber = cleanPolicyCode(transcriptPreviousMatch[2]);
   }
   return result;
 };
@@ -320,8 +485,46 @@ const extractVehicleDetailsFromText = (text = "") => {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-",
     model: "-", variant: "-", manufacturingYear: "-",
     cubicCapacity: "-", seatingCapacity: "-", financierName: "NA", fuelType: "-", idv: "-",
-    ncb: "0%" 
+    commercialVehicleType: "-", ncb: "0%"
   };
+
+  const normalizedText = String(text || "")
+    .replace(/\r/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\t/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ ]{2,}/g, " ")
+    .trim();
+
+  // =======================================================
+  // BAJAJ COMMERCIAL VEHICLE PACKAGE SCHEDULE FORMAT
+  // =======================================================
+  if (/Commercial\s+Vehicle\s+Package\s+Policy/i.test(normalizedText)) {
+    const vehicleTypeMatch = normalizedText.match(/Vehicle\s+Type\s*([A-Za-z0-9\s:>&/-]+?)\s+Period\s+Of\s+Insurance/i);
+    if (vehicleTypeMatch?.[1]) {
+      result.commercialVehicleType = cleanValue(vehicleTypeMatch[1]);
+    }
+
+    const commercialPackageVehicleMatch = normalizedText.match(
+      /(?:Registration\s+Number\s+Vehicle\s+Make\s+Vehicle\s+SubType\s+Vehicle\s+Model[\s\S]{0,260}|Registration\s+No\.\s+MakeSubTypeModel[\s\S]{0,260})\s+([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s*(\d?)\s*(TATA|MAHINDRA|EICHER|ASHOK\s+LEYLAND|MARUTI|HYUNDAI|BAJAJ)\s*(STARBUS\s+STAFF\s+BUS\s*\(\s*\d{1,3}\s*\+\s*1\s*\)|SCHOOL\s+BUS\s*\(\s*\d{1,3}\s*\+\s*1\s*\))\s+([A-Z0-9.]+(?:\s+[A-Z0-9.]+)?)\s*(0?)\s*(20\d{2})\s*(\d{1,3})\s*(\d{5})\s*(\d{5})\s+Fuel\s+Type/i
+    );
+
+    if (commercialPackageVehicleMatch) {
+      result.registrationNumber = cleanAlphaNumeric(`${commercialPackageVehicleMatch[1]}${commercialPackageVehicleMatch[2]}`);
+      result.make = cleanValue(commercialPackageVehicleMatch[3]).toUpperCase();
+      result.variant = cleanValue(commercialPackageVehicleMatch[4]).toUpperCase();
+      const rawModel = cleanValue(commercialPackageVehicleMatch[5]).toUpperCase();
+      const gluedCcMatch = rawModel.match(/^(.+?)0$/);
+      result.model = gluedCcMatch && !commercialPackageVehicleMatch[6]
+        ? cleanValue(gluedCcMatch[1]).toUpperCase()
+        : rawModel;
+      result.cubicCapacity = commercialPackageVehicleMatch[6] || (gluedCcMatch ? "0" : "-");
+      result.manufacturingYear = commercialPackageVehicleMatch[7];
+      result.seatingCapacity = commercialPackageVehicleMatch[8];
+      result.chassisNumber = cleanAlphaNumeric(commercialPackageVehicleMatch[9]);
+      result.engineNumber = cleanAlphaNumeric(commercialPackageVehicleMatch[10]);
+    }
+  }
 
   // =======================================================
   // BAJAJ COMMERCIAL LIABILITY ONLY FORMAT
@@ -527,6 +730,11 @@ const extractVehicleDetailsFromText = (text = "") => {
   if (ncbMatch) {
     result.ncb = ncbMatch[1];
   }
+
+  const pdfScheduleVehicle = extractBajajCommercialPackageVehicle(text);
+  Object.entries(pdfScheduleVehicle).forEach(([key, value]) => {
+    if (value && value !== "-" && value !== "NA") result[key] = value;
+  });
   
   return result;
 };

@@ -22,6 +22,14 @@ const sanitizeValue = (value, fallback = "-") => {
   return String(value).trim();
 };
 
+const preferValue = (...values) => {
+  for (const value of values) {
+    const cleaned = String(value ?? "").trim();
+    if (cleaned && cleaned !== "-") return cleaned;
+  }
+  return "";
+};
+
 const cleanAmount = (value) => String(value || "").replace(/,/g, "").trim();
 
 const sumNumbers = (...values) =>
@@ -245,8 +253,8 @@ const extractPremiumData = (fullText = "") => {
     if (premSum) result.netPremium = premSum[1];
   }
 
-  const cgstMatch = text.match(/CGST\s*([\d,.]+)/i);
-  const sgstMatch = text.match(/SGST\/UTGST\s*([\d,.]+)/i);
+  const cgstMatch = text.match(/CGST\s*(?:\d+(?:\.\d+)?%)?\s*([\d,.]+)/i);
+  const sgstMatch = text.match(/SGST\/UTGST\s*(?:\d+(?:\.\d+)?%)?\s*([\d,.]+)/i);
   if (cgstMatch || sgstMatch) {
     result.gst = sumNumbers(cgstMatch?.[1], sgstMatch?.[1]).toFixed(2);
   } else {
@@ -265,7 +273,7 @@ const extractVehicleDetails = (fullText = "") => {
   const result = {
     registrationNumber: "-", chassisNumber: "-", engineNumber: "-", make: "-", model: "-",
     variant: "-", gvw: "-", manufacturingYear: "-", fuelType: "-", cubicCapacity: "-", 
-    seatingCapacity: "-", financierName: "-", ncb: "0%"
+    seatingCapacity: "-", financierName: "-", commercialVehicleType: "-", ncb: "0%"
   };
   
   if (!fullText) return result;
@@ -313,8 +321,29 @@ const extractVehicleDetails = (fullText = "") => {
     }
   }
 
+  const shriramPccvVehicleMatch = text.match(
+    /([A-Z]{2})\s*-\s*(\d{2})\s*-\s*([A-Z]{1,3})\s*-\s*(\d{3,4})\s*&\s*([A-Z]+)[\s\S]{0,40}?([A-Z0-9]{10,})\s*&\s*([A-Z0-9]{10,})\s+([A-Z][A-Z\s]+?)\s*-\s*([A-Z0-9][A-Z0-9\s.]*?)\s+(SEDAN|MOTOR\s*CAB|MAXI\s*CAB|OMNI\s*BUS|STATION\s*WAGON|CAR|JEEP)\s*\/\s*([A-Z]+)\s*(\d+(?:\.\d+)?)\s*\/\s*\d+(?:\.\d+)?\s*\/\s*(\d{4})\s*(\d{2}\/\d{2}\/\d{4})\s*(\d+\s*\+\s*\d+)/i
+  );
+
+  if (shriramPccvVehicleMatch) {
+    result.registrationNumber = `${shriramPccvVehicleMatch[1]}${shriramPccvVehicleMatch[2]}${shriramPccvVehicleMatch[3]}${shriramPccvVehicleMatch[4]}`;
+    result.engineNumber = shriramPccvVehicleMatch[6].trim();
+    result.chassisNumber = shriramPccvVehicleMatch[7].trim();
+    result.make = shriramPccvVehicleMatch[8].replace(/\s+/g, " ").trim();
+
+    const modelVariant = shriramPccvVehicleMatch[9].replace(/\s+/g, " ").trim();
+    const modelParts = modelVariant.split(" ");
+    result.model = modelParts[0] || "-";
+    result.variant = modelParts.slice(1).join(" ").trim() || "-";
+
+    result.fuelType = shriramPccvVehicleMatch[11].trim();
+    result.cubicCapacity = String(Math.round(parseFloat(shriramPccvVehicleMatch[12])) || shriramPccvVehicleMatch[12]).trim();
+    result.manufacturingYear = shriramPccvVehicleMatch[13].trim();
+    result.seatingCapacity = shriramPccvVehicleMatch[15].replace(/\s+/g, " ").trim();
+  }
+
   const bodyFuelMatch = text.match(
-    /\b(SCOOTY|SCOOTER|MOTOR\s*CYCLE|MOTORCYCLE|MOPED|CAR|JEEP|GOODS\s*CARRIER|THREE\s*WHEELER|TRACTOR|BUS)\s*\/\s*([A-Z]+)\s*(?=\d+\s*\/\s*\d+(?:\.\d+)?\s*\/\s*\d{4})/i
+    /\b(SCOOTY|SCOOTER|MOTOR\s*CYCLE|MOTORCYCLE|MOPED|SEDAN|CAR|JEEP|GOODS\s*CARRIER|THREE\s*WHEELER|TRACTOR|BUS)\s*\/\s*([A-Z]+)\s*(?=\d+\s*\/\s*\d+(?:\.\d+)?\s*\/\s*\d{4})/i
   );
   if (bodyFuelMatch) {
     result.fuelType = bodyFuelMatch[2].replace(/\s+/g, " ").trim();
@@ -337,6 +366,17 @@ const extractVehicleDetails = (fullText = "") => {
 
   result.financierName = "N/A";
   result.gvw = "-";
+
+  const financierMatch =
+    text.match(/HYPOTHECATION\s+AGREEMENT\s+WITH\s*:\s*([A-Z0-9 .,&'-]+?)(?=HIRE\s+PURCHASE|LEASE\s+AGREEMENT|AGREEMENT\s+NUMBER|LIMIT\s+OF\s+LIABILITY|$)/i) ||
+    text.match(/HYPOTHECATION\s*:\s*([A-Z0-9 .,&'-]+?)(?=COMMERCIAL\s+VEHICLE|MOTOR\s+VEHICLE|$)/i);
+  if (financierMatch?.[1]) {
+    result.financierName = financierMatch[1].replace(/\s+/g, " ").trim();
+  }
+
+  if (/PCCV-4\s*WHEELERS[\s\S]{0,80}CAPACITY\s*NOT\s*>\s*6|CARRYING\s+PASSENGERS[\s\S]{0,80}CAPACITY\s*NOT\s*>\s*6/i.test(text)) {
+    result.commercialVehicleType = "Taxi upto 6 pass";
+  }
 
   const ncbPatterns = [
     // Added '%' inside the brackets [\s:\-%]* so it safely reads "No Claim Bonus %   0%"
@@ -383,12 +423,12 @@ function ShriramPolicyCard({ item }) {
   const vehicle = item?.vehicleDetails || {};
   const premium = item?.premiumDetails || {};
 
-  const insuredName = insured?.insuredName || insuredDetails?.insuredName || "";
-  const insuredAddress = insured?.insuredAddress || insuredDetails?.insuredAddress || "";
-  const panNumber = insured?.panNumber || insuredDetails?.panNumber || "";
-  const contactNumber = insured?.contactNumber || insuredDetails?.contactNumber || "";
-  const email = insured?.email || insuredDetails?.email || "";
-  const gstin = insured?.gstin || insuredDetails?.gstin || "";
+  const insuredName = preferValue(insured?.insuredName, insuredDetails?.insuredName);
+  const insuredAddress = preferValue(insured?.insuredAddress, insuredDetails?.insuredAddress);
+  const panNumber = preferValue(insured?.panNumber, insuredDetails?.panNumber);
+  const contactNumber = preferValue(insured?.contactNumber, insuredDetails?.contactNumber);
+  const email = preferValue(insured?.email, insuredDetails?.email);
+  const gstin = preferValue(insured?.gstin, insuredDetails?.gstin);
 
   const policyNumber = policy?.policyNumber || item?.fullText?.match(/Policy\s*No\.?\s*[:.]?\s*([\d/]+)/i)?.[1] || "-";
 
@@ -404,19 +444,20 @@ function ShriramPolicyCard({ item }) {
 
   // ✅ ADDED `ncb` HERE SO IT PASSED TO POLICYCARDVIEW
   const mergedVehicle = {
-    registrationNumber: vehicle?.registrationNumber || vehicleDetails?.registrationNumber || "-",
-    chassisNumber: vehicle?.chassisNumber || vehicleDetails?.chassisNumber || "-",
-    engineNumber: vehicle?.engineNumber || vehicleDetails?.engineNumber || "-",
-    make: vehicle?.make || vehicleDetails?.make || "-",
-    model: vehicle?.model || vehicleDetails?.model || "-",
-    variant: vehicle?.variant || vehicleDetails?.variant || "-",
-    gvw: vehicle?.gvw || vehicleDetails?.gvw || "-",
-    manufacturingYear: vehicle?.manufacturingYear || vehicleDetails?.manufacturingYear || "-",
-    fuelType: vehicle?.fuelType || vehicleDetails?.fuelType || "-",
-    cubicCapacity: vehicle?.cubicCapacity || vehicleDetails?.cubicCapacity || "-",
-    seatingCapacity: vehicle?.seatingCapacity || vehicleDetails?.seatingCapacity || "-",
-    financierName: vehicle?.financierName || vehicleDetails?.financierName || "-",
-    ncb: vehicle?.ncb || vehicleDetails?.ncb || "0%",
+    registrationNumber: preferValue(vehicle?.registrationNumber, vehicleDetails?.registrationNumber) || "-",
+    chassisNumber: preferValue(vehicle?.chassisNumber, vehicleDetails?.chassisNumber) || "-",
+    engineNumber: preferValue(vehicle?.engineNumber, vehicleDetails?.engineNumber) || "-",
+    make: preferValue(vehicle?.make, vehicleDetails?.make) || "-",
+    model: preferValue(vehicle?.model, vehicleDetails?.model) || "-",
+    variant: preferValue(vehicle?.variant, vehicleDetails?.variant) || "-",
+    gvw: preferValue(vehicle?.gvw, vehicleDetails?.gvw) || "-",
+    manufacturingYear: preferValue(vehicle?.manufacturingYear, vehicleDetails?.manufacturingYear) || "-",
+    fuelType: preferValue(vehicle?.fuelType, vehicleDetails?.fuelType) || "-",
+    cubicCapacity: preferValue(vehicle?.cubicCapacity, vehicleDetails?.cubicCapacity) || "-",
+    seatingCapacity: preferValue(vehicle?.seatingCapacity, vehicleDetails?.seatingCapacity) || "-",
+    financierName: preferValue(vehicle?.financierName, vehicleDetails?.financierName) || "-",
+    commercialVehicleType: preferValue(vehicle?.commercialVehicleType, vehicleDetails?.commercialVehicleType) || "-",
+    ncb: preferValue(vehicle?.ncb, vehicleDetails?.ncb) || "0%",
   };
 
   // Build sanitized objects for PolicyCardView
