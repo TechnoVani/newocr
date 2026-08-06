@@ -11,12 +11,14 @@ const DOCUMENT_FIELDS = [
     "rcFrontDocument",
     "rcBackDocument",
     "previousPolicyDocument",
+    "invoiceDocument",
     "surveyReportDocument",
     "gstCertificateDocument"
 ];
 
 const RC_REQUIRED_BUSINESS_TYPES = new Set(["Rollover", "BreakIN", "NIB Renewal", "Renewal"]);
 const PREVIOUS_POLICY_REQUIRED_BUSINESS_TYPES = new Set(["Rollover", "NIB Renewal", "Renewal"]);
+const INVOICE_REQUIRED_BUSINESS_TYPES = new Set(["New"]);
 
 export const validateDocuments = (data) => {
     if (!data.pdfDocument?.buffer) {
@@ -58,6 +60,15 @@ export const validateDocuments = (data) => {
         !data.previousPolicyDocument?.buffer
     ) {
         const error = new Error(`Previous Policy document is required for ${businessType}`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (
+        INVOICE_REQUIRED_BUSINESS_TYPES.has(businessType) &&
+        !data.invoiceDocument?.buffer
+    ) {
+        const error = new Error(`Invoice document is required for ${businessType}`);
         error.statusCode = 400;
         throw error;
     }
@@ -149,6 +160,9 @@ const storePolicyDocuments = async (data, folderPath, policyNumber) => {
     }
     if (data.previousPolicyDocument) {
         stored.previousPolicy = await FolderService.storeBuffer(data.previousPolicyDocument, folderPath, "previous_policy");
+    }
+    if (data.invoiceDocument) {
+        stored.invoice = await FolderService.storeBuffer(data.invoiceDocument, folderPath, "invoice");
     }
     if (data.surveyReportDocument) {
         stored.surveyReport = await FolderService.storeBuffer(data.surveyReportDocument, folderPath, "survey_report");
@@ -299,6 +313,10 @@ class PoliciesMotorService {
 
         if (data.previousPolicyDocument) {
             await FolderService.storeBuffer(data.previousPolicyDocument, folderPath, "previous_policy");
+        }
+
+        if (data.invoiceDocument) {
+            await FolderService.storeBuffer(data.invoiceDocument, folderPath, "invoice");
         }
 
         if (data.surveyReportDocument) {

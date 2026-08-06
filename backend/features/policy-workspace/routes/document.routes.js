@@ -59,6 +59,7 @@ router.get("/rc/:id", DocumentController.rc);
 router.get("/rc-front/:id", DocumentController.rcFront);
 router.get("/rc-back/:id", DocumentController.rcBack);
 router.get("/previous-policy/:id", DocumentController.previousPolicy);
+router.get("/invoice/:id", DocumentController.invoice);
 router.get("/survey-report/:id", DocumentController.surveyReport);
 router.get("/gst-certificate/:id", DocumentController.gstCertificate);
 

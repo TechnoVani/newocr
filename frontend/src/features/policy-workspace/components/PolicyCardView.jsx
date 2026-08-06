@@ -114,6 +114,7 @@ const getPremiumValue = (value) => {
 
 const RC_REQUIRED_BUSINESS_TYPES = new Set(["Rollover", "BreakIN", "NIB Renewal", "Renewal"]);
 const PREVIOUS_POLICY_REQUIRED_BUSINESS_TYPES = new Set(["Rollover", "NIB Renewal", "Renewal"]);
+const INVOICE_REQUIRED_BUSINESS_TYPES = new Set(["New"]);
 
 // ============================================
 // 🔥 SEATING CAPACITY PARSER HELPER
@@ -505,6 +506,7 @@ function PolicyCardView({
       rcFrontDocument: null,
       rcBackDocument: null,
       previousPolicyDocument: null,
+      invoiceDocument: null,
       surveyReport: null,
       gstCertificate: null,
     }
@@ -549,6 +551,7 @@ function PolicyCardView({
         rcFrontDocument: null,
         rcBackDocument: null,
         previousPolicyDocument: null,
+        invoiceDocument: null,
         surveyReport: null,
         gstCertificate: null,
       }
@@ -686,6 +689,7 @@ function PolicyCardView({
   const hasRcFrontDocument = mergedVehicle.rcFrontDocument instanceof File;
   const hasRcBackDocument = mergedVehicle.rcBackDocument instanceof File;
   const hasPreviousPolicy = mergedVehicle.previousPolicyDocument instanceof File;
+  const hasInvoiceDocument = mergedVehicle.invoiceDocument instanceof File;
 
   if (
     RC_REQUIRED_BUSINESS_TYPES.has(businessType) &&
@@ -696,6 +700,10 @@ function PolicyCardView({
   }
   if (PREVIOUS_POLICY_REQUIRED_BUSINESS_TYPES.has(businessType) && !hasPreviousPolicy) {
     toast.error(`Previous Policy document is required for ${businessType}.`);
+    return;
+  }
+  if (INVOICE_REQUIRED_BUSINESS_TYPES.has(businessType) && !hasInvoiceDocument) {
+    toast.error(`Invoice document is required for ${businessType}.`);
     return;
   }
   try {
@@ -742,6 +750,7 @@ function PolicyCardView({
     rcFrontDocument: formData.vehicle.rcFrontDocument,
     rcBackDocument: formData.vehicle.rcBackDocument,
     previousPolicyDocument: formData.vehicle.previousPolicyDocument,
+    invoiceDocument: formData.vehicle.invoiceDocument,
     surveyReport: formData.vehicle.surveyReport,
     gstCertificate: formData.vehicle.gstCertificate,
     ncb: formData.vehicle?.ncb ?? extractedVehicle?.ncb ?? "",
@@ -971,6 +980,14 @@ function PolicyCardView({
                   label="Previous Policy *"
                   value={mergedVehicle.previousPolicyDocument}
                   onChange={(file) => handleVehicleChange("previousPolicyDocument", file)}
+                  type="file"
+                />
+              )}
+              {INVOICE_REQUIRED_BUSINESS_TYPES.has(resolvedMotorFormData.businessType) && (
+                <EditableRow
+                  label="Invoice *"
+                  value={mergedVehicle.invoiceDocument}
+                  onChange={(file) => handleVehicleChange("invoiceDocument", file)}
                   type="file"
                 />
               )}

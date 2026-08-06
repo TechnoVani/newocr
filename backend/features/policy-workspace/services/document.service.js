@@ -12,6 +12,7 @@ const DOCUMENT_BASENAMES = Object.freeze({
     rc_front: () => "rc_front",
     rc_back: () => "rc_back",
     previous_policy: () => "previous_policy",
+    invoice: () => "invoice",
     survey_report: () => "survey_report",
     gst_certificate: () => "gst_certificate"
 });

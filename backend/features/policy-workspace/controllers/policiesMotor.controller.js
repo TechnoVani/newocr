@@ -212,6 +212,9 @@ function attachUploadedDocuments(data, files = {}) {
     const previousPolicy = files.previous_policy?.[0];
     if (previousPolicy) data.previousPolicyDocument = previousPolicy;
 
+    const invoice = files.invoice?.[0];
+    if (invoice) data.invoiceDocument = invoice;
+
     const surveyReport = files.survey_report?.[0];
     if (surveyReport) data.surveyReportDocument = surveyReport;
 
