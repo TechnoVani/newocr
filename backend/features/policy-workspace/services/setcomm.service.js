@@ -60,8 +60,18 @@ class SetCommService {
             commissionFields.map(field => [field, data[field]])
         );
         await SetCommModel.update(id, commissionData, readScope);
+        const updatedRecord = await SetCommModel.findById(id, readScope);
+        const persisted = commissionFields.every(field =>
+            Number(updatedRecord?.[field] ?? 0).toFixed(2) === Number(commissionData[field] ?? 0).toFixed(2)
+        );
+        if (!persisted) {
+            const error = new Error("Policy commission could not be saved in database");
+            error.statusCode = 409;
+            throw error;
+        }
         return {
-            message: "Policy commission updated successfully"
+            message: "Policy commission updated successfully",
+            record: updatedRecord
         };
     }
 
