@@ -2674,12 +2674,23 @@ const extractPremiumData = (text = "") => {
   const extractVal = (regex) => text.match(regex)?.[1]?.replace(/,/g, "") || "";
 
   result.totalOdPremium = extractVal(/Total Own Damage Premium\(A\)\s*\n?\s*([\d,]+\.?\d*)/i) || "0";
-  result.totalTpPremium = extractVal(/Total Liability Premium\s*\(B\)\s*`?\s*([\d,]+\.?\d*)/i) || "0";
+  result.totalTpPremium =
+    extractVal(/Total Liability Premium\s*\(B\)\s*`?\s*([\d,]+\.?\d*)/i) ||
+    extractVal(/Total Liability Premium\s*([\d,]+\.?\d*)/i) ||
+    "0";
   
   result.netPremium = extractVal(/Total Package Premium\s*\(A\+B\)\s*:?\s*([\d,]+\.?\d*)/i) || 
                       extractVal(/Total Premium\s*:?\s*`?\s*([\d,]+\.?\d*)/i) || 
                       extractVal(/Total Own Damage Premium\(A\) \s*:?\s*`?\s*([\d,]+\.?\d*)/i) || 
                       extractVal(/Total Premium Payable In\s+`\s*([\d,]+\.?\d*)/i);
+
+  if (
+    /Premium\s+Details\s+LIABILITY/i.test(text) &&
+    result.totalTpPremium !== "0" &&
+    result.totalOdPremium === "0"
+  ) {
+    result.netPremium = result.totalTpPremium;
+  }
 
   if (!result.netPremium || result.netPremium === "0") {
     const od = parseFloat(result.totalOdPremium) || 0;
@@ -2707,6 +2718,46 @@ const extractPremiumData = (text = "") => {
   result.totalPayable = extractVal(/Total Premium Payable In\s+\D*([\d,]+\.?\d*)/i) || extractVal(/Total Premium Payable\s*:?\s*\D*([\d,]+\.?\d*)/i) || "0";
   
   return result;
+};
+
+const extractICICIProductType = (policyType = "", fullText = "") => {
+  const currentTitleMatch = String(fullText || "").match(
+    /CERTIFICATE\s+OF\s+INSURANCE\s+CUM\s+POLICY\s+SCHEDULE[\s\S]{0,120}?([A-Z][A-Z\s/+-]*?(?:LIABILITY|PACKAGE|BUNDLED|OWN\s+DAMAGE|STANDALONE)[A-Z\s/+-]*?POLICY)/i
+  );
+  const currentTitle = currentTitleMatch?.[1]?.replace(/\s+/g, " ").trim() || "";
+
+  if (/liability/i.test(currentTitle)) return "Liability Policy";
+  if (/stand\s*alone|standalone|own\s+damage/i.test(currentTitle)) return "Standalone OD Policy";
+  if (/bundled/i.test(currentTitle)) return "Bundled Policy";
+  if (/package|comprehensive/i.test(currentTitle)) return "Package Policy";
+
+  if (
+    /Premium\s+Details\s+LIABILITY/i.test(fullText) &&
+    /Total\s+Liability\s+Premium/i.test(fullText) &&
+    !/Total\s+Own\s+Damage\s+Premium/i.test(fullText)
+  ) {
+    return "Liability Policy";
+  }
+
+  return sanitizeClassificationValue(getProductType(policyType, fullText));
+};
+
+const sanitizeClassificationValue = (value) => {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "string" && value.trim() === "") return "-";
+  return value;
+};
+
+const extractICICIVehicleCategory = (policyType = "", fullText = "") => {
+  if (
+    /C1\(B\)\s*-\s*3\s*WHEELED\s+VEHICLE/i.test(fullText) ||
+    /AUTO\s+RICKSHAW/i.test(fullText) ||
+    /Passenger\s+Carrying\s+Vehicles?\s+Liability\s+Policy/i.test(fullText)
+  ) {
+    return "Commercial Vehicle";
+  }
+
+  return sanitizeClassificationValue(getVehicleCategory(policyType, fullText));
 };
 
 // =======================================
@@ -2767,6 +2818,36 @@ const extractVehicleDetailsFromText = (text = "") => {
       .trim();
 
     return cleaned || "-";
+  };
+
+  const cleanEngineNumber = (value = "") => {
+    const cleaned = String(value || "")
+      .replace(/\s+/g, "")
+      .replace(/[^A-Z0-9./-]/gi, "")
+      .toUpperCase()
+      .trim();
+
+    return cleaned || "-";
+  };
+
+  const preferLongerEngineNumber = (currentValue, nextValue) => {
+    const currentEngine = cleanEngineNumber(currentValue);
+    const nextEngine = cleanEngineNumber(nextValue);
+
+    if (nextEngine === "-") return currentEngine;
+    if (currentEngine === "-" || nextEngine.length > currentEngine.length) return nextEngine;
+    return currentEngine;
+  };
+
+  const completeWrappedEngineNumber = (engineValue) => {
+    const engine = cleanEngineNumber(engineValue);
+    if (engine === "-") return "-";
+
+    const wrappedMatch = normalizedText.match(
+      new RegExp(`${engine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+(\\d{2,4})\\s+Premium\\s+Details`, "i")
+    );
+
+    return wrappedMatch?.[1] ? cleanEngineNumber(`${engine}${wrappedMatch[1]}`) : engine;
   };
 
   const cleanIdv = (value = "") => {
@@ -2843,7 +2924,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.manufacturingYear = newTwoWheelerTableMatch[7];
     result.seatingCapacity = newTwoWheelerTableMatch[8];
     result.chassisNumber = `${newTwoWheelerTableMatch[9]}${newTwoWheelerTableMatch[10]}`.replace(/\s+/g, "");
-    result.engineNumber = newTwoWheelerTableMatch[11].replace(/\s+/g, "");
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, newTwoWheelerTableMatch[11]);
   }
 
   // ============================================================
@@ -2862,9 +2943,29 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.manufacturingYear = schoolBusTableMatch[8];
     result.seatingCapacity = schoolBusTableMatch[9];
     result.chassisNumber = `${schoolBusTableMatch[11]}${schoolBusTableMatch[12]}`.replace(/\s+/g, "");
-    result.engineNumber = schoolBusTableMatch[13].replace(/\s+/g, "");
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, schoolBusTableMatch[13]);
     result.idv = cleanIdv(schoolBusTableMatch[14]);
     result.commercialVehicleType = "SCHOOL BUS";
+  }
+
+  // ============================================================
+  // ICICI C1(B) PASSENGER-CARRYING 3 WHEELER LIABILITY LAYOUT
+  // ============================================================
+  const passengerThreeWheelerMatch = normalizedText.match(
+    /Vehicle\s+Registration\s+No\.?\s*MakeVehicle\s+SubClassModelModel\s+Build\s+([A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4})\s*([A-Z][A-Z0-9\s&.-]+?)\s+C1\(B\)\s*-\s*3\s*WHEELED\s+VEHICLE[\s\S]{0,220}?PASSENGER\s+([A-Z0-9][A-Z0-9\s.-]+?)\s+(FULLY\s+BUILT|SEMI\s+BUILT|BUILT)\s+Type\s+of\s+BodyCCMfg\s+YrSeating\s+CapacityCarrying\s+CapacityChassis\s+No\.?Engine\s+No\.?\s+(Open|Closed|Saloon|Hatch\s*Back|Sedan|SUV|MUV)\s*(\d{2,5})(19\d{2}|20\d{2})(\d{1,2})(\d{1,2})([A-Z0-9]{12,25})\s+([A-Z0-9\s]{5,25})\s+Premium\s+Details/i
+  );
+
+  if (passengerThreeWheelerMatch) {
+    result.registrationNumber = cleanRegistrationNumber(passengerThreeWheelerMatch[1]);
+    result.make = cleanValue(passengerThreeWheelerMatch[2]);
+    result.model = cleanValue(passengerThreeWheelerMatch[3]);
+    result.variant = cleanValue(passengerThreeWheelerMatch[4]);
+    result.cubicCapacity = passengerThreeWheelerMatch[6];
+    result.manufacturingYear = passengerThreeWheelerMatch[7];
+    result.seatingCapacity = passengerThreeWheelerMatch[8];
+    result.chassisNumber = passengerThreeWheelerMatch[10].replace(/\s+/g, "");
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, passengerThreeWheelerMatch[11]);
+    result.commercialVehicleType = "Three Wheeler - PCV - UPTO 6 PASS";
   }
 
   // ============================================================
@@ -2883,7 +2984,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     result.manufacturingYear = commercialBusTableMatch[7];
     result.seatingCapacity = commercialBusTableMatch[8];
     result.chassisNumber = `${commercialBusTableMatch[9]}${commercialBusTableMatch[10]}`.replace(/\s+/g, "");
-    result.engineNumber = commercialBusTableMatch[11].replace(/\s+/g, "");
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, commercialBusTableMatch[11]);
     result.idv = cleanIdv(commercialBusTableMatch[12]);
   }
 
@@ -2977,7 +3078,7 @@ const extractVehicleDetailsFromText = (text = "") => {
       result.manufacturingYear = raRowMatch[2];
     }
 
-    result.engineNumber = cleanValue(raRowMatch[3]).replace(/\s+/g, "");
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, raRowMatch[3]);
     result.chassisNumber = cleanValue(raRowMatch[4]).replace(/\s+/g, "");
 
     const currentNcb = Number(raRowMatch[5]);
@@ -3008,7 +3109,7 @@ const extractVehicleDetailsFromText = (text = "") => {
       }
 
       if (result.engineNumber === "-") {
-        result.engineNumber = simpleVehicleRowMatch[3];
+        result.engineNumber = preferLongerEngineNumber(result.engineNumber, simpleVehicleRowMatch[3]);
       }
 
       if (result.chassisNumber === "-") {
@@ -3149,7 +3250,7 @@ const extractVehicleDetailsFromText = (text = "") => {
     }
 
     if (result.engineNumber === "-") {
-      result.engineNumber = tableMatch[7].replace(/\s+/g, "");
+      result.engineNumber = preferLongerEngineNumber(result.engineNumber, tableMatch[7]);
     }
   }
 
@@ -3223,7 +3324,7 @@ const extractVehicleDetailsFromText = (text = "") => {
       const match = normalizedText.match(pattern);
 
       if (match?.[1]) {
-        result.engineNumber = match[1].replace(/\s+/g, "").trim();
+        result.engineNumber = preferLongerEngineNumber(result.engineNumber, match[1]);
         break;
       }
     }
@@ -3444,14 +3545,14 @@ const extractVehicleDetailsFromText = (text = "") => {
   const exactRowMatch = normalizedText.match(/\b(NEW|[A-Z]{2}[- ]?\d{1,2}[- ]?[A-Z]{1,3}[- ]?\d{3,4})\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\s+([A-Z0-9]{5,20})\s+([A-Z0-9]{15,25})\s+\d{1,3}\s*%/i);
   if (exactRowMatch) {
     result.registrationNumber = exactRowMatch[1] === "NEW" ? "NEW" : exactRowMatch[1];
-    result.engineNumber = exactRowMatch[2].toUpperCase();
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, exactRowMatch[2]);
     result.chassisNumber = exactRowMatch[3].toUpperCase();
   }
 
   const tableChassisEngine = normalizedText.match(/\b\d{1,3}\s+([A-Z0-9\s]{15,25})\s+([A-Z0-9]{5,20})\s+\d{1,3}\s+[\d,]+\.\d{2}/i);
   if (tableChassisEngine) {
     result.chassisNumber = tableChassisEngine[1].replace(/\s+/g, "").toUpperCase();
-    result.engineNumber = tableChassisEngine[2].replace(/\s+/g, "").toUpperCase();
+    result.engineNumber = preferLongerEngineNumber(result.engineNumber, tableChassisEngine[2]);
   }
 
   const regCheck = normalizedText.match(/Vehicle\s+Registration\s+No\.?\s*[:.]?\s*(NEW)/i);
@@ -3461,12 +3562,14 @@ const extractVehicleDetailsFromText = (text = "") => {
 
   if (/CHASSIS/i.test(result.engineNumber)) {
      const backupEngine = normalizedText.match(/Engine\s+No\.?\s*[:.]?\s*(?!Chassis)([A-Z0-9]{5,})/i);
-     result.engineNumber = backupEngine ? backupEngine[1].toUpperCase() : "-";
+     result.engineNumber = backupEngine ? cleanEngineNumber(backupEngine[1]) : "-";
   }
 
   // ============================================================
   // FINAL CLEANUP
   // ============================================================
+  result.engineNumber = completeWrappedEngineNumber(result.engineNumber);
+
   if (result.make !== "-") {
     result.make = cleanValue(result.make).toUpperCase();
   }
@@ -3508,6 +3611,27 @@ function ICICIPolicyCard({ item }) {
     return value;
   };
 
+  const hasMeaningfulValue = (value) => {
+    if (value === null || value === undefined) return false;
+    const normalizedValue = String(value).trim();
+    return normalizedValue !== "" && !/^(?:-|N\/A|NA|null|undefined)$/i.test(normalizedValue);
+  };
+
+  const preferExtractedValue = (existingValue, extractedValue) =>
+    hasMeaningfulValue(extractedValue) ? extractedValue : existingValue;
+
+  const preferLongerCode = (existingValue, extractedValue) => {
+    const existingCode = hasMeaningfulValue(existingValue)
+      ? String(existingValue).replace(/\s+/g, "")
+      : "";
+    const extractedCode = hasMeaningfulValue(extractedValue)
+      ? String(extractedValue).replace(/\s+/g, "")
+      : "";
+
+    if (extractedCode.length > existingCode.length) return extractedCode;
+    return existingCode || extractedCode || "-";
+  };
+
   const fullText = item?.fullText || "";
   const insured = item?.insuredDetails || {};
   const policy = item?.policyDetails || {};
@@ -3538,20 +3662,20 @@ function ICICIPolicyCard({ item }) {
 
   // Merge vehicle details with the layout style of Bajaj/Indusind
   const mergedVehicle = {
-    registrationNumber: vehicle?.registrationNumber || extractedVehicle.registrationNumber,
-    chassisNumber: vehicle?.chassisNumber || extractedVehicle.chassisNumber,
-    engineNumber: vehicle?.engineNumber || extractedVehicle.engineNumber,
-    make: vehicle?.make || extractedVehicle.make,
-    model: vehicle?.model || extractedVehicle.model,
-    variant: vehicle?.variant || extractedVehicle.variant,
-    manufacturingYear: vehicle?.manufacturingYear || extractedVehicle.manufacturingYear,
-    fuelType: vehicle?.fuelType || extractedVehicle.fuelType,
-    cubicCapacity: vehicle?.cubicCapacity || extractedVehicle.cubicCapacity,
-    seatingCapacity: vehicle?.seatingCapacity || extractedVehicle.seatingCapacity,
-    financierName: vehicle?.financierName || extractedVehicle.financierName,
-    commercialVehicleType: vehicle?.commercialVehicleType || extractedVehicle.commercialVehicleType,
-    gvw: vehicle?.gvw || extractedVehicle.gvw,
-    ncb: vehicle?.ncb || extractedVehicle.ncb,
+    registrationNumber: preferExtractedValue(vehicle?.registrationNumber, extractedVehicle.registrationNumber),
+    chassisNumber: preferLongerCode(vehicle?.chassisNumber, extractedVehicle.chassisNumber),
+    engineNumber: preferLongerCode(vehicle?.engineNumber, extractedVehicle.engineNumber),
+    make: preferExtractedValue(vehicle?.make, extractedVehicle.make),
+    model: preferExtractedValue(vehicle?.model, extractedVehicle.model),
+    variant: preferExtractedValue(vehicle?.variant, extractedVehicle.variant),
+    manufacturingYear: preferExtractedValue(vehicle?.manufacturingYear, extractedVehicle.manufacturingYear),
+    fuelType: preferExtractedValue(vehicle?.fuelType, extractedVehicle.fuelType),
+    cubicCapacity: preferExtractedValue(vehicle?.cubicCapacity, extractedVehicle.cubicCapacity),
+    seatingCapacity: preferExtractedValue(vehicle?.seatingCapacity, extractedVehicle.seatingCapacity),
+    financierName: hasMeaningfulValue(vehicle?.financierName) ? vehicle.financierName : extractedVehicle.financierName,
+    commercialVehicleType: preferExtractedValue(vehicle?.commercialVehicleType, extractedVehicle.commercialVehicleType),
+    gvw: hasMeaningfulValue(vehicle?.gvw) ? vehicle.gvw : extractedVehicle.gvw,
+    ncb: hasMeaningfulValue(vehicle?.ncb) ? vehicle.ncb : extractedVehicle.ncb,
   };
 
   if (/^new$/i.test(mergedVehicle.registrationNumber?.trim())) {
@@ -3560,8 +3684,12 @@ function ICICIPolicyCard({ item }) {
 
   // Determine Product Type
   const isNewVehicle = mergedVehicle.registrationNumber === "NEW";
-  const originalProductType = sanitizeValue(getProductType(policy?.policyType, fullText));
-  const finalProductType = isNewVehicle ? "Bundled Policy" : originalProductType;
+  const originalProductType = sanitizeValue(extractICICIProductType(policy?.policyType, fullText));
+  const vehicleCategory = sanitizeValue(extractICICIVehicleCategory(policy?.policyType, fullText));
+  const finalProductType =
+    isNewVehicle && originalProductType !== "Liability Policy"
+      ? "Bundled Policy"
+      : originalProductType;
 
   return (
     <PolicyCardView
@@ -3570,7 +3698,7 @@ function ICICIPolicyCard({ item }) {
       insuranceCompany={sanitizeValue(extractInsuranceCompanyName(fullText))}
       branchAddress={sanitizeValue(extractBranchAddress(fullText))}
       productType={finalProductType}
-      vehicleCategory={sanitizeValue(getVehicleCategory(policy?.policyType, fullText))}
+      vehicleCategory={vehicleCategory}
       
       insuredName={sanitizeValue(insured?.insuredName || autoInsuredDetails?.insuredName)}
       panNumber={sanitizeValue(insured?.panNumber || autoInsuredDetails?.panNumber)}
