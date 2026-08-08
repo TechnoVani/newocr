@@ -46,6 +46,22 @@ const ensureUniqueIndex = async (tableName, indexName, columnName) => {
   }
 };
 
+const ensureUniqueIndexIfClean = async (tableName, indexName, columnName) => {
+  const [duplicateRows] = await db.query(
+    `SELECT \`${columnName}\`, COUNT(*) AS count
+       FROM \`${tableName}\`
+      WHERE \`${columnName}\` IS NOT NULL AND TRIM(\`${columnName}\`) != ''
+      GROUP BY LOWER(TRIM(\`${columnName}\`))
+     HAVING COUNT(*) > 1
+      LIMIT 1`
+  );
+  if (duplicateRows.length) {
+    console.warn(`Skipped unique index ${indexName}; clean duplicate ${tableName}.${columnName} values first.`);
+    return;
+  }
+  await ensureUniqueIndex(tableName, indexName, columnName);
+};
+
 const ensureForeignKeyForColumn = async (
   tableName,
   columnName,
@@ -161,6 +177,7 @@ export const ensureAccountSchema = async () => {
 
   await ensureColumn('insurance_company', 'status', "ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active' AFTER `type`");
   await ensureColumn('insurance_branch', 'status', "ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active' AFTER `email`");
+  await ensureUniqueIndexIfClean('insurance_company', 'insurance_company_insurer_unique', 'insurer');
   await db.query(`
     CREATE TABLE IF NOT EXISTS insurer_statement_rows (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

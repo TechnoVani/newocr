@@ -11,7 +11,6 @@ import {
   Save,
   Lock
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { checkPolicyNumberExists, submitPolicyData } from '../../../config/axios';
 import ReusableForm from '../../../components/reusable/ReusableForm';
 import ReusableSearchSelect from '../../../components/reusable/ReusableSearchSelect';
@@ -20,6 +19,7 @@ import {
   readMotorPolicyFormDraft,
   saveMotorPolicyFormDraft,
 } from '../services/motorDraftStorage';
+import { showApiError, showDuplicate, showError, showSuccess, showValidation } from '../../../utils/alert';
 
 // ----- Date Helpers -----
 const monthNames = {
@@ -470,9 +470,9 @@ function PolicyCardView({
   const handleUnlockOcr = () => {
     if (ocrPassword.toLowerCase() === 'paas') {
       setIsOcrUnlocked(true);
-      toast.success('OCR section unlocked');
+      showSuccess('OCR section unlocked', { key: 'ocr-unlocked' });
     } else {
-      toast.error('Incorrect password');
+      showError('Incorrect password', { key: 'ocr-password-error' });
     }
   };
 
@@ -572,18 +572,20 @@ function PolicyCardView({
   useEffect(() => {
     const policyNumber = String(formData.policyNumber || "").trim();
     if (!policyNumber || policyNumber === "-") {
-      setPolicyNumberCheck({ status: "idle", exists: false, policy: null, message: "" });
-      return;
+      const resetId = window.setTimeout(() => {
+        setPolicyNumberCheck({ status: "idle", exists: false, policy: null, message: "" });
+      }, 0);
+      return () => window.clearTimeout(resetId);
     }
 
     const controller = new AbortController();
-    setPolicyNumberCheck((prev) => ({
-      ...prev,
-      status: "checking",
-      message: "Checking policy number...",
-    }));
 
     const timeoutId = window.setTimeout(async () => {
+      setPolicyNumberCheck((prev) => ({
+        ...prev,
+        status: "checking",
+        message: "Checking policy number...",
+      }));
       try {
         const response = await checkPolicyNumberExists(policyNumber, { signal: controller.signal });
         const exists = Boolean(response?.data?.exists);
@@ -650,29 +652,29 @@ function PolicyCardView({
   });
   if (!isValid) {
     resolvedSetMotorErrors?.(motorValidationErrors);
-    toast.error("Please fill in all Motor Entry dropdowns.");
+    showValidation("Please fill in all Motor Entry dropdowns.");
     return;
   }
 
   const rawFile = item?.rawFile || null;
   if (!(rawFile instanceof File)) {
-    toast.error("Please upload the policy PDF.");
+    showValidation("Please upload the policy PDF.");
     return;
   }
   if (!String(formData.policyNumber || "").trim()) {
-    toast.error("Policy number is required.");
+    showValidation("Policy number is required.");
     return;
   }
   if (policyNumberCheck.exists) {
-    toast.error("Policy number already exists.");
+    showDuplicate("Policy Number already exists.");
     return;
   }
   if (!toDateInputValue(formData.dateOfIssue)) {
-    toast.error("Please enter a valid policy issue date.");
+    showValidation("Please enter a valid policy issue date.");
     return;
   }
   if (!String(mergedVehicle.rto || "").trim()) {
-    toast.error("Registration Authority / RTO is required.");
+    showValidation("Registration Authority / RTO is required.");
     return;
   }
 
@@ -683,12 +685,12 @@ function PolicyCardView({
   const hasGstCertificate = mergedVehicle.gstCertificate instanceof File;
 
   if ((hasAadhaarFront || hasAadhaarBack) && !hasCompleteAadhaar) {
-    toast.error("Upload both Aadhaar front and Aadhaar back, or use PAN card/GST certificate instead.");
+    showValidation("Upload both Aadhaar front and Aadhaar back, or use PAN card/GST certificate instead.");
     return;
   }
 
   if (!hasCompleteAadhaar && !hasPanCard && !hasGstCertificate) {
-    toast.error("Upload at least one KYC document: Aadhaar front & back, PAN card, or GST certificate.");
+    showValidation("Upload at least one KYC document: Aadhaar front & back, PAN card, or GST certificate.");
     return;
   }
 
@@ -702,15 +704,15 @@ function PolicyCardView({
     RC_REQUIRED_BUSINESS_TYPES.has(businessType) &&
     (!hasRcFrontDocument || !hasRcBackDocument)
   ) {
-    toast.error(`RC front and RC back documents are required for ${businessType}.`);
+    showValidation(`RC front and RC back documents are required for ${businessType}.`);
     return;
   }
   if (PREVIOUS_POLICY_REQUIRED_BUSINESS_TYPES.has(businessType) && !hasPreviousPolicy) {
-    toast.error(`Previous Policy document is required for ${businessType}.`);
+    showValidation(`Previous Policy document is required for ${businessType}.`);
     return;
   }
   if (INVOICE_REQUIRED_BUSINESS_TYPES.has(businessType) && !hasInvoiceDocument) {
-    toast.error(`Invoice document is required for ${businessType}.`);
+    showValidation(`Invoice document is required for ${businessType}.`);
     return;
   }
   try {
@@ -721,15 +723,14 @@ function PolicyCardView({
       motorEntry: resolvedMotorFormData,
     };
 
-    toast.loading("Uploading policy documents...", { id: "motor-submit" });
     const response = await submitPolicyData(rawFile, payload);
     if (!response?.success) throw new Error(response?.message || "Failed to submit policy data");
 
-    toast.success("Policy documents saved successfully!", { id: "motor-submit" });
+    showSuccess("Policy documents saved successfully!", { key: "motor-submit-success" });
     if (onSubmit) onSubmit(response.data);
     resolvedMotorProps.onSubmitSuccess?.(response.data);
   } catch (error) {
-    toast.error(error.userMessage || error.response?.data?.message || error.message || "Failed to submit data", { id: "motor-submit" });
+    showApiError(error, "Failed to submit data", { key: "motor-submit-error" });
   } finally {
     setIsSubmitting(false);
   }

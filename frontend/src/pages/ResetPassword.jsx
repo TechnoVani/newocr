@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
 import axiosInstance from "../config/axios";
+import { showApiError, showSuccess, showValidation } from "../utils/alert";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -34,11 +34,11 @@ export default function ResetPassword() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      toast.error("Use at least 8 characters with a letter and number.");
+      showValidation("Use at least 8 characters with a letter and number.");
       return;
     }
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match.");
+      showValidation("Passwords do not match.");
       return;
     }
 
@@ -50,9 +50,9 @@ export default function ResetPassword() {
         confirmPassword,
       });
       setComplete(true);
-      toast.success(response.data?.message || "Password reset successfully.");
+      showSuccess(response.data?.message || "Password reset successfully.", { key: "password-reset-success" });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Unable to reset password.");
+      showApiError(error, "Unable to reset password.", { key: "password-reset-error" });
       if (error.response?.status === 400) setValidToken(false);
     } finally {
       setSubmitting(false);
@@ -61,7 +61,6 @@ export default function ResetPassword() {
 
   return (
     <div className="flex flex-1 items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 px-4 py-8">
-      <Toaster position="top-right" />
       <div className="w-full max-w-md rounded-[2rem] border border-white/40 bg-white/80 p-7 shadow-2xl backdrop-blur-xl sm:p-8">
         <div className="mb-6 flex flex-col items-center text-center">
           <img src="/logo.png" alt="Notion Insurance Logo" className="mb-3 w-48 object-contain" />

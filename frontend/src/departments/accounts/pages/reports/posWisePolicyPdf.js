@@ -1,4 +1,6 @@
-// posCommissionPdf.js – Executive Layout with Auto‑Fitting Dynamic Watermark
+import { showValidation } from "../../../../utils/alert";
+
+// posCommissionPdf.js - Executive Layout with Auto-Fitting Dynamic Watermark
 // Customer name now wraps up to 4 lines for better readability
 
 const PAGE_WIDTH = 595;
@@ -47,7 +49,6 @@ const colors = {
 
 const FONT_NORMAL = "F1";
 const FONT_BOLD = "F2";
-const FONT_SERIF = "F3";
 
 // ============================================================
 // GENERAL & TEXT FORMATTING HELPERS
@@ -326,7 +327,7 @@ export function downloadPosWiseSelectedPoliciesPdf({ policies, pos, month, posId
   const selectedPolicies = Array.isArray(policies) ? policies : [];
 
   if (!selectedPolicies.length) {
-    window.alert("Please select at least one policy before generating the PDF.");
+    showValidation("Please select at least one policy before generating the PDF.");
     return;
   }
 
@@ -481,7 +482,6 @@ export function downloadPosWiseSelectedPoliciesPdf({ policies, pos, month, posId
     if (!fitted) {
       fontSize = 24;
       tWidth = textWidth(text, fontSize, true);
-      tHeight = fontSize * 1.2;
       centerX = PAGE_WIDTH / 2;
       centerY = PAGE_HEIGHT / 2 - 20;
     }

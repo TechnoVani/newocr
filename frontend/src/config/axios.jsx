@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL, LOGIN_URL } from './env';
+import { getApiError, getApiErrorMessage } from '../utils/apiError';
+import { showApiError } from '../utils/alert';
 
 /**
  * Centralized Axios Configuration
@@ -79,9 +81,27 @@ axiosInstance.interceptors.response.use(
         window.location.assign(LOGIN_URL);
       }
     }
+    error.apiError = getApiError(error);
+    error.userMessage = error.apiError.message;
+    if (shouldShowGlobalErrorAlert(error)) {
+      window.setTimeout(() => {
+        if (error._swalHandled) return;
+        showApiError(error, error.userMessage, { key: `api:${error.response?.status || error.code}:${error.userMessage}` });
+      }, 0);
+    }
     return Promise.reject(error);
   }
 );
+
+const shouldShowGlobalErrorAlert = (error) => {
+  if (typeof window === 'undefined') return false;
+  if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') return false;
+  if (error.config?.skipGlobalErrorAlert) return false;
+
+  const requestUrl = String(error.config?.url || '').split('?')[0];
+  if (requestUrl.endsWith('/auth/me')) return false;
+  return Boolean(error.response || error.code === 'ERR_NETWORK');
+};
 
 /**
  * Helper to update headers globally (e.g., after login/logout)
@@ -150,11 +170,12 @@ export const submitPolicyData = async (file, formDataObject) => {
     const response = await axiosInstance.post('/policies', data);
     return response.data;
   } catch (error) {
-    error.userMessage =
-      error.response?.data?.message ||
-      (error.code === 'ERR_NETWORK'
+    error.userMessage = getApiErrorMessage(
+      error,
+      error.code === 'ERR_NETWORK'
         ? 'Cannot reach the policy server. Check the API environment configuration and backend status.'
-        : error.message);
+        : 'Unable to submit policy data.'
+    );
     console.error('Policy Submission Error:', {
       status: error.response?.status,
       message: error.userMessage,

@@ -3,6 +3,7 @@ import { User, Mail, Phone, Calendar, MapPin, Award, BookOpen, Loader2, Edit3, S
 import axiosInstance from "../config/axios";
 import useAuth from "../hooks/useAuth";
 import ReusableSelect from "../components/reusable/ReusableSelect";
+import { showApiError, showValidation } from "../utils/alert";
 
 const DOCUMENT_UPLOADS = [
   { name: "aadhaar_front", label: "Aadhaar Front" },
@@ -361,7 +362,7 @@ export default function Profile() {
 
     for (const field of requiredFields) {
       if (!formData[field.name] || formData[field.name].toString().trim() === "") {
-        alert(`Field "${field.label}" is required. Please fill it out.`);
+        showValidation(`Field "${field.label}" is required. Please fill it out.`);
         return;
       }
     }
@@ -369,40 +370,40 @@ export default function Profile() {
     // Format & regex validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.personal_email.trim())) {
-      alert("Please provide a valid personal email address.");
+      showValidation("Please provide a valid personal email address.");
       return;
     }
 
     if (!/^\d{10}$/.test(formData.mobile.trim())) {
-      alert("Mobile number must be a valid 10-digit number.");
+      showValidation("Mobile number must be a valid 10-digit number.");
       return;
     }
 
     if (!/^\d{10}$/.test(formData.emergency_contact.trim())) {
-      alert("Emergency contact number must be a valid 10-digit number.");
+      showValidation("Emergency contact number must be a valid 10-digit number.");
       return;
     }
 
     if (!/^\d{6}$/.test(formData.pin_code.trim())) {
-      alert("Pin code must be a valid 6-digit number.");
+      showValidation("Pin code must be a valid 6-digit number.");
       return;
     }
 
     if (!/^\d{12}$/.test(formData.aadhaar_number.trim())) {
-      alert("Aadhaar number must be a valid 12-digit number.");
+      showValidation("Aadhaar number must be a valid 12-digit number.");
       return;
     }
 
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
     if (!panRegex.test(formData.pan_number.trim().toUpperCase())) {
-      alert("PAN number must be in a valid format (e.g. ABCDE1234F).");
+      showValidation("PAN number must be in a valid format (e.g. ABCDE1234F).");
       return;
     }
 
     const currentYear = new Date().getFullYear();
     const yop = parseInt(formData.year_of_passing, 10);
     if (isNaN(yop) || yop < 1950 || yop > currentYear + 5) {
-      alert("Please provide a valid Year of Passing.");
+      showValidation("Please provide a valid Year of Passing.");
       return;
     }
 
@@ -418,7 +419,7 @@ export default function Profile() {
         setIsEditing(false);
       }
     } catch (err) {
-      alert(err.response?.data?.message || err.message || "Failed to update profile");
+      showApiError(err, "Failed to update profile");
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,6 @@
 import express from "express";
 import PosManagementController from "../../controllers/pos-management/posManagement.controller.js";
-import policyWorkspaceRoutes from "../../features/policy-workspace/routes/index.routes.js";
+import policyWorkspaceRoutes from "../operations/policy-workspace/index.routes.js";
 
 const router = express.Router();
 

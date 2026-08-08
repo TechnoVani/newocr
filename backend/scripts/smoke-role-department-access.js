@@ -1,7 +1,7 @@
 import "../config/env.js";
 import jwt from "jsonwebtoken";
 import db from "../config/database.js";
-import UserModel from "../models/user.model.js";
+import UserModel from "../models/auth/user.model.js";
 import { getPortalAccess } from "../config/departmentAccess.js";
 import { getAccessRole } from "../utils/roleAccess.js";
 import { getApiOrigin } from "../config/env.js";

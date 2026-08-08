@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import axiosInstance from "../../../../config/axios";
 import MonthYearPicker from "../../../../pages/reusable/MonthYearPicker";
 import ReusableTable from "../../../../components/reusable/ReusableTable";
+import { showApiError, showSuccess, showValidation } from "../../../../utils/alert";
 
 // Define the columns for the grouped summary table
 const REPORT_COLUMNS = [
@@ -74,7 +74,7 @@ export default function ReportEntry() {
         const message = requestError.response?.data?.message || "Unable to load policy report.";
         setError(message);
         setPolicies([]);
-        toast.error(message);
+        showApiError(requestError, message);
       } finally {
         if (active) setLoading(false);
       }
@@ -173,7 +173,7 @@ export default function ReportEntry() {
   // --- Excel Export ---
   const exportExcel = (exportRows = groupedSummary) => {
     if (!exportRows.length) {
-      toast.error("No summary records available to export.");
+      showValidation("No summary records available to export.");
       return;
     }
 
@@ -195,7 +195,7 @@ export default function ReportEntry() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Grouped Summary");
     const filename = `Insurer_Summary_${monthTitle.replaceAll(" ", "_")}.xlsx`;
     XLSX.writeFile(workbook, filename);
-    toast.success(`${filename} downloaded successfully.`);
+    showSuccess(`${filename} downloaded successfully.`, { key: "insurer-report-export-success" });
   };
 
   return (
@@ -215,8 +215,6 @@ export default function ReportEntry() {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
-      <Toaster position="top-right" />
-
       {/* --- Main Grouped Data Table --- */}
       <ReusableTable
         key={`${month}-${year}`}

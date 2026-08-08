@@ -1,12 +1,12 @@
 // src/components/UploadSection.jsx
 import { useState } from 'react';
-import toast from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import { CloudUpload } from 'lucide-react';
 import Loader from '../../../pages/Loader';
 import PolicyListingModal from './PolicyListingModal';
 import PolicyCardWrapper from './PolicyCardWrapper';
+import { showError, showSuccess, showValidation } from '../../../utils/alert';
 import {
   clearMotorPolicyDrafts,
   readMotorPolicyDraft,
@@ -144,12 +144,10 @@ const UploadSection = ({ children, isSideBySide = false, motorProps = {} }) => {
         Number(restoredPolicy.lastModified) === selectedFile.lastModified;
       if (isSameRestoredFile) {
         setPolicies([{ ...restoredPolicy, rawFile: selectedFile }]);
-        toast.success('Policy file reattached. Your saved changes are preserved.', { id: 'pdf-process' });
+        showSuccess('Policy file reattached. Your saved changes are preserved.', { key: 'pdf-process-success' });
         return;
       }
 
-      toast.loading('Extracting data...', { id: 'pdf-process' });
-      
       const rawText = await extractTextFromPDF(selectedFile);
       if (!rawText?.trim()) throw new Error('No text extracted. Possibly scanned PDF.');
 
@@ -168,10 +166,10 @@ const UploadSection = ({ children, isSideBySide = false, motorProps = {} }) => {
       motorProps.onNewPolicy?.();
       setPolicies([newPolicy]);
       saveMotorPolicyDraft(newPolicy);
-      toast.success('Extracted successfully!', { id: 'pdf-process' });
+      showSuccess('Extracted successfully!', { key: 'pdf-process-success' });
     } catch (err) {
       console.error(err);
-      toast.error(`Extraction failed: ${err.message}`, { id: 'pdf-process' });
+      showError(`Extraction failed: ${err.message || 'Unable to read the selected PDF.'}`, { key: 'pdf-process-error' });
     } finally {
       setLoading(false);
     }
@@ -181,7 +179,7 @@ const UploadSection = ({ children, isSideBySide = false, motorProps = {} }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== 'application/pdf') {
-      toast.error('Please select a PDF file');
+      showValidation('Please select a PDF file');
       return;
     }
     processPDF(file);

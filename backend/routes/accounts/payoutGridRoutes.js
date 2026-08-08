@@ -3,7 +3,7 @@ import {
   getPayoutGridReport,
   getPayoutGridBatches,
   importPayoutGrid,
-} from "../../controllers/accounts/payoutGridController.js";
+} from "../../controllers/accounts/payoutGrid.controller.js";
 import { requireMinimumRole } from "../../middleware/departmentAccess.middleware.js";
 import { ACCESS_ROLES } from "../../utils/roleAccess.js";
 

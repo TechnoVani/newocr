@@ -1,5 +1,5 @@
 import express from 'express';
-import { getBranches, addBranch, updateBranch, updateBranchStatus } from '../../controllers/accounts/branchController.js';
+import { getBranches, addBranch, updateBranch, updateBranchStatus } from '../../controllers/accounts/branch.controller.js';
 import { requireMinimumRole } from '../../middleware/departmentAccess.middleware.js';
 import { ACCESS_ROLES } from '../../utils/roleAccess.js';
 

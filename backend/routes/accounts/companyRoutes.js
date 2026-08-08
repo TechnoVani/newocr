@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   getCompanies, addCompany, updateCompany, updateCompanyStatus
-} from '../../controllers/accounts/companyController.js';
+} from '../../controllers/accounts/company.controller.js';
 import { requireMinimumRole } from '../../middleware/departmentAccess.middleware.js';
 import { ACCESS_ROLES } from '../../utils/roleAccess.js';
 

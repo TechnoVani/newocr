@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Search } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
 import ReusableTable from "../../../../components/reusable/ReusableTable";
 import { accountsApi } from "../../services/accountsApi";
 import { exportPayoutReport } from "./payoutGridExcel";
+import { showApiError } from "../../../../utils/alert";
 
 const initialFilters = {
   company: "",
@@ -38,7 +38,7 @@ export default function PayoutGridReport() {
     } catch (requestError) {
       const message = requestError.response?.data?.message || "Unable to load payout-grid report.";
       setError(message);
-      toast.error(message);
+      showApiError(requestError, message);
     } finally {
       setLoading(false);
     }
@@ -47,7 +47,10 @@ export default function PayoutGridReport() {
   useEffect(() => {
     accountsApi.payoutGridReport()
       .then(setReport)
-      .catch((requestError) => setError(requestError.response?.data?.message || "Unable to load payout-grid report."))
+      .catch((requestError) => {
+        setError(requestError.response?.data?.message || "Unable to load payout-grid report.");
+        showApiError(requestError, "Unable to load payout-grid report.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -89,7 +92,6 @@ export default function PayoutGridReport() {
 
   return (
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-3 py-6 sm:px-6 lg:px-10">
-      <Toaster position="top-right" />
       <form onSubmit={(event) => { event.preventDefault(); load(); }} className="mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4">
           <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Accounts · Payout Grid</p>

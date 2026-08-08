@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import toast from "react-hot-toast";
 import useAuth from "../hooks/useAuth";
 import { getDefaultPortalPath } from "../config/departmentPortal";
+import { showApiError, showSuccess, showValidation } from "../utils/alert";
 
 // ----- Inline SVG Icons -----
 const UserIcon = () => (
@@ -30,8 +30,8 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!identifier.trim()) return toast.error("Please enter Email or Mobile Number");
-    if (!password) return toast.error("Please enter Password");
+    if (!identifier.trim()) return showValidation("Please enter Email or Mobile Number");
+    if (!password) return showValidation("Please enter Password");
 
     // Determine if identifier is an email or mobile
     const isEmail = identifier.trim().includes("@");
@@ -43,13 +43,12 @@ const Login = () => {
 
     try {
       setLoading(true);
-      toast.loading("Authenticating...", { id: "auth" });
       const auth = await login(payload, rememberMe);
-      toast.success(`Welcome back, ${auth.user.name}!`, { id: "auth" });
+      showSuccess(`Welcome back, ${auth.user.name}!`, { key: "auth-success" });
 
       navigate(getDefaultPortalPath(auth.user), { replace: true });
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || "Failed to login", { id: "auth" });
+      showApiError(err, "Failed to login", { key: "auth-error" });
     } finally {
       setLoading(false);
     }

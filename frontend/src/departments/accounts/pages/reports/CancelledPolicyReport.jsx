@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import MonthYearPicker from "../../../../pages/reusable/MonthYearPicker";
 import ReusableTable from "../../../../components/reusable/ReusableTable";
 import { accountsApi } from "../../services/accountsApi";
+import { showApiError, showSuccess, showValidation } from "../../../../utils/alert";
 
 const REPORT_COLUMNS = [
   { key: "policy_number", label: "Policy Number" },
@@ -124,7 +124,7 @@ export default function CancelledPolicyReport() {
       const message = requestError.response?.data?.message || "Unable to load cancelled policy report.";
       setError(message);
       setRecords([]);
-      toast.error(message);
+      showApiError(requestError, message);
     } finally {
       setLoading(false);
     }
@@ -156,11 +156,11 @@ export default function CancelledPolicyReport() {
   const saveCancelledPolicy = async (event) => {
     event.preventDefault();
     if (!form.policy_number.trim()) {
-      toast.error("Policy number is required.");
+      showValidation("Policy number is required.");
       return;
     }
     if (!form.cancellation_date) {
-      toast.error("Cancellation date is required.");
+      showValidation("Cancellation date is required.");
       return;
     }
     setSaving(true);
@@ -170,11 +170,11 @@ export default function CancelledPolicyReport() {
         cancellation_date: form.cancellation_date,
         cancellation_reason: form.cancellation_reason.trim() || undefined,
       });
-      toast.success("Cancelled policy record saved.");
+      showSuccess("Cancelled policy record saved.", { key: "cancelled-policy-save-success" });
       setForm((current) => ({ ...current, policy_number: "", cancellation_reason: "" }));
       await loadReport();
     } catch (requestError) {
-      toast.error(requestError.response?.data?.message || "Unable to save cancelled policy record.");
+      showApiError(requestError, "Unable to save cancelled policy record.");
     } finally {
       setSaving(false);
     }
@@ -182,7 +182,7 @@ export default function CancelledPolicyReport() {
 
   const exportExcel = (exportRows = records) => {
     if (!exportRows.length) {
-      toast.error("No cancelled policy records available to export.");
+      showValidation("No cancelled policy records available to export.");
       return;
     }
     const rows = exportRows.map((policy, index) => {
@@ -200,13 +200,11 @@ export default function CancelledPolicyReport() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Cancelled Policies");
     const filename = `Cancelled_Policies_${monthTitle.replaceAll(" ", "_")}.xlsx`;
     XLSX.writeFile(workbook, filename);
-    toast.success(`${filename} downloaded successfully.`);
+    showSuccess(`${filename} downloaded successfully.`, { key: "cancelled-policy-export-success" });
   };
 
   return (
     <main className="mx-auto flex w-full flex-1 flex-col px-3 py-4 sm:px-6 sm:py-8">
-      <Toaster position="top-right" />
-
       <form onSubmit={saveCancelledPolicy} className="mb-5 rounded-xl border border-rose-100 bg-white p-4 shadow-sm">
         <div className="mb-3">
           <p className="text-xs font-black uppercase tracking-widest text-rose-600">Accounts Report</p>
