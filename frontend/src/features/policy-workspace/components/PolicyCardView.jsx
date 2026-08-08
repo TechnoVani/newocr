@@ -213,14 +213,14 @@ const twoWheelerClassificationOptions = [
 ];
 
 const isPrivateCarCategory = (category = "") => {
-  const normalized = String(category).trim().toLowerCase();
+  const normalized = String(category).trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
   return ["pvt car", "private car", "car"].includes(normalized);
 };
 
 const getClassificationOptionsForCategory = (category = "") => {
-  const normalized = String(category).trim().toLowerCase();
+  const normalized = String(category).trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
   if (isPrivateCarCategory(category)) return privateCarClassificationOptions;
-  if (["two wheeler", "2 wheeler", "two-wheeler", "bike", "scooter"].includes(normalized)) return twoWheelerClassificationOptions;
+  if (["two wheeler", "2 wheeler", "two wheeler vehicle", "bike", "scooter"].includes(normalized)) return twoWheelerClassificationOptions;
   if (normalized === "commercial vehicle" || normalized === "commercial") return commercialVehicleOptions;
   if (normalized === "miscellaneous" || normalized === "misc") return miscVehicleOptions;
   return [];

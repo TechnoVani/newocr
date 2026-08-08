@@ -6,7 +6,7 @@ import { CloudUpload } from 'lucide-react';
 import Loader from '../../../pages/Loader';
 import PolicyListingModal from './PolicyListingModal';
 import PolicyCardWrapper from './PolicyCardWrapper';
-import { showError, showSuccess, showValidation } from '../../../utils/alert';
+import { showErrorToast, showSuccessToast, showValidation } from '../../../utils/alert';
 import {
   clearMotorPolicyDrafts,
   readMotorPolicyDraft,
@@ -144,7 +144,7 @@ const UploadSection = ({ children, isSideBySide = false, motorProps = {} }) => {
         Number(restoredPolicy.lastModified) === selectedFile.lastModified;
       if (isSameRestoredFile) {
         setPolicies([{ ...restoredPolicy, rawFile: selectedFile }]);
-        showSuccess('Policy file reattached. Your saved changes are preserved.', { key: 'pdf-process-success' });
+        showSuccessToast('Policy file reattached. Your saved changes are preserved.', { key: 'pdf-process-success' });
         return;
       }
 
@@ -166,10 +166,10 @@ const UploadSection = ({ children, isSideBySide = false, motorProps = {} }) => {
       motorProps.onNewPolicy?.();
       setPolicies([newPolicy]);
       saveMotorPolicyDraft(newPolicy);
-      showSuccess('Extracted successfully!', { key: 'pdf-process-success' });
+      showSuccessToast('Extracted successfully!', { key: 'pdf-process-success' });
     } catch (err) {
       console.error(err);
-      showError(`Extraction failed: ${err.message || 'Unable to read the selected PDF.'}`, { key: 'pdf-process-error' });
+      showErrorToast(`Extraction failed: ${err.message || 'Unable to read the selected PDF.'}`, { key: 'pdf-process-error', timer: 3500 });
     } finally {
       setLoading(false);
     }
