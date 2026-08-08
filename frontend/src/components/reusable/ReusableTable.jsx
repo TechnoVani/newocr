@@ -3,13 +3,25 @@ import { Download, RotateCcw, Search } from "lucide-react";
 import ReusableSelect from "./ReusableSelect";
 import ReusableSearchSelect from "./ReusableSearchSelect";
 
-const normalizeFilterOptions = (options = []) => options.map((option) => ({
-  value: typeof option === "object" ? option.value : option,
-  label: typeof option === "object" ? option.label : option,
-}));
+const normalizeFilterOptions = (filter) => {
+  const options = (filter.options || []).map((option) => ({
+    value: typeof option === "object" ? option.value : option,
+    label: typeof option === "object" ? option.label : option,
+  }));
+  if (filter.includeAll === false || !filter.label) return options;
+
+  const allValue = filter.allValue ?? "";
+  const hasAllOption = options.some((option) =>
+    String(option.value) === String(allValue) ||
+    String(option.label).toLowerCase() === `all ${String(filter.label).toLowerCase()}`
+  );
+  return hasAllOption
+    ? options
+    : [{ value: allValue, label: filter.allLabel || `All ${filter.label}` }, ...options];
+};
 
 function SearchableTableFilter({ filter, onChange }) {
-  const options = normalizeFilterOptions(filter.options);
+  const options = normalizeFilterOptions(filter);
   const selected = options.find((option) => String(option.value) === String(filter.value ?? "")) || null;
 
   return (
@@ -80,16 +92,16 @@ export default function ReusableTable({
   }, [pages, safePage]);
 
   return (
-    <section className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.03)]">
-      <header className={`flex gap-2 bg-[#1E88E5] px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm sm:px-5 sm:py-4 sm:text-sm ${headerAction ? "flex-col items-start justify-between sm:flex-row sm:items-center" : "items-center justify-center text-center"}`}>
+    <section className="flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white shadow-[0_6px_22px_rgb(0,0,0,0.025)]">
+      <header className={`flex gap-2 bg-[#1E88E5] px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm sm:px-4 sm:py-3 ${headerAction ? "flex-col items-start justify-between sm:flex-row sm:items-center" : "items-center justify-center text-center"}`}>
         <div className={headerAction ? "flex-1 text-center sm:text-left" : ""}>
           <div>{title}</div>
           {subtitle && <p className="mt-0.5 text-[8px] font-bold uppercase tracking-wider text-blue-100 sm:text-[9px]">{subtitle}</p>}
         </div>
         {headerAction}
       </header>
-      <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/20 p-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
+      <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/20 p-2.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
           {filters.map((filter) => filter.render ? (
             filter.label ? (
               <label key={filter.name} className={`relative block pt-2 ${filter.className || "w-full sm:w-auto"}`}>
@@ -100,7 +112,7 @@ export default function ReusableTable({
               <div key={filter.name} className={filter.className || "w-full sm:w-auto"}>{filter.render}</div>
             )
           ) : (
-            <label key={filter.name} className={`relative block w-full pt-2 ${filter.className || "sm:w-44"}`}>
+            <label key={filter.name} className={`relative block w-full pt-2 ${filter.className || "sm:w-40"}`}>
               <span className="pointer-events-none absolute left-3 top-0 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">{filter.label}</span>
               {filter.type === "input" ? (
                 <input
@@ -124,7 +136,7 @@ export default function ReusableTable({
               )}
             </label>
           ))}
-          <label className="relative block w-full pt-2 sm:w-64">
+          <label className="relative block w-full pt-2 sm:w-56">
             <span className="pointer-events-none absolute left-3 top-0 z-10 bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">Search</span>
             <span className="relative">
             <Search size={14} className="pointer-events-none absolute left-3 top-2.5 text-slate-400" aria-hidden="true" />
@@ -143,7 +155,7 @@ export default function ReusableTable({
             />
             </span>
           </label>
-          <label className="relative block w-full pt-2 sm:w-24">
+          <label className="relative block w-full pt-2 sm:w-20">
             <span className="pointer-events-none absolute left-3 top-0 z-10 bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">Rows</span>
             <ReusableSelect
               size="compact"
@@ -172,7 +184,7 @@ export default function ReusableTable({
           </button>
         )}
       </div>
-      <div className="border-b border-slate-100/50 bg-slate-50/10 px-4 py-3 text-xs font-semibold text-slate-500 sm:px-6 sm:py-4">
+      <div className="border-b border-slate-100/50 bg-slate-50/10 px-3 py-2 text-[11px] font-semibold text-slate-500 sm:px-4">
         Showing {pagination ? rows.length : filtered.length} of {pagination?.total ?? rows.length} {recordLabel}{countSuffix ? ` (${countSuffix})` : ""}
       </div>
       {error && (
@@ -221,7 +233,7 @@ export default function ReusableTable({
           </tbody>
         </table>
       </div>
-      <footer className="flex flex-col gap-3 border-t border-slate-100 bg-white p-3 text-[11px] font-bold text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-4">
+      <footer className="flex flex-col gap-2 border-t border-slate-100 bg-white p-2.5 text-[11px] font-bold text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-3">
         <span className="text-center sm:text-left">Page {safePage} of {pages} — Showing {totalRecords ? pageStart + 1 : 0}-{Math.min(pageStart + effectiveRowsPerPage, totalRecords)} of {totalRecords} records</span>
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           <button type="button" disabled={safePage === 1} onClick={() => pagination?.onPageChange ? pagination.onPageChange(Math.max(1, safePage - 1)) : setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-bold uppercase text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>

@@ -55,8 +55,8 @@ const posMonthColumns = months => [
       label,
       render: (_, row) => {
         const values = row.months?.[key];
-        if (!values?.policy_count) return <span className="inline-flex min-w-16 justify-center rounded-lg bg-red-50 px-3 py-2 font-black text-red-600 ring-1 ring-inset ring-red-100">N/A</span>;
-        return <div className="min-w-36 space-y-1 whitespace-normal rounded-lg bg-blue-50/60 p-2 text-[9px]">
+        if (!values?.policy_count) return <span className="inline-flex min-w-12 justify-center rounded-md bg-red-50 px-2 py-1 font-black text-red-600 ring-1 ring-inset ring-red-100">N/A</span>;
+        return <div className="min-w-28 space-y-0.5 whitespace-normal rounded-md bg-blue-50/60 p-1.5 text-[9px]">
           <p><span className="text-slate-400">Count:</span> <b className="text-slate-800">{values.policy_count}</b></p>
           <p><span className="text-slate-400">Net:</span> <b className="text-slate-700">{currency(values.net_premium)}</b></p>
           <p><span className="text-slate-400">Gross:</span> <b className="text-slate-700">{currency(values.gross_premium)}</b></p>
@@ -87,25 +87,25 @@ export default function AdministrationDashboard({ data, department, reportView =
     { label: "Total POS Income", value: currency(summary.total_income), detail: "OD + TP + Net income", icon: BadgeIndianRupee, tone: "bg-amber-50 text-amber-700" },
   ];
 
-  return <div className="space-y-7">
+  return <div className="space-y-4">
     {dashboardView && <DepartmentDashboardPage data={data} department={department}/>}
     {toolbar}
-    {error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{error}</div>}
+    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{error}</div>}
     <section>
-      <div className="mb-4">
+      <div className="mb-3">
         <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Policy business · {reports.period?.label || "Current Month"}</p>
-        <h2 className="mt-1 text-xl font-black text-slate-900">
+        <h2 className="mt-1 text-lg font-black text-slate-900">
           {reportView === "pos" ? "Complete POS-wise Business and Income Report" : reportView === "pos-month" ? "Complete POS Monthly Business Report" : reportView === "employee" ? "Complete Employee-wise Policy Business Report" : "POS and Employee Business Overview"}
         </h2>
         <p className="mt-1 text-xs font-medium text-slate-500">
           {reportView === "pos" ? "Policy business is grouped by policies.pos_id, with OD, TP and Net POS income." : reportView === "pos-month" ? "Every POS record is shown and matched with policies for the selected issue month." : "Employee business is assigned from each policy’s POS relationship manager."}
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ label, value, detail, icon: Icon, tone }) => <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map(({ label, value, detail, icon: Icon, tone }) => <article key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
           <div className="flex items-start justify-between gap-3">
-            <div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="mt-3 text-2xl font-black text-slate-900">{value}</p><p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p></div>
-            <span className={`rounded-xl p-3 ${tone}`}><Icon size={20}/></span>
+            <div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="mt-2 truncate text-xl font-black text-slate-900">{value}</p><p className="mt-0.5 text-[11px] font-semibold text-slate-500">{detail}</p></div>
+            <span className={`rounded-lg p-2.5 ${tone}`}><Icon size={18}/></span>
           </div>
         </article>)}
       </div>
@@ -177,7 +177,7 @@ function MonthlyBusinessReport({ reportView, ...props }) {
   }, [month, props.department.slug]);
 
   const [year, selectedMonth] = month.split("-").map(Number);
-  const toolbar = <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+  const toolbar = <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-end sm:justify-between">
     <div>
       <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{reportView === "employee" ? "Employee Monthly Report" : "POS Monthly Report"}</p>
       <p className="mt-1 text-sm font-semibold text-slate-600">Select the policy issue month to refresh the complete {reportView === "employee" ? "employee" : "POS"} business and income report.</p>

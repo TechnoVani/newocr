@@ -55,33 +55,36 @@ export default function PosDashboard() {
       actionIcon={Files}
     />
     {error && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{error}</p>}
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map(({ label, value, icon: Icon }) => <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <Icon size={22} className="text-blue-600"/>
-        <p className="mt-5 text-2xl font-black text-slate-900">{value}</p>
-        <p className="mt-1 text-sm font-medium text-slate-500">{label}</p>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map(({ label, value, icon: Icon }) => <article key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+        <div className="flex items-start justify-between gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Icon size={18}/></span>
+          <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">POS</span>
+        </div>
+        <p className="mt-4 truncate text-xl font-black text-slate-900">{value}</p>
+        <p className="mt-0.5 text-xs font-bold text-slate-500">{label}</p>
       </article>)}
     </section>
-    <section className="mt-7 grid grid-cols-1 gap-5 xl:grid-cols-2">
-      <div className="space-y-5">
+    <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="space-y-4">
         <BusinessMixDonut rows={analytics?.businessMix} period={analytics?.period?.label} loading={loading}/>
         <RenewalTrendChart rows={analytics?.monthlyComparison} period={analytics?.period?.label} loading={loading}/>
       </div>
       <BusinessDetails motor={analytics?.motorBreakdown} other={analytics?.businessMix} loading={loading}/>
     </section>
-    <section className="mt-5">
+    <section className="mt-4">
       <MonthlyComparisonChart rows={analytics?.monthlyComparison} period={analytics?.period?.label} previousPeriod={analytics?.period?.previousLabel} loading={loading}/>
     </section>
-    <section className="mt-5">
+    <section className="mt-4">
       <ReusableTable title="Policies Renewal Report (Next 45 Days)" rows={analytics?.upcomingRenewals || []} columns={renewalColumns} loading={loading} emptyMessage="No policies expire within the next 45 days."/>
     </section>
-    <section className="mt-5">
+    <section className="mt-4">
       <ReusableTable title="Expired Policies Report" rows={analytics?.expiredPolicies || []} columns={expiredColumns} loading={loading} emptyMessage="No unrenewed expired policies found."/>
     </section>
-    <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-900">Recent Policy Activity</h2>
-      <div className="mt-4 divide-y divide-slate-100">
-        {(data?.recentEntries || []).map(row => <div key={row.id} className="grid gap-2 py-4 text-xs sm:grid-cols-[1fr_1fr_180px]">
+    <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-black text-slate-900">Recent Policy Activity</h2>
+      <div className="mt-3 divide-y divide-slate-100">
+        {(data?.recentEntries || []).map(row => <div key={row.id} className="grid gap-2 py-3 text-xs sm:grid-cols-[1fr_1fr_160px]">
           <span className="font-bold text-slate-800">{row.policy_number}</span>
           <span className="text-slate-600">{row.insured_name || "—"} · {row.insurance_company || "—"}</span>
           <span className="text-slate-500">{row.created_by_display || "—"}</span>

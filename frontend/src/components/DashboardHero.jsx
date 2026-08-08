@@ -26,22 +26,22 @@ export default function DashboardHero({
   }, []);
 
   return (
-    <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d5cab] via-[#1676cc] to-[#29a1e6] px-6 py-8 text-white shadow-xl sm:px-9">
-      <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[40px] border-white/10" />
-      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+    <section className="relative mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-sm sm:px-5">
+      <div className="absolute inset-y-0 left-0 w-1.5 bg-[#1E88E5]" />
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="mb-2 text-sm font-medium text-blue-100">{eyebrow}</p>
-          <h1 className="text-2xl font-bold sm:text-3xl">
+          <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-blue-600">{eyebrow}</p>
+          <h1 className="text-xl font-black sm:text-2xl">
             {getGreeting(currentTime.getHours())}, {firstName}
           </h1>
-          <p className="mt-2 text-sm text-blue-100 sm:text-base">{description}</p>
+          <p className="mt-1 max-w-3xl text-xs font-medium text-slate-500 sm:text-sm">{description}</p>
         </div>
         {actionTo && (
           <Link
             to={actionTo}
-            className="inline-flex w-fit items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-blue-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50"
+            className="inline-flex h-9 w-fit items-center gap-2 rounded-lg bg-[#1E88E5] px-3.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-blue-700"
           >
-            <ActionIcon size={18} /> {actionLabel}
+            <ActionIcon size={15} /> {actionLabel}
           </Link>
         )}
       </div>

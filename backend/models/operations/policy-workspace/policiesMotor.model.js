@@ -310,22 +310,59 @@ class PoliciesMotorModel {
             SELECT
                 COUNT(*) AS totalEntries,
                 COALESCE(SUM(
-                    created_at >= CURRENT_DATE()
-                    AND created_at < CURRENT_DATE() + INTERVAL 1 DAY
+                    p.created_at >= CURRENT_DATE()
+                    AND p.created_at < CURRENT_DATE() + INTERVAL 1 DAY
                 ), 0) AS todayEntries,
                 COALESCE(SUM(
-                    created_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-                    AND created_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+                    p.created_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+                    AND p.created_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
                 ), 0) AS currentMonthEntries,
                 COALESCE(SUM(
-                    created_at >= DATE_FORMAT(CURRENT_DATE() - INTERVAL 1 MONTH, '%Y-%m-01')
-                    AND created_at < DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+                    p.created_at >= DATE_FORMAT(CURRENT_DATE() - INTERVAL 1 MONTH, '%Y-%m-01')
+                    AND p.created_at < DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
                 ), 0) AS lastMonthEntries,
+                COALESCE(SUM(p.total_od), 0) AS totalOdPremium,
+                COALESCE(SUM(p.total_tp), 0) AS totalTpPremium,
+                COALESCE(SUM(p.net_premium), 0) AS netPremium,
+                COALESCE(SUM(p.total_payable), 0) AS grossPremium,
                 DATE_FORMAT(CURRENT_DATE(), '%d %b %Y') AS todayLabel,
                 DATE_FORMAT(CURRENT_DATE(), '%M %Y') AS currentMonthLabel,
                 DATE_FORMAT(CURRENT_DATE() - INTERVAL 1 MONTH, '%M %Y') AS lastMonthLabel
             FROM policies_motor p
             WHERE ${ownership.sql}
+        `;
+        const posBreakdownQuery = `
+            SELECT
+                p.pos_id,
+                COALESCE(
+                    NULLIF(CONCAT_WS(' - ', NULLIF(pos_employee.name, ''), NULLIF(pos_employee.pos_code, '')), ''),
+                    CAST(p.pos_id AS CHAR),
+                    'Unassigned POS'
+                ) AS pos_display,
+                COUNT(*) AS policy_count,
+                COALESCE(SUM(p.total_od), 0) AS total_od,
+                COALESCE(SUM(p.total_tp), 0) AS total_tp,
+                COALESCE(SUM(p.net_premium), 0) AS net_premium,
+                COALESCE(SUM(p.total_payable), 0) AS gross_premium
+            FROM policies_motor p
+            LEFT JOIN employee_pos pos_employee ON p.pos_id = pos_employee.id
+            WHERE ${ownership.sql}
+            GROUP BY p.pos_id, pos_display
+            ORDER BY net_premium DESC, policy_count DESC, pos_display ASC
+            LIMIT 8
+        `;
+        const posActivityQuery = `
+            SELECT
+                COUNT(DISTINCT p.pos_id) AS totalPos,
+                COUNT(DISTINCT CASE
+                    WHEN p.issue_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+                    AND p.issue_date < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+                    THEN p.pos_id
+                END) AS activePos
+            FROM policies_motor p
+            WHERE ${ownership.sql}
+              AND p.pos_id IS NOT NULL
+              AND p.pos_id != ''
         `;
         const recentQuery = `
             SELECT
@@ -340,15 +377,21 @@ class PoliciesMotorModel {
             LEFT JOIN employees e ON p.created_by = e.id
             WHERE ${ownership.sql}
             ORDER BY p.created_at DESC, p.id DESC
-            LIMIT 5
+            LIMIT 8
         `;
 
-        const [[summaryRows], [recentEntries]] = await Promise.all([
+        const [[summaryRows], [posBreakdown], [posActivityRows], [recentEntries]] = await Promise.all([
             db.query(summaryQuery, ownership.params),
+            db.query(posBreakdownQuery, ownership.params),
+            db.query(posActivityQuery, ownership.params),
             db.query(recentQuery, ownership.params)
         ]);
 
         const summary = summaryRows[0] || {};
+        const posActivity = posActivityRows[0] || {};
+        const amount = value => Number(value) || 0;
+        const activePos = Number(posActivity.activePos) || 0;
+        const totalPos = Number(posActivity.totalPos) || 0;
         return {
             counts: {
                 total: Number(summary.totalEntries) || 0,
@@ -360,6 +403,26 @@ class PoliciesMotorModel {
                 today: summary.todayLabel,
                 currentMonth: summary.currentMonthLabel,
                 lastMonth: summary.lastMonthLabel
+            },
+            premiumTotals: {
+                totalOd: amount(summary.totalOdPremium),
+                totalTp: amount(summary.totalTpPremium),
+                netPremium: amount(summary.netPremium),
+                grossPremium: amount(summary.grossPremium)
+            },
+            posBreakdown: posBreakdown.map(row => ({
+                pos_id: row.pos_id,
+                pos_display: row.pos_display || "Unassigned POS",
+                policy_count: Number(row.policy_count) || 0,
+                total_od: amount(row.total_od),
+                total_tp: amount(row.total_tp),
+                net_premium: amount(row.net_premium),
+                gross_premium: amount(row.gross_premium)
+            })),
+            posActivity: {
+                active: activePos,
+                notActive: Math.max(0, totalPos - activePos),
+                total: totalPos
             },
             recentEntries,
             visibility: ownership.scope.all ? "all" : "self"
