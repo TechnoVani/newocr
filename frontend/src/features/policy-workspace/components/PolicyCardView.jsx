@@ -203,6 +203,29 @@ const commercialVehicleOptions = [
     { value: "Other", label: "Other" }
   ];
 
+const privateCarClassificationOptions = [
+  { value: "Pvt Car", label: "Pvt Car" },
+];
+
+const twoWheelerClassificationOptions = [
+  { value: "Bike", label: "Bike" },
+  { value: "Scooter", label: "Scooter" },
+];
+
+const isPrivateCarCategory = (category = "") => {
+  const normalized = String(category).trim().toLowerCase();
+  return ["pvt car", "private car", "car"].includes(normalized);
+};
+
+const getClassificationOptionsForCategory = (category = "") => {
+  const normalized = String(category).trim().toLowerCase();
+  if (isPrivateCarCategory(category)) return privateCarClassificationOptions;
+  if (["two wheeler", "2 wheeler", "two-wheeler", "bike", "scooter"].includes(normalized)) return twoWheelerClassificationOptions;
+  if (normalized === "commercial vehicle" || normalized === "commercial") return commercialVehicleOptions;
+  if (normalized === "miscellaneous" || normalized === "misc") return miscVehicleOptions;
+  return [];
+};
+
 const rtoStatePrefixes = [
   "AN", "AP", "AR", "AS", "BR", "CG", "CH", "DD", "DL", "DN", "GA", "GJ",
   "HP", "HR", "JH", "JK", "KA", "KL", "LA", "LD", "MH", "ML", "MN", "MP",
@@ -739,6 +762,7 @@ function PolicyCardView({
 };
 
 
+  const isPrivateCar = isPrivateCarCategory(formData.vehicleCategory);
   const mergedVehicle = {
     ...formData.vehicle,
     registrationNumber: formData.vehicle?.registrationNumber ?? extractedVehicle?.registrationNumber ?? "",
@@ -764,12 +788,13 @@ function PolicyCardView({
     surveyReport: formData.vehicle.surveyReport,
     gstCertificate: formData.vehicle.gstCertificate,
     ncb: formData.vehicle?.ncb ?? extractedVehicle?.ncb ?? "",
-    commercialVehicleType:
-      formData.vehicle?.commercialVehicleType ??
-      formData.vehicle?.miscVehicleType ??
-      extractedVehicle?.commercialVehicleType ??
-      extractedVehicle?.miscVehicleType ??
-      "",
+    commercialVehicleType: isPrivateCar
+      ? "Pvt Car"
+      : formData.vehicle?.commercialVehicleType ??
+        formData.vehicle?.miscVehicleType ??
+        extractedVehicle?.commercialVehicleType ??
+        extractedVehicle?.miscVehicleType ??
+        "",
     rto:
       formData.vehicle?.rto ??
       extractedVehicle?.rto ??
@@ -779,6 +804,9 @@ function PolicyCardView({
   };
 
   const matchedPolicy = getPolicyCategory(formData.productType, "");
+  const classificationOptions = isPrivateCar
+    ? []
+    : getClassificationOptionsForCategory(formData.vehicleCategory);
 
   // ----- Render -----
   return (
@@ -942,23 +970,13 @@ function PolicyCardView({
                 />
               )}
 
-              {formData.vehicleCategory === "Commercial Vehicle" && (
+              {classificationOptions.length > 0 && (
                 <EditableRow
                   label="Classification *"
                   value={mergedVehicle.commercialVehicleType || ""}
                   onChange={(val) => handleVehicleChange("commercialVehicleType", val)}
                   type="select"
-                  options={commercialVehicleOptions}
-                />
-              )}
-
-              {formData.vehicleCategory === "Miscellaneous" && (
-                <EditableRow
-                  label="Misc Vehicle Type *"
-                  value={mergedVehicle.commercialVehicleType || ""}
-                  onChange={(val) => handleVehicleChange("commercialVehicleType", val)}
-                  type="select"
-                  options={miscVehicleOptions}
+                  options={classificationOptions}
                 />
               )}
 
