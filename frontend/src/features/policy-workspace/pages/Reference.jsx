@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import toast, { Toaster } from "react-hot-toast";
 import { AlertCircle, FilePenLine, FileText } from "lucide-react";
 import * as XLSX from "xlsx";
 import ReusableTable from "../../../components/reusable/ReusableTable";
@@ -7,6 +6,7 @@ import ReusableForm, { formControlClass } from "../../../components/reusable/Reu
 import ReusableSearchSelect from "../../../components/reusable/ReusableSearchSelect";
 import { hierarchyApi } from "../services/hierarchyApi";
 import { referenceApi } from "../services/referenceApi";
+import { showApiError, showSuccess, showValidation } from "../../../utils/alert";
 
 // Dropdown configuration for reference creation flow
 const DROPDOWN_STEPS = [
@@ -59,7 +59,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
     } catch (err) {
       console.error("Failed to load references:", err);
       if (showError) {
-        toast.error(err.response?.data?.message || "Failed to load references list");
+        showApiError(err, "Failed to load references list");
       }
       return [];
     }
@@ -77,7 +77,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
     } catch (err) {
       if (hierarchyRequestIds.current[fieldName] !== requestId) return [];
       setAllOptions((prev) => ({ ...prev, [fieldName]: [] }));
-      toast.error(err.response?.data?.message || err.message || `Failed to load ${fieldName}`);
+      showApiError(err, `Failed to load ${fieldName}`);
       return [];
     } finally {
       if (hierarchyRequestIds.current[fieldName] === requestId) {
@@ -103,7 +103,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
     } catch (err) {
       if (tableRequestId.current !== requestId) return [];
       setFilteredReferences([]);
-      toast.error(err.response?.data?.message || err.message || "Failed to load POSP references");
+      showApiError(err, "Failed to load POSP references");
       return [];
     } finally {
       if (tableRequestId.current === requestId) setTableLoading(false);
@@ -313,7 +313,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
     setErrors(newErrors);
 
     if (!isValid) {
-      toast.error("Please fill in all required fields.");
+      showValidation("Please fill in all required fields.");
       return;
     }
 
@@ -329,15 +329,13 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
     const saveReference = async () => {
       try {
         const isEdit = !!editingId;
-        const toastId = "reference-save";
-        toast.loading(isEdit ? "Updating reference..." : "Creating reference...", { id: toastId });
         
         const response = isEdit
           ? await referenceApi.update(editingId, payload)
           : await referenceApi.create(payload);
 
         if (response?.success) {
-          toast.success(isEdit ? "Reference updated successfully!" : "Reference created successfully!", { id: toastId });
+          showSuccess(isEdit ? "Reference updated successfully!" : "Reference created successfully!", { key: "reference-save-success" });
           const savedPospId = String(formData.posp);
           await loadReferences();
           setSelectedPospFilter(savedPospId);
@@ -347,7 +345,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
           throw new Error(response?.message || `Failed to ${isEdit ? 'update' : 'create'} reference`);
         }
       } catch (err) {
-        toast.error(err.response?.data?.message || err.message || `Failed to save reference`, { id: "reference-save" });
+        showApiError(err, "Failed to save reference", { key: "reference-save-error" });
       }
     };
 
@@ -370,7 +368,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
 
   const exportReferences = () => {
     if (!filteredReferences.length) {
-      toast.error("No reference records available to export.");
+      showValidation("No reference records available to export.");
       return;
     }
     const rows = filteredReferences.map((reference, index) => ({
@@ -387,7 +385,7 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "References");
     XLSX.writeFile(workbook, `Operations_References_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast.success("Reference report downloaded successfully.");
+    showSuccess("Reference report downloaded successfully.", { key: "reference-export-success" });
   };
 
   return (
@@ -411,8 +409,6 @@ export default function AddReference({ portalLabel = "Operations", reportTitle =
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-
       <ReusableForm
         title={editingId ? `Edit ${portalLabel} Reference` : `Add New ${portalLabel} Reference`}
         icon={FilePenLine}

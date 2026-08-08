@@ -4,6 +4,8 @@ import { Building2, Pencil, Save, ToggleLeft, ToggleRight } from "lucide-react";
 import ReusableTable from "../../../components/reusable/ReusableTable";
 import ReusableForm, { formControlClass, formLabelClass, formLabelTextClass } from "../../../components/reusable/ReusableForm";
 import ReusableSelect from "../../../components/reusable/ReusableSelect";
+import { showApiError, showSuccess, showValidation } from "../../../utils/alert";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 const EMPTY = { insurer: "", link: "", type: "", status: "Active" };
 export default function CreateCompany({ companies = [], onAddCompany, onUpdateCompany, onChangeStatus }) {
@@ -28,19 +30,35 @@ export default function CreateCompany({ companies = [], onAddCompany, onUpdateCo
   };
   const submit = async (event) => {
     event.preventDefault();
-    if (!form.insurer.trim()) return setMessage({ type: "error", text: "Insurer name is required." });
-    if (!form.type) return setMessage({ type: "error", text: "Select an insurer type." });
-    if (companies.some((item) => String(item.id) !== String(editingId) && String(item.insurer || "").toLowerCase() === form.insurer.trim().toLowerCase())) return setMessage({ type: "error", text: "This insurer is already registered." });
+    if (!form.insurer.trim()) {
+      setMessage({ type: "error", text: "Insurer name is required." });
+      showValidation("Insurer name is required.");
+      return;
+    }
+    if (!form.type) {
+      setMessage({ type: "error", text: "Select an insurer type." });
+      showValidation("Select an insurer type.");
+      return;
+    }
+    if (companies.some((item) => String(item.id) !== String(editingId) && String(item.insurer || "").toLowerCase() === form.insurer.trim().toLowerCase())) {
+      setMessage({ type: "error", text: "This insurer is already registered." });
+      showValidation("This insurer is already registered.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = { ...form, insurer: form.insurer.trim(), link: form.link.trim() };
       if (editingId) await onUpdateCompany(editingId, payload);
       else await onAddCompany(payload);
-      setMessage({ type: "success", text: editingId ? "Insurer company updated successfully." : "Insurer company created successfully." });
+      const successMessage = editingId ? "Insurer company updated successfully." : "Insurer company created successfully.";
+      setMessage({ type: "success", text: successMessage });
+      showSuccess(successMessage);
       setForm(EMPTY);
       setEditingId(null);
     } catch (error) {
-      setMessage({ type: "error", text: error.response?.data?.error || `Unable to ${editingId ? "update" : "create"} insurer company.` });
+      const fallback = `Unable to ${editingId ? "update" : "create"} insurer company.`;
+      setMessage({ type: "error", text: getApiErrorMessage(error, fallback) });
+      showApiError(error, fallback);
     } finally {
       setSubmitting(false);
     }
@@ -51,9 +69,12 @@ export default function CreateCompany({ companies = [], onAddCompany, onUpdateCo
     setMessage({ type: "", text: "" });
     try {
       await onChangeStatus(company.id, status);
-      setMessage({ type: "success", text: `${company.insurer} is now ${status}.` });
+      const successMessage = `${company.insurer} is now ${status}.`;
+      setMessage({ type: "success", text: successMessage });
+      showSuccess(successMessage);
     } catch (error) {
-      setMessage({ type: "error", text: error.response?.data?.error || error.message || "Unable to change insurer status." });
+      setMessage({ type: "error", text: getApiErrorMessage(error, "Unable to change insurer status.") });
+      showApiError(error, "Unable to change insurer status.");
     } finally {
       setActionId(null);
     }

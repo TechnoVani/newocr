@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import toast, { Toaster } from "react-hot-toast";
 import UploadSection from "../components/UploadSection";
 import MotorEntrySection, { DROPDOWN_STEPS } from "../components/MotorEntrySection";
 import { hierarchyApi } from "../services/hierarchyApi";
@@ -8,6 +7,7 @@ import {
   readMotorEntryDraft,
   saveMotorEntryDraft,
 } from "../services/motorDraftStorage";
+import { showApiError } from "../../../utils/alert";
 
 // Static business type options
 const BUSINESS_TYPES = [
@@ -88,7 +88,7 @@ export default function MotorEntry() {
     } catch (error) {
       if (requestIds.current[fieldName] !== requestId) return [];
       setLocalOptions((prev) => ({ ...prev, [fieldName]: [] }));
-      toast.error(error.response?.data?.message || error.message || `Failed to load ${fieldName}`);
+      showApiError(error, `Failed to load ${fieldName}`);
       return [];
     } finally {
       if (requestIds.current[fieldName] === requestId) {
@@ -231,7 +231,6 @@ export default function MotorEntry() {
 
   return (
     <div>
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <UploadSection motorProps={motorProps}>
         <MotorEntrySection
           motorFormData={motorFormData}

@@ -1,5 +1,5 @@
-import { PayoutGridModel } from "../../models/accounts/payoutGridModel.js";
-import { CompanyModel } from "../../models/accounts/companyModel.js";
+import { PayoutGridModel } from "../../models/accounts/payoutGrid.model.js";
+import { CompanyModel } from "../../models/accounts/company.model.js";
 
 const MAX_ROWS = 10000;
 const WILDCARDS = new Set(["", "-", "--", "all", "any", "na", "n/a", "not applicable"]);

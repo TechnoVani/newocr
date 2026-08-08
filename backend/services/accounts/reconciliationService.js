@@ -1,4 +1,4 @@
-import { ReconciliationModel } from "../../models/accounts/reconciliationModel.js";
+import { ReconciliationModel } from "../../models/accounts/reconciliation.model.js";
 import { getPolicyReadScope } from "../../utils/dataScope.js";
 
 export const RECONCILIATION_FIELDS = [

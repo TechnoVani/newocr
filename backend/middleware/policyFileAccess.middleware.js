@@ -1,5 +1,6 @@
-import PoliciesMotorModel from "../features/policy-workspace/models/policiesMotor.model.js";
+import PoliciesMotorModel from "../models/operations/policy-workspace/policiesMotor.model.js";
 import { getPolicyReadScope } from "../utils/dataScope.js";
+import { errorResponse } from "../utils/response.js";
 
 /**
  * Authorize access to:
@@ -12,10 +13,7 @@ const policyFileAccessMiddleware = async (req, res, next) => {
     try {
         const segments = req.path.split("/").filter(Boolean);
         if (segments.length !== 4 || segments.includes("temp")) {
-            return res.status(404).json({
-                success: false,
-                message: "File not found"
-            });
+            return errorResponse(res, "File not found", null, 404);
         }
 
         const policyFolder = segments[2];
@@ -25,10 +23,7 @@ const policyFileAccessMiddleware = async (req, res, next) => {
         );
 
         if (!ownsFolder) {
-            return res.status(404).json({
-                success: false,
-                message: "File not found"
-            });
+            return errorResponse(res, "File not found", null, 404);
         }
 
         next();

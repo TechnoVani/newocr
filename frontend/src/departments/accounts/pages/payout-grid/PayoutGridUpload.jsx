@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock3, Download, FileSpreadsheet, Upload } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
 import { accountsApi } from "../../services/accountsApi";
 import { downloadPayoutTemplate, parsePayoutWorkbook } from "./payoutGridExcel";
+import { showApiError, showError, showSuccess, showValidation } from "../../../../utils/alert";
 
 const maxMonth = new Date().toISOString().slice(0, 7);
 
@@ -27,7 +27,7 @@ export default function PayoutGridUpload() {
   useEffect(() => {
     accountsApi.companies()
       .then((rows) => setCompanies((Array.isArray(rows) ? rows : []).filter((item) => item.status !== "Inactive")))
-      .catch(() => toast.error("Unable to load insurer companies."));
+      .catch((error) => showApiError(error, "Unable to load insurer companies."));
     loadBatches();
   }, [loadBatches]);
 
@@ -40,11 +40,11 @@ export default function PayoutGridUpload() {
     try {
       const rows = await parsePayoutWorkbook(selectedFile);
       setPreviewRows(rows);
-      toast.success(`${rows.length} payout rows are ready to import.`);
+      showSuccess(`${rows.length} payout rows are ready to import.`, { key: "payout-parse-success" });
     } catch (error) {
       setFile(null);
       if (fileInput.current) fileInput.current.value = "";
-      toast.error(error.message || "Unable to read the selected workbook.");
+      showError(error.message || "Unable to read the selected workbook.", { key: "payout-parse-error" });
     } finally {
       setParsing(false);
     }
@@ -52,7 +52,7 @@ export default function PayoutGridUpload() {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!file) return toast.error("Select an Excel file.");
+    if (!file) return showValidation("Select an Excel file.");
     setLoading(true);
     setResult(null);
     try {
@@ -64,13 +64,13 @@ export default function PayoutGridUpload() {
         rows,
       });
       setResult(response);
-      toast.success("Payout grid imported successfully.");
+      showSuccess("Payout grid imported successfully.", { key: "payout-import-success" });
       setFile(null);
       setPreviewRows([]);
       if (fileInput.current) fileInput.current.value = "";
       loadBatches();
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || "Unable to import payout grid.");
+      showApiError(error, "Unable to import payout grid.", { key: "payout-import-error" });
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,6 @@ export default function PayoutGridUpload() {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
-      <Toaster position="top-right" />
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Accounts · Payout Grid</p>

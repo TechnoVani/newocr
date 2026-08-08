@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, Upload } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import ReusableTable from "../../../../components/reusable/ReusableTable";
 import MonthYearPicker from "../../../../pages/reusable/MonthYearPicker";
 import { accountsApi } from "../../services/accountsApi";
+import { showApiError, showSuccess, showValidation } from "../../../../utils/alert";
 
 const money = (value) => new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -328,7 +328,7 @@ export default function VerifyReport() {
   const downloadTemplate = () => {
     const workbook = createTemplateWorkbook();
     XLSX.writeFile(workbook, "Insurer_Statement_Import_Format.xlsx");
-    toast.success("Insurer statement import format downloaded.");
+    showSuccess("Insurer statement import format downloaded.", { key: "verify-template-success" });
   };
 
   const exportResults = () => {
@@ -355,7 +355,7 @@ export default function VerifyReport() {
       workbook,
       `Verification_Results_Issue_${year || "All"}_${month ? String(month).padStart(2, "0") : "All"}_Created_${createdYear || "All"}_${createdMonth ? String(createdMonth).padStart(2, "0") : "All"}.xlsx`,
     );
-    toast.success("Verification results exported.");
+    showSuccess("Verification results exported.", { key: "verify-export-success" });
   };
 
   const importExcel = async (event) => {
@@ -363,7 +363,7 @@ export default function VerifyReport() {
     event.target.value = "";
     if (!file) return;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      toast.error("Please select an Excel or CSV file.");
+      showValidation("Please select an Excel or CSV file.");
       return;
     }
     setImporting(true);
@@ -372,10 +372,10 @@ export default function VerifyReport() {
       const result = await accountsApi.importReconciliation({
         rows,
       });
-      toast.success(`${result.imported} insurer statement rows imported.`);
+      showSuccess(`${result.imported} insurer statement rows imported.`, { key: "verify-import-success" });
       await loadReport();
     } catch (importError) {
-      toast.error(importError.response?.data?.message || importError.message || "Unable to import insurer statement.");
+      showApiError(importError, "Unable to import insurer statement.", { key: "verify-import-error" });
     } finally {
       setImporting(false);
     }
@@ -396,7 +396,6 @@ export default function VerifyReport() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1900px] flex-1 flex-col gap-5 px-3 py-4 sm:px-6 sm:py-8">
-      <Toaster position="top-right" />
       <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>

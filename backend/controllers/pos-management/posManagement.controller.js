@@ -1,7 +1,7 @@
 import PosManagementModel from "../../models/pos-management/posManagement.model.js";
-import PoliciesMotorModel from "../../features/policy-workspace/models/policiesMotor.model.js";
-import PoliciesMotorService from "../../features/policy-workspace/services/policiesMotor.service.js";
-import SetCommService from "../../features/policy-workspace/services/setcomm.service.js";
+import PoliciesMotorModel from "../../models/operations/policy-workspace/policiesMotor.model.js";
+import PoliciesMotorService from "../../services/operations/policy-workspace/policiesMotor.service.js";
+import SetCommService from "../../services/accounts/setcomm.service.js";
 import { getPolicyReadScope } from "../../utils/dataScope.js";
 import { successResponse, errorResponse } from "../../utils/response.js";
 import { buildPosAnalytics } from "../../utils/posAnalytics.js";

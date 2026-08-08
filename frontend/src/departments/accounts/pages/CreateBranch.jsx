@@ -6,6 +6,8 @@ import ReusableForm, { formControlClass, formLabelClass, formLabelTextClass } fr
 import ReusableSelect from "../../../components/reusable/ReusableSelect";
 import ReusableSearchSelect from "../../../components/reusable/ReusableSearchSelect";
 import { getCityOptions, INDIAN_STATE_OPTIONS } from "../../../config/indiaLocations";
+import { showApiError, showSuccess, showValidation } from "../../../utils/alert";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 const EMPTY = { insurer_type: "", insurer: "", status: "Active", brockercode: "", gst_no: "", address: "", state: "", city: "", pin_code: "", contact: "", support_email: "", name: "", designation: "", mobile: "", email: "" };
 const fields = [
@@ -51,17 +53,29 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
   };
   const submit = async (event) => {
     event.preventDefault();
-    if (!form.insurer_type) return setMessage({ type: "error", text: "Select an insurer type." });
-    if (!form.insurer) return setMessage({ type: "error", text: "Select an insurance company." });
+    if (!form.insurer_type) {
+      setMessage({ type: "error", text: "Select an insurer type." });
+      showValidation("Select an insurer type.");
+      return;
+    }
+    if (!form.insurer) {
+      setMessage({ type: "error", text: "Select an insurance company." });
+      showValidation("Select an insurance company.");
+      return;
+    }
     setSubmitting(true);
     try {
       if (editingId) await onUpdateBranch(editingId, form);
       else await onAddBranch(form);
-      setMessage({ type: "success", text: `Insurance branch ${editingId ? "updated" : "created"} successfully.` });
+      const successMessage = `Insurance branch ${editingId ? "updated" : "created"} successfully.`;
+      setMessage({ type: "success", text: successMessage });
+      showSuccess(successMessage);
       setForm(EMPTY);
       setEditingId(null);
     } catch (error) {
-      setMessage({ type: "error", text: error.response?.data?.error || error.message || `Unable to ${editingId ? "update" : "create"} branch.` });
+      const fallback = `Unable to ${editingId ? "update" : "create"} branch.`;
+      setMessage({ type: "error", text: getApiErrorMessage(error, fallback) });
+      showApiError(error, fallback);
     } finally {
       setSubmitting(false);
     }
@@ -72,9 +86,12 @@ export default function CreateBranch({ branches = [], companies = [], onAddBranc
     setMessage({ type: "", text: "" });
     try {
       await onChangeStatus(branch.id, status);
-      setMessage({ type: "success", text: `Branch is now ${status}.` });
+      const successMessage = `Branch is now ${status}.`;
+      setMessage({ type: "success", text: successMessage });
+      showSuccess(successMessage);
     } catch (error) {
-      setMessage({ type: "error", text: error.response?.data?.error || error.message || "Unable to change branch status." });
+      setMessage({ type: "error", text: getApiErrorMessage(error, "Unable to change branch status.") });
+      showApiError(error, "Unable to change branch status.");
     } finally {
       setActionId(null);
     }

@@ -1,4 +1,5 @@
 import { canAccessPortal, hasAllDepartmentAccess, PORTALS } from "../config/departmentAccess.js";
+import { unauthorized } from "./AppError.js";
 
 const FULL_POLICY_ACCESS_PORTALS = Object.freeze([
     PORTALS.ACCOUNTS,
@@ -19,9 +20,7 @@ export const normalizePolicyReadScope = scope => {
     const all = Boolean(scope && typeof scope === "object" && scope.all);
     const userId = Number(scope && typeof scope === "object" ? scope.userId : scope);
     if (!all && (!Number.isInteger(userId) || userId <= 0)) {
-        const error = new Error("A valid authenticated user is required for policy access");
-        error.statusCode = 401;
-        throw error;
+        throw unauthorized("A valid authenticated user is required for policy access");
     }
     return { all, userId, user: scope?.user || null };
 };

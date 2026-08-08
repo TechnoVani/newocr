@@ -1,10 +1,51 @@
 import { errorResponse } from "../utils/response.js";
+import { AppError, httpStatusTitle } from "../utils/AppError.js";
 
-/**
- * Global Express Error Handling Middleware
- */
+const duplicateMessageFor = err => {
+    const source = `${err.sqlMessage || ""} ${err.message || ""}`.toLowerCase();
+    const keyMatch = source.match(/for key ['"`]?(?:[^.'"`]+[.])?([^'"`\s]+)['"`]?/i);
+    const key = String(keyMatch?.[1] || "").toLowerCase();
+    const combined = `${key} ${source}`;
+
+    if (combined.includes("personal_email") || combined.includes("email")) return "This email already exists.";
+    if (combined.includes("mobile") || combined.includes("contact")) return "This mobile number already exists.";
+    if (combined.includes("aadhaar")) return "This Aadhaar number already exists.";
+    if (combined.includes("pan")) return "This PAN number already exists.";
+    if (combined.includes("employee_code")) return "This employee code already exists.";
+    if (combined.includes("policy")) return "Policy Number already exists.";
+    if (combined.includes("insurer") || combined.includes("company")) return "This insurer already exists.";
+    if (combined.includes("branch")) return "This branch already exists.";
+    if (combined.includes("reference") || combined.includes("ref_mobile")) return "This reference already exists.";
+    if (combined.includes("document_number")) return "This document number already exists.";
+    if (combined.includes("shift")) return "This shift already exists.";
+    if (combined.includes("holiday")) return "This holiday already exists.";
+    if (combined.includes("attendance")) return "Attendance for this employee and date already exists.";
+    if (combined.includes("payroll")) return "Payroll for this employee and month already exists.";
+    if (combined.includes("leave_type")) return "This leave type already exists.";
+    if (combined.includes("performance")) return "Performance review for this employee and period already exists.";
+    if (combined.includes("employee")) return "This employee record already exists.";
+
+    return "This record already exists.";
+};
+
+const publicMessageFor = err => {
+    if (err instanceof AppError) return err.message;
+    if (err.expose || (Number(err.statusCode) >= 400 && Number(err.statusCode) < 500)) {
+        return err.message || httpStatusTitle(err.statusCode);
+    }
+    return "Something went wrong. Please try again or contact support.";
+};
+
 const errorMiddleware = (err, req, res, next) => {
-    console.error("Global Error Handler Log:", err);
+    if (res.headersSent) return next(err);
+
+    console.error("API error:", {
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: err.statusCode,
+        code: err.code,
+        message: err.message
+    });
 
     const databaseErrorCodes = new Set([
         "ECONNREFUSED",
@@ -25,7 +66,7 @@ const errorMiddleware = (err, req, res, next) => {
     }
 
     if (err.code === "ER_DUP_ENTRY") {
-        return errorResponse(res, "Policy number already exists", null, 409);
+        return errorResponse(res, duplicateMessageFor(err), null, 409);
     }
 
     if (err.code === "ER_NO_REFERENCED_ROW_2") {
@@ -71,10 +112,8 @@ const errorMiddleware = (err, req, res, next) => {
         return errorResponse(res, err.message || "Invalid file upload request.", null, 400);
     }
     
-    const statusCode = err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    
-    return errorResponse(res, message, process.env.NODE_ENV === "development" ? err : null, statusCode);
+    const statusCode = Number(err.statusCode) || 500;
+    return errorResponse(res, publicMessageFor(err), err.details || null, statusCode);
 };
 
 export default errorMiddleware;

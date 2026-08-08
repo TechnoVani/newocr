@@ -606,6 +606,7 @@ ALTER TABLE `insurance_branch`
 --
 ALTER TABLE `insurance_company`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `insurance_company_insurer_unique` (`insurer`),
   ADD KEY `insurance_company_created_by` (`created_by`);
 
 --

@@ -1,8 +1,8 @@
 // src/pages/ForgotPassword.jsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import toast, { Toaster } from "react-hot-toast";
 import axiosInstance from "../config/axios";
+import { showApiError, showSuccess, showValidation } from "../utils/alert";
 
 // Inline SVG Icons
 const UserIcon = () => (
@@ -23,17 +23,16 @@ const ForgotPassword = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    if (!email.trim()) return toast.error("Please enter your registered email");
+    if (!email.trim()) return showValidation("Please enter your registered email");
 
     try {
       setLoading(true);
-      toast.loading("Sending reset instructions...", { id: "reset" });
       
       const response = await axiosInstance.post("/auth/forgot-password", { email: email.trim() });
-      toast.success(response.data?.message || "If registered, a reset link has been sent.", { id: "reset" });
+      showSuccess(response.data?.message || "If registered, a reset link has been sent.", { key: "reset-success" });
       setEmail("");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to send reset link", { id: "reset" });
+      showApiError(err, "Failed to send reset link", { key: "reset-error" });
     } finally {
       setLoading(false);
     }
@@ -42,8 +41,6 @@ const ForgotPassword = () => {
   return (
     // Base Page Layout exactly matching Login.jsx
     <div className="flex w-full flex-1 flex-col justify-between bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-y-auto">
-      <Toaster position="top-right" />
-      
       <main className="flex-grow flex items-center justify-center w-full px-4 py-6">
         
         {/* Glassmorphism Card */}

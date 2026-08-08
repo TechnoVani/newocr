@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
 import axiosInstance from "../../../config/axios";
 import MonthYearPicker from "../../../pages/reusable/MonthYearPicker";
 import ReusableTable from "../../../components/reusable/ReusableTable";
+import { showApiError, showValidation } from "../../../utils/alert";
 
 // ---------------------------------------------------------------------
 // Helper functions
@@ -207,7 +207,7 @@ export default function SetComm() {
       setTotal(0);
       setPages(1);
       setError(message);
-      toast.error(message);
+      showApiError(requestError, message);
     } finally {
       setLoading(false);
     }
@@ -274,8 +274,8 @@ export default function SetComm() {
         ...current,
         [policy.id]: calculateTotalGiven(policy, draft).toFixed(2),
       }));
-      if (Number(policy.net_premium || 0) <= 0) toast.error("Net Premium must be greater than zero to reverse-calculate POS Net %.");
-      else toast.error("Total Given cannot be lower than the POS OD and POS TP contribution.");
+      if (Number(policy.net_premium || 0) <= 0) showValidation("Net Premium must be greater than zero to reverse-calculate POS Net %.");
+      else showValidation("Total Given cannot be lower than the POS OD and POS TP contribution.");
       return;
     }
     saveOnBlur(policy.id);
@@ -295,7 +295,7 @@ export default function SetComm() {
       const amount = Number(String(draft[field] ?? "").replace("%", ""));
       if (!Number.isFinite(amount) || amount < 0) {
         setSaveStatus((current) => ({ ...current, [policyId]: "error" }));
-        toast.error(`${field.replaceAll("_", " ").toUpperCase()} must be zero or a positive number.`);
+        showValidation(`${field.replaceAll("_", " ").toUpperCase()} must be zero or a positive number.`);
         return;
       }
       payload[field] = Number(amount.toFixed(2));
@@ -330,7 +330,7 @@ export default function SetComm() {
     } catch (requestError) {
       if (saveVersions.current[policyId] !== version) return;
       setSaveStatus((current) => ({ ...current, [policyId]: "error" }));
-      toast.error(requestError.response?.data?.message || "Unable to save policy commission.");
+      showApiError(requestError, "Unable to save policy commission.");
     }
   };
 
@@ -437,8 +437,6 @@ export default function SetComm() {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
-      <Toaster position="top-right" />
-
       <ReusableTable
         title={`Policies Commission Report · ${visibility === "all" ? "All Employees" : "My Data"}`}
         subtitle="Enter Total Given to reverse-calculate POS Net %; commission values save automatically"

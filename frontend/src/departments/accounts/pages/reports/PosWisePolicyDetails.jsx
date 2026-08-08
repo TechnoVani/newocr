@@ -67,28 +67,26 @@ export default function PosWisePolicyDetails() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
-    setPolicies([]);
-    setServerSummary(null);
-    accountsApi.posWisePolicies(posId, { month })
-      .then(data => {
+
+    const loadPolicies = async () => {
+      setLoading(true);
+      setError("");
+      setPolicies([]);
+      setServerSummary(null);
+      try {
+        const data = await accountsApi.posWisePolicies(posId, { month });
         if (!active) return;
-        const nextPolicies = data?.policies || [];
         setReportRow(data?.pos || location.state?.posRow || null);
-        setPolicies(nextPolicies);
+        setPolicies(data?.policies || []);
         setServerSummary(data?.summary || null);
         setSelected(new Set());
-      })
-      .catch(async requestError => {
-        if (!active) return;
+      } catch (requestError) {
         try {
           const fallback = await accountsApi.posWiseReport({ month, posId });
           if (!active) return;
           const row = (fallback?.rows || []).find(item => String(item.pos_id) === String(posId)) || location.state?.posRow || null;
-          const nextPolicies = row?.policy_details || [];
           setReportRow(row);
-          setPolicies(nextPolicies);
+          setPolicies(row?.policy_details || []);
           setServerSummary(null);
           setSelected(new Set());
           setError("");
@@ -106,8 +104,12 @@ export default function PosWisePolicyDetails() {
           setServerSummary(null);
           setError(message);
         }
-      })
-      .finally(() => { if (active) setLoading(false); });
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadPolicies();
     return () => { active = false; };
   }, [location.state?.posRow, month, posId]);
 

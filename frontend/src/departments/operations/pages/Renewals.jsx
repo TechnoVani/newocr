@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import toast, { Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import axiosInstance from "../../../config/axios";
 import ReusableTable from "../../../components/reusable/ReusableTable";
+import { showApiError, showSuccess, showValidation } from "../../../utils/alert";
 
 const formatApiDate = (val) => {
   if (!val) return "N/A";
@@ -71,7 +71,7 @@ export default function Renewals() {
         setVisibility(data?.data?.visibility || "self");
       } catch (err) {
         const msg = err.response?.data?.message || "Unable to load renewal policies.";
-        setError(msg); setPolicies([]); toast.error(msg);
+        setError(msg); setPolicies([]); showApiError(err, msg);
       } finally { setLoading(false); }
     };
     fetchRenewals();
@@ -90,7 +90,7 @@ export default function Renewals() {
   const reportPeriod = "Today to Next 45 Days";
 
   const handleExportExcel = (exportPolicies = filteredPolicies) => {
-    if (!exportPolicies.length) return toast.error("No policy records available to export.");
+    if (!exportPolicies.length) return showValidation("No policy records available to export.");
 
     const rows = exportPolicies.map((p, idx) => {
       const row = { "Sr. No.": idx + 1 };
@@ -105,7 +105,7 @@ export default function Renewals() {
     
     const filename = "Policies_Upcoming_Renewal_Report_Next_45_Days.xlsx";
     XLSX.writeFile(workbook, filename);
-    toast.success(`Report "${filename}" downloaded successfully!`);
+    showSuccess(`Report "${filename}" downloaded successfully!`, { key: "renewals-export-success" });
   };
 
   return (
@@ -116,8 +116,6 @@ export default function Renewals() {
         .renewals-dashboard thead { z-index: 10; }
         .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       `}</style>
-      <Toaster position="top-right" />
-
       <ReusableTable
         title={`Upcoming Policy Report · ${visibility === "all" ? "All Employees" : "My Data"}`}
         rows={filteredPolicies}

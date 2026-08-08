@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import axiosInstance from "../../../config/axios";
 import MonthYearPicker from "../../../pages/reusable/MonthYearPicker";
 import ReusableTable from "../../../components/reusable/ReusableTable";
+import { showApiError, showSuccess, showValidation } from "../../../utils/alert";
 
 const REPORT_COLUMNS = [
   { key: "report_date", label: "Issue / Cancel Date", type: "date" },
@@ -145,7 +145,7 @@ export default function ReportEntry() {
         const message = requestError.response?.data?.message || "Unable to load policy report.";
         setError(message);
         setPolicies([]);
-        toast.error(message);
+        showApiError(requestError, message);
       } finally {
         if (active) setLoading(false);
       }
@@ -171,7 +171,7 @@ export default function ReportEntry() {
 
   const exportExcel = (exportRows = filteredPolicies) => {
     if (!exportRows.length) {
-      toast.error("No policy records available to export.");
+      showValidation("No policy records available to export.");
       return;
     }
 
@@ -196,7 +196,7 @@ export default function ReportEntry() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Policy Report");
     const filename = `Policies_Report_${monthTitle.replaceAll(" ", "_")}.xlsx`;
     XLSX.writeFile(workbook, filename);
-    toast.success(`${filename} downloaded successfully.`);
+    showSuccess(`${filename} downloaded successfully.`, { key: "operations-report-export-success" });
   };
 
   return (
@@ -220,8 +220,6 @@ export default function ReportEntry() {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
-      <Toaster position="top-right" />
-
       <ReusableTable
         key={`${month}-${year}`}
         title={`Policies Report · ${visibility === "all" ? "All Employees" : "My Data"}`}

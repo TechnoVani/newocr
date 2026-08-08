@@ -1,5 +1,5 @@
 // Authentication controller.
-import UserModel from "../../models/user.model.js";
+import UserModel from "../../models/auth/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
@@ -181,10 +181,7 @@ class AuthController {
             
             // Check if document_status is '1' (profile is locked)
             if (req.user.document_status === '1') {
-                return res.status(403).json({
-                    success: false,
-                    message: "Profile is locked and cannot be updated."
-                });
+                return errorResponse(res, "Profile is locked and cannot be updated.", null, 403);
             }
 
             // Backend validation: Ensure all fields are filled
@@ -200,44 +197,41 @@ class AuthController {
             for (const field of requiredFields) {
                 if (!req.body[field] || req.body[field].toString().trim() === "") {
                     const formattedField = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    return res.status(400).json({
-                        success: false,
-                        message: `All fields are required. Please fill out: ${formattedField}`
-                    });
+                    return errorResponse(res, `All fields are required. Please fill out: ${formattedField}`, null, 400);
                 }
             }
 
             // Formatting & validations
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(req.body.personal_email)) {
-                return res.status(400).json({ success: false, message: "Please provide a valid personal email address." });
+                return errorResponse(res, "Please provide a valid personal email address.", null, 400);
             }
 
             if (!/^\d{10}$/.test(req.body.mobile)) {
-                return res.status(400).json({ success: false, message: "Mobile number must be a valid 10-digit number." });
+                return errorResponse(res, "Mobile number must be a valid 10-digit number.", null, 400);
             }
 
             if (!/^\d{10}$/.test(req.body.emergency_contact)) {
-                return res.status(400).json({ success: false, message: "Emergency contact number must be a valid 10-digit number." });
+                return errorResponse(res, "Emergency contact number must be a valid 10-digit number.", null, 400);
             }
 
             if (!/^\d{6}$/.test(req.body.pin_code)) {
-                return res.status(400).json({ success: false, message: "Pin code must be a valid 6-digit number." });
+                return errorResponse(res, "Pin code must be a valid 6-digit number.", null, 400);
             }
 
             if (!/^\d{12}$/.test(req.body.aadhaar_number)) {
-                return res.status(400).json({ success: false, message: "Aadhaar number must be a valid 12-digit number." });
+                return errorResponse(res, "Aadhaar number must be a valid 12-digit number.", null, 400);
             }
 
             const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
             if (!panRegex.test(req.body.pan_number.toUpperCase())) {
-                return res.status(400).json({ success: false, message: "PAN number must be in a valid format (e.g. ABCDE1234F)." });
+                return errorResponse(res, "PAN number must be in a valid format (e.g. ABCDE1234F).", null, 400);
             }
 
             const currentYear = new Date().getFullYear();
             const yop = parseInt(req.body.year_of_passing, 10);
             if (isNaN(yop) || yop < 1950 || yop > currentYear + 5) {
-                return res.status(400).json({ success: false, message: "Please provide a valid Year of Passing." });
+                return errorResponse(res, "Please provide a valid Year of Passing.", null, 400);
             }
 
             // Normalise PAN number to uppercase
