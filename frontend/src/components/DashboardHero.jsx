@@ -26,22 +26,25 @@ export default function DashboardHero({
   }, []);
 
   return (
-    <section className="relative mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-sm sm:px-5">
-      <div className="absolute inset-y-0 left-0 w-1.5 bg-[#1E88E5]" />
+    <section className="relative mb-6 overflow-hidden rounded-2xl border border-slate-950/5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-6 py-6 text-white shadow-md sm:px-8">
+      {/* Background Decorative Blurs */}
+      <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-blue-500/20 blur-3xl" />
+      <div className="absolute -left-20 -bottom-20 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl" />
+      
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-blue-600">{eyebrow}</p>
-          <h1 className="text-xl font-black sm:text-2xl">
+          <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-blue-400">{eyebrow}</p>
+          <h1 className="text-2xl font-black sm:text-3xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-blue-200">
             {getGreeting(currentTime.getHours())}, {firstName}
           </h1>
-          <p className="mt-1 max-w-3xl text-xs font-medium text-slate-500 sm:text-sm">{description}</p>
+          <p className="mt-1.5 max-w-2xl text-xs font-semibold text-slate-300 sm:text-sm leading-relaxed">{description}</p>
         </div>
         {actionTo && (
           <Link
             to={actionTo}
-            className="inline-flex h-9 w-fit items-center gap-2 rounded-lg bg-[#1E88E5] px-3.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-blue-700"
+            className="inline-flex h-10 w-fit items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-blue-500/20 transition-all duration-300 hover:from-blue-600 hover:to-indigo-700 hover:shadow-xl hover:shadow-blue-600/30 hover:-translate-y-0.5"
           >
-            <ActionIcon size={15} /> {actionLabel}
+            <ActionIcon className="w-4 h-4" /> {actionLabel}
           </Link>
         )}
       </div>
