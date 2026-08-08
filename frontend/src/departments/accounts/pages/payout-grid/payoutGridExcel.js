@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 
 export const PAYOUT_COLUMNS = [
   { key: "business_type", header: "Business Type", aliases: ["business", "business type", "business_type"] },
-  { key: "category", header: "Vehicle Category", aliases: ["category", "motor category", "vehicle_category", "motor_category"] },
+  { key: "category", header: "Categories", aliases: ["category", "motor category", "categories", "motor_category"] },
   { key: "classification", header: "Classification", aliases: ["vehicle classification", "vehicle_classification", "vehicle_Classification"] },
   { key: "product_type", header: "Product Type", aliases: ["product", "product_type"] },
   { key: "rto", header: "RTO", aliases: ["rto applicability", "rto code", "rto_codes"] },
@@ -54,7 +54,7 @@ export const parsePayoutWorkbook = async (file) => {
   }).filter((row) => Object.values(row).some((value) => String(value || "").trim()));
 
   if (!recognizedHeaders.has("category") && !recognizedHeaders.has("classification")) {
-    throw new Error('The Excel file must contain a "Vehicle Category" or "Classification" column.');
+    throw new Error('The Excel file must contain a "Categories" or "Classification" column.');
   }
   if (!["od_comm", "tp_comm", "net_comm"].some((key) => recognizedHeaders.has(key))) {
     throw new Error("The Excel file must contain at least one OD, TP, or Net Commission column.");
@@ -67,7 +67,7 @@ export const downloadPayoutTemplate = () => {
   const workbook = XLSX.utils.book_new();
   const example = [{
     "Business Type": "New",
-    "Vehicle Category": "Private Car",
+    "Categories": "Private Car",
     Classification: "Private Car",
     "Product Type": "Package",
     RTO: "All India",
@@ -92,7 +92,7 @@ export const downloadPayoutTemplate = () => {
   const instructions = XLSX.utils.aoa_to_sheet([
     ["Payout Grid Import Instructions"],
     ["Column", "Rule"],
-    ["Vehicle Category / Classification", "At least one is required."],
+    ["Categories / Classification", "At least one is required."],
     ["OD / TP / Net Commission", "At least one commission column is required. Enter 15 or 15%."],
     ["RTO", "Use a code, comma-separated codes, All India, or leave blank."],
     ["Seat / GVW", "Supports exact values, ranges such as 1-7, and rules such as Up to 3500 or Above 3500."],
@@ -108,7 +108,7 @@ export const exportPayoutReport = (rows) => {
     Company: row.company,
     Month: row.month,
     "Business Type": row.business_type,
-    "Vehicle Category": row.category,
+    "Categories": row.category,
     Classification: row.classification,
     "Product Type": row.product_type,
     RTO: row.rto || "",

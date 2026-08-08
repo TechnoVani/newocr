@@ -116,7 +116,7 @@ export const AccountsDashboardModel = {
       db.query(`
         SELECT
           p.id, p.policy_number, p.insured_name, p.insurance_company,
-          p.policy_type, p.issue_date, p.net_premium, p.total_payable,
+          p.product_type, p.issue_date, p.net_premium, p.total_payable,
           'Active' AS policy_status,
           pc.cancellation_date,
           pc.created_at AS cancellation_record_created_at,
@@ -133,7 +133,7 @@ export const AccountsDashboardModel = {
       db.query(`
         SELECT
           pc.id, p.policy_number, p.insured_name, p.insurance_company,
-          p.policy_type, p.issue_date, p.net_premium, p.total_payable,
+          p.product_type, p.issue_date, p.net_premium, p.total_payable,
           'Cancelled' AS policy_status,
           pc.cancellation_date,
           pc.created_at AS cancellation_record_created_at,

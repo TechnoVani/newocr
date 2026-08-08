@@ -9,7 +9,7 @@ export const validateSetComm = (req, res, next) => {
         ref_id,
         business_type,
         insurance_company,
-        vehicle_category,
+        categories,
         insured_name,
         contact,
         email,

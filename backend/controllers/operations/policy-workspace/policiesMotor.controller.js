@@ -103,8 +103,8 @@ function mapFrontendToBackend(frontendData) {
         frontendData.insurer_branch ||
         frontendData.insurerBranch ||
         frontendData.branchAddress;
-    data.policy_type = frontendData.policy_type || frontendData.productType;
-    data.vehicle_category = frontendData.vehicle_category || frontendData.vehicleCategory;
+    data.product_type = frontendData.product_type || frontendData.policy_type || frontendData.productType;
+    data.categories = frontendData.categories || frontendData.vehicle_category || frontendData.vehicleCategory;
     data.insured_name = frontendData.insured_name || frontendData.insuredName;
     data.pan = frontendData.pan || frontendData.panNumber;
     data.gstin = frontendData.gstin;
@@ -151,8 +151,9 @@ function mapFrontendToBackend(frontendData) {
         : String(seatingCapacity).trim();
     data.chassis_number = frontendData.chassis_number || v.chassisNumber;
     data.engine_number = frontendData.engine_number || v.engineNumber;
-    data.sub_type = frontendData.sub_type || v.subType;
-    data.commercial_vehicle_type =
+    data.classification =
+        frontendData.classification ||
+        frontendData.commercial_type ||
         frontendData.commercial_vehicle_type ||
         v.commercialVehicleType ||
         v.miscVehicleType;

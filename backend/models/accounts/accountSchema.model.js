@@ -46,6 +46,41 @@ const ensureUniqueIndex = async (tableName, indexName, columnName) => {
   }
 };
 
+const tableExists = async (tableName) => {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS count FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [tableName]
+  );
+  return Number(rows[0].count) > 0;
+};
+
+const columnExists = async (tableName, columnName) => {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  return Number(rows[0].count) > 0;
+};
+
+const renameColumnIfNeeded = async (tableName, oldName, newName, definition) => {
+  const hasOld = await columnExists(tableName, oldName);
+  const hasNew = await columnExists(tableName, newName);
+  if (hasOld && !hasNew) {
+    await db.query(`ALTER TABLE \`${tableName}\` CHANGE COLUMN \`${oldName}\` \`${newName}\` ${definition}`);
+    return;
+  }
+  if (hasOld && hasNew) {
+    await db.query(
+      `UPDATE \`${tableName}\`
+          SET \`${newName}\` = COALESCE(NULLIF(\`${newName}\`, ''), \`${oldName}\`)
+        WHERE \`${oldName}\` IS NOT NULL`
+    );
+    await db.query(`ALTER TABLE \`${tableName}\` DROP COLUMN \`${oldName}\``);
+  }
+};
+
 const ensureUniqueIndexIfClean = async (tableName, indexName, columnName) => {
   const [duplicateRows] = await db.query(
     `SELECT \`${columnName}\`, COUNT(*) AS count
@@ -120,6 +155,41 @@ export const ensurePayoutGridSchema = async () => {
   `);
 };
 
+const ensureSetCountSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS set_count (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      pos_id INT UNSIGNED DEFAULT NULL,
+      ref_id INT UNSIGNED DEFAULT NULL,
+      business_type VARCHAR(100) DEFAULT NULL,
+      insurance_company VARCHAR(255) DEFAULT NULL,
+      categories VARCHAR(100) DEFAULT NULL,
+      insured_name VARCHAR(255) DEFAULT NULL,
+      contact VARCHAR(30) DEFAULT NULL,
+      email VARCHAR(150) DEFAULT NULL,
+      first_year_od DECIMAL(15,2) DEFAULT 0.00,
+      first_year_tp DECIMAL(15,2) DEFAULT 0.00,
+      total_od DECIMAL(15,2) DEFAULT 0.00,
+      total_tp DECIMAL(15,2) DEFAULT 0.00,
+      irda_od DECIMAL(10,2) DEFAULT 0.00,
+      irda_tp DECIMAL(10,2) DEFAULT 0.00,
+      irda_net DECIMAL(10,2) DEFAULT 0.00,
+      pos_od DECIMAL(10,2) DEFAULT 0.00,
+      pos_tp DECIMAL(10,2) DEFAULT 0.00,
+      pos_net DECIMAL(10,2) DEFAULT 0.00,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY set_count_pos_id (pos_id),
+      KEY set_count_ref_id (ref_id),
+      KEY set_count_categories (categories)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  if (await tableExists("set_count")) {
+    await renameColumnIfNeeded("set_count", "vehicle_category", "categories", "VARCHAR(100) DEFAULT NULL");
+  }
+};
+
 export const ensureCancelledPolicySchema = async () => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS policies_cancelled (
@@ -147,6 +217,8 @@ export const ensureCancelledPolicySchema = async () => {
 };
 
 export const ensureAccountSchema = async () => {
+  await ensureSetCountSchema();
+
   await ensureColumn(
     'account_details',
     'updated_by',

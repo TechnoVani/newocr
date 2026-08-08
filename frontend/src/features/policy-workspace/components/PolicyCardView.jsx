@@ -944,7 +944,7 @@ function PolicyCardView({
 
               {formData.vehicleCategory === "Commercial Vehicle" && (
                 <EditableRow
-                  label="Commercial Vehicle Type *"
+                  label="Classification *"
                   value={mergedVehicle.commercialVehicleType || ""}
                   onChange={(val) => handleVehicleChange("commercialVehicleType", val)}
                   type="select"

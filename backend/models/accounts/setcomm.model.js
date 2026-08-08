@@ -27,7 +27,7 @@ class SetCommModel {
                 ref_id,
                 business_type,
                 insurance_company,
-                vehicle_category,
+                categories,
                 insured_name,
                 contact,
                 email,
@@ -49,7 +49,7 @@ class SetCommModel {
             data.ref_id,
             data.business_type || "",
             data.insurance_company || "",
-            data.vehicle_category || "",
+            data.categories || "",
             data.insured_name,
             data.contact || "",
             data.email || "",
@@ -100,7 +100,7 @@ class SetCommModel {
         // Allowed columns to prevent SQL injection in sorting
         const allowedSortColumns = [
             "id", "pos_id", "ref_id", "business_type", "insurance_company",
-            "vehicle_category", "insured_name", "contact", "email", "created_at",
+            "categories", "insured_name", "contact", "email", "created_at",
             "issue_date", "policy_number", "registration_number",
             "first_year_od", "first_year_tp", "total_od", "total_tp",
             "irda_od", "irda_tp", "irda_net", "pos_od", "pos_tp", "pos_net"

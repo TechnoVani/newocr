@@ -29,7 +29,7 @@ export default function PosDashboard() {
     { key: "policy_number", label: "Policy No." },
     { key: "insured_name", label: "Customer Name" },
     { key: "insurance_company", label: "Insurance Company" },
-    { key: "policy_type", label: "Policy Type" },
+    { key: "product_type", label: "Product Type" },
     { key: "registration_number", label: "Registration No." },
     { key: "expiry_date", label: "Expiry Date" },
     { key: "net_premium", label: "Net Premium", render: value => `₹${currency(value)}` },
