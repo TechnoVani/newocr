@@ -82,14 +82,14 @@ function StatCard({ label, value, detail, icon: Icon, tone = "blue" }) {
     cyan: "bg-cyan-50 text-cyan-600 ring-cyan-100",
   };
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-slate-900">{value}</p>
-          <p className="mt-1 text-xs font-medium text-slate-500">{detail}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+          <p className="mt-2 truncate text-xl font-black tracking-tight text-slate-900">{value}</p>
+          <p className="mt-0.5 text-[11px] font-semibold text-slate-500">{detail}</p>
         </div>
-        <span className={`rounded-xl p-3 ring-1 ${styles[tone]}`}><Icon size={21} /></span>
+        <span className={`rounded-lg p-2.5 ring-1 ${styles[tone]}`}><Icon size={18} /></span>
       </div>
     </article>
   );
@@ -120,7 +120,7 @@ function StatusPill({ value, kind }) {
 }
 
 function EmptyPanel({ children }) {
-  return <div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-5 text-center text-sm font-medium text-slate-400">{children}</div>;
+  return <div className="flex min-h-36 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 text-center text-xs font-semibold text-slate-400">{children}</div>;
 }
 
 export default function Home({ companies = [], branches = [], dbStatus = "checking" }) {
@@ -178,7 +178,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
   const connectionLabel = dbStatus === "connected" && !error ? "Live data" : dbStatus === "checking" ? "Connecting" : "Cached masters";
 
   return (
-    <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-3 py-5 sm:px-6 sm:py-8 lg:px-10">
+    <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-2.5 py-4 sm:px-4 lg:px-6">
       <DashboardHero
         eyebrow={`Accounts command center · ${dashboard.period?.label || fallback.period.label}`}
         description={`${dashboard.visibility === "all" ? "Department-wide" : "Assigned"} financial overview, reconciliation status, and insurer performance.`}
@@ -187,18 +187,18 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
         actionIcon={BadgeCheck}
       />
 
-      <div className="-mt-2 mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="-mt-1 mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
           <span className={`h-2.5 w-2.5 rounded-full ${dbStatus === "connected" && !error ? "bg-emerald-500" : dbStatus === "checking" ? "animate-pulse bg-amber-400" : "bg-rose-400"}`} />
           {connectionLabel}
           {error && <span className="hidden text-rose-600 sm:inline">· {error}</span>}
         </div>
-        <button type="button" onClick={loadDashboard} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:opacity-60">
+        <button type="button" onClick={loadDashboard} disabled={loading} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:opacity-60">
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh dashboard
         </button>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
         <StatCard label="Gross premium" value={compactMoney(policies.gross_premium)} detail="Current issue month" icon={IndianRupee} tone="blue" />
         <StatCard label="Net premium" value={compactMoney(policies.net_premium)} detail={`${policies.current_month} policies this month`} icon={CircleDollarSign} tone="emerald" />
         <StatCard label="Verification" value={`${verificationRate}%`} detail={`${policies.pending_verification} awaiting review`} icon={FileCheck2} tone={policies.pending_verification ? "amber" : "emerald"} />
@@ -209,27 +209,27 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
         <StatCard label="Active POS" value={`${masters.pos?.active || 0}/${masters.pos?.total || 0}`} detail="Partner distribution network" icon={Users} tone="violet" />
       </section>
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-[1.45fr_1fr]">
-        <article className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1.45fr_1fr]">
+        <article className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm font-black text-slate-900">Premium movement</p>
               <p className="mt-0.5 text-xs text-slate-500">Net premium across the last six issue months</p>
             </div>
-            <div className="rounded-xl bg-blue-50 px-3 py-2 text-right">
+            <div className="rounded-lg bg-blue-50 px-3 py-1.5 text-right">
               <p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">This month</p>
               <p className="text-sm font-black text-blue-700">{money(policies.net_premium)}</p>
             </div>
           </header>
-          <div className="px-5 pb-5 pt-7">
-            <div className="flex h-56 items-end gap-3 sm:gap-5">
+          <div className="px-4 pb-4 pt-5">
+            <div className="flex h-44 items-end gap-3 sm:gap-4">
               {trend.map(item => {
                 const height = Math.max(5, Math.round(((Number(item.net_premium) || 0) / maxTrend) * 100));
                 return (
                   <div key={item.period} className="group flex h-full min-w-0 flex-1 flex-col justify-end">
                     <div className="mb-2 hidden text-center text-[10px] font-bold text-slate-400 sm:block">{item.policies} policies</div>
-                    <div className="relative flex h-[78%] items-end overflow-hidden rounded-t-xl bg-slate-50">
-                      <div style={{ height: `${height}%` }} className="w-full rounded-t-xl bg-gradient-to-t from-blue-600 to-cyan-400 transition-all duration-500 group-hover:from-blue-700 group-hover:to-cyan-500">
+                    <div className="relative flex h-[78%] items-end overflow-hidden rounded-t-lg bg-slate-50">
+                      <div style={{ height: `${height}%` }} className="w-full rounded-t-lg bg-gradient-to-t from-blue-600 to-cyan-400 transition-all duration-500 group-hover:from-blue-700 group-hover:to-cyan-500">
                         <span className="absolute -top-6 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[9px] font-bold text-white group-hover:block">{compactMoney(item.net_premium)}</span>
                       </div>
                     </div>
@@ -241,7 +241,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
           </div>
         </article>
 
-        <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-black text-slate-900">Top insurers</p>
@@ -250,12 +250,12 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
             <Landmark size={20} className="text-violet-500" />
           </div>
           {(dashboard.top_insurers || []).length ? (
-            <div className="mt-6 space-y-5">
+            <div className="mt-4 space-y-4">
               {dashboard.top_insurers.map((item, index) => (
                 <div key={item.insurer}>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black text-slate-500">{index + 1}</span>
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[10px] font-black text-slate-500">{index + 1}</span>
                       <p className="truncate text-xs font-bold text-slate-700">{item.insurer}</p>
                     </div>
                     <p className="shrink-0 text-xs font-black text-slate-900">{compactMoney(item.net_premium)}</p>
@@ -270,9 +270,9 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
         </article>
       </section>
 
-      <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_1.6fr]">
-        <div className="grid gap-5">
-          <article className="rounded-2xl border border-slate-200/80 bg-slate-900 p-5 text-white shadow-sm">
+      <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.6fr]">
+        <div className="grid gap-4">
+          <article className="rounded-xl border border-slate-200/80 bg-slate-900 p-4 text-white shadow-sm">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-300">Payout grid control</p>
@@ -281,7 +281,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
               </div>
               <FileSpreadsheet className="text-blue-300" size={24} />
             </div>
-            <div className="mt-5 flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+            <div className="mt-4 flex items-center justify-between rounded-lg bg-white/5 px-3 py-2.5">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Latest grid</p>
                 <p className="mt-1 text-sm font-bold">{payout.latest_month || "Not uploaded"}</p>
@@ -290,7 +290,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
             </div>
           </article>
 
-          <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-black text-slate-900">Leading POS partners</p>
@@ -299,9 +299,9 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
               <Link to="/accounts/reports/pos-wise" className="text-xs font-black text-blue-600 hover:text-blue-800">Full report</Link>
             </div>
             {(dashboard.top_pos || []).length ? (
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2.5">
                 {dashboard.top_pos.slice(0, 4).map((item, index) => (
-                  <div key={`${item.pos_id ?? "none"}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                  <div key={`${item.pos_id ?? "none"}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[10px] font-black text-blue-700">{index + 1}</span>
                       <div className="min-w-0">
@@ -316,7 +316,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
             ) : <div className="mt-4"><EmptyPanel>No POS-linked policy activity this month.</EmptyPanel></div>}
           </article>
 
-          <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-black text-slate-900">Quick actions</p>
@@ -332,7 +332,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
                 { to: "/accounts/payout-grid/report", label: "Payout lookup", icon: TrendingUp },
                 ...(canManage ? [{ to: "/accounts/masters/insurers", label: "Manage insurers", icon: Building2 }] : []),
               ].map(({ to, label, icon: Icon }) => (
-                <Link key={to} to={to} className="group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3 text-xs font-bold text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                <Link key={to} to={to} className="group flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
                   <span className="flex items-center gap-2"><Icon size={15} />{label}</span>
                   <ArrowRight size={13} className="transition group-hover:translate-x-0.5" />
                 </Link>
@@ -341,8 +341,8 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
           </article>
         </div>
 
-        <article className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <article className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm font-black text-slate-900">Recent policy activity</p>
               <p className="mt-0.5 text-xs text-slate-500">{policies.total.toLocaleString("en-IN")} policies visible in your account scope</p>
@@ -354,28 +354,28 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
               <table className="w-full min-w-[760px] text-left">
                 <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-400">
                   <tr>
-                    <th className="px-5 py-3">Policy / Insured</th>
-                    <th className="px-4 py-3">Insurer</th>
-                    <th className="px-4 py-3">Issue / Cancel Date</th>
-                    <th className="px-4 py-3">Policy status</th>
-                    <th className="px-4 py-3">Net premium</th>
-                    <th className="px-4 py-3">Verification</th>
-                    <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-2.5">Policy / Insured</th>
+                    <th className="px-4 py-2.5">Insurer</th>
+                    <th className="px-4 py-2.5">Issue / Cancel Date</th>
+                    <th className="px-4 py-2.5">Policy status</th>
+                    <th className="px-4 py-2.5">Net premium</th>
+                    <th className="px-4 py-2.5">Verification</th>
+                    <th className="px-4 py-2.5">Payment</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {dashboard.recent_policies.map(row => (
                     <tr key={row.report_row_id || row.id} className="transition hover:bg-blue-50/30">
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3">
                         <p className="text-xs font-black text-slate-800">{row.policy_number}</p>
                         <p className="mt-1 max-w-48 truncate text-[11px] font-medium text-slate-400">{row.policy_status || "Active"} · {row.insured_name || "Unnamed insured"}</p>
                       </td>
-                      <td className="max-w-44 truncate px-4 py-3.5 text-xs font-semibold text-slate-600">{row.insurance_company || "—"}</td>
-                      <td className="px-4 py-3.5 text-xs font-medium text-slate-500">{shortDate(row.activity_date || row.cancellation_record_created_at || row.issue_date)}</td>
-                      <td className="px-4 py-3.5"><StatusPill value={row.policy_status} kind="policy" /></td>
-                      <td className="px-4 py-3.5 text-xs font-black text-slate-800">{money(row.net_premium)}</td>
-                      <td className="px-4 py-3.5"><StatusPill value={row.verification_status} kind="verification" /></td>
-                      <td className="px-4 py-3.5"><StatusPill value={row.payment_status} kind="payment" /></td>
+                      <td className="max-w-44 truncate px-4 py-3 text-xs font-semibold text-slate-600">{row.insurance_company || "—"}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-500">{shortDate(row.activity_date || row.cancellation_record_created_at || row.issue_date)}</td>
+                      <td className="px-4 py-3"><StatusPill value={row.policy_status} kind="policy" /></td>
+                      <td className="px-4 py-3 text-xs font-black text-slate-800">{money(row.net_premium)}</td>
+                      <td className="px-4 py-3"><StatusPill value={row.verification_status} kind="verification" /></td>
+                      <td className="px-4 py-3"><StatusPill value={row.payment_status} kind="payment" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -388,7 +388,7 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
       </section>
 
       {(policies.pending_verification > 0 || policies.pending_payment > 0) && (
-        <section className="mt-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <ShieldAlert size={20} className="mt-0.5 shrink-0 text-amber-600" />
             <div>

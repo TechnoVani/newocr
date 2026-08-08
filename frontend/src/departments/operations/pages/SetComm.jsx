@@ -345,10 +345,10 @@ export default function SetComm() {
       const isTotalGiven = column.key === "total_given";
       return {
         ...column,
-        headerClassName: `sticky top-0 z-20 whitespace-nowrap px-2 py-2 text-[10px] font-bold uppercase tracking-wider shadow-[0_1px_0_#e2e8f0] sm:px-3 sm:py-3 ${isCommission ? "bg-blue-50 text-blue-700" : isTotalGiven ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"}`,
+        headerClassName: `sticky top-0 z-20 whitespace-nowrap px-2 py-2 text-[9px] font-bold uppercase tracking-wider shadow-[0_1px_0_#e2e8f0] ${isCommission ? "bg-blue-50 text-blue-700" : isTotalGiven ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"}`,
         cellClassName: isCommission
-          ? "bg-blue-50/30 px-1 py-1 sm:px-2 sm:py-2"
-          : `whitespace-nowrap px-2 py-2 text-[10px] font-semibold sm:px-3 sm:py-3 ${isTotalGiven ? "text-emerald-700" : column.key === "policy_number" ? "text-blue-600" : "text-slate-700"}`,
+          ? "bg-blue-50/30 px-1 py-1"
+          : `whitespace-nowrap px-2 py-2 text-[10px] font-semibold ${isTotalGiven ? "text-emerald-700" : column.key === "policy_number" ? "text-blue-600" : "text-slate-700"}`,
         render: (_, policy) => {
           const draft = drafts[policy.id] || {};
           const merged = { ...policy, ...draft };
@@ -365,7 +365,7 @@ export default function SetComm() {
                   onBlur={() => handleTotalGivenBlur(policy)}
                   onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
                   title="Enter Total Given to reverse-calculate POS Net percentage"
-                  className="h-7 w-24 rounded-lg border border-emerald-200 bg-white pl-5 pr-2 text-right text-[10px] font-bold text-emerald-700 outline-none transition hover:border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:h-8 sm:w-28 sm:text-[11px]"
+                  className="h-7 w-24 rounded-md border border-emerald-200 bg-white pl-5 pr-2 text-right text-[10px] font-bold text-emerald-700 outline-none transition hover:border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 />
               </span>
             );
@@ -390,7 +390,7 @@ export default function SetComm() {
                   onChange={(event) => handleCommissionChange(policy.id, column.key, event.target.value)}
                   onBlur={() => saveOnBlur(policy.id)}
                   onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-                  className="h-7 w-20 min-w-[60px] rounded-lg border border-blue-200 bg-white px-1 pr-5 text-right text-[10px] font-bold text-blue-800 outline-none transition hover:border-blue-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-100 sm:h-8 sm:w-28 sm:min-w-[112px] sm:px-2 sm:pr-6 sm:text-[11px]"
+                  className="h-7 w-20 min-w-[72px] rounded-md border border-blue-200 bg-white px-1 pr-5 text-right text-[10px] font-bold text-blue-800 outline-none transition hover:border-blue-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-100"
                 />
                 <span className="pointer-events-none absolute right-2 text-[10px] font-black text-blue-500">%</span>
               </span>
@@ -402,13 +402,13 @@ export default function SetComm() {
     }),
     {
       key: "auto_save",
-      label: "Auto Save",
-      headerClassName: "sticky right-0 top-0 z-[30] whitespace-nowrap bg-slate-100 px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-[-1px_0_0_#e2e8f0] sm:px-3 sm:py-3",
-      cellClassName: "sticky right-0 z-10 bg-slate-50 px-2 py-2 text-center shadow-[-1px_0_0_#f1f5f9] sm:px-3 sm:py-3",
+      label: "Save",
+      headerClassName: "sticky right-0 top-0 z-[30] whitespace-nowrap bg-slate-100 px-2 py-2 text-center text-[9px] font-bold uppercase tracking-wider text-slate-500 shadow-[-1px_0_0_#e2e8f0]",
+      cellClassName: "sticky right-0 z-10 bg-slate-50 px-2 py-2 text-center shadow-[-1px_0_0_#f1f5f9]",
       render: (_, policy) => {
         const status = saveStatus[policy.id];
         return (
-          <span className={`inline-flex min-w-[60px] justify-center rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:min-w-16 sm:px-2 sm:py-1 sm:text-[10px] ${status === "saved" ? "bg-emerald-50 text-emerald-700" : status === "error" ? "bg-red-50 text-red-700" : status === "saving" ? "bg-blue-50 text-blue-700" : status === "pending" ? "bg-amber-50 text-amber-700" : "border border-slate-200 bg-white text-slate-400"}`}>
+          <span className={`inline-flex min-w-14 justify-center rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${status === "saved" ? "bg-emerald-50 text-emerald-700" : status === "error" ? "bg-red-50 text-red-700" : status === "saving" ? "bg-blue-50 text-blue-700" : status === "pending" ? "bg-amber-50 text-amber-700" : "border border-slate-200 bg-white text-slate-400"}`}>
             {status === "saved" ? "Saved" : status === "error" ? "Error" : status === "saving" ? "Saving" : status === "pending" ? "Wait" : "Ready"}
           </span>
         );
@@ -420,7 +420,7 @@ export default function SetComm() {
   // Render
   // ---------------------------------------------------------------------
   return (
-    <main className="setcomm-dashboard mx-auto flex w-full flex-1 flex-col px-3 py-4 sm:px-6 sm:py-8">
+    <main className="setcomm-dashboard mx-auto flex w-full flex-1 flex-col px-2 py-3 sm:px-4 sm:py-5">
       <style>{`
         .setcomm-dashboard { font-family: Arial, sans-serif; }
         .setcomm-dashboard button, .setcomm-dashboard select, .setcomm-dashboard input,
@@ -445,7 +445,7 @@ export default function SetComm() {
             type="button"
             onClick={fetchPolicies}
             disabled={loading}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/20 disabled:opacity-50"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-white/10 transition hover:bg-white/20 disabled:opacity-50"
             title="Refresh policies"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -494,9 +494,9 @@ export default function SetComm() {
             name: "total-given-sum",
             className: "order-last w-full sm:ml-auto sm:w-auto",
             render: (
-              <div className="flex h-9 min-w-56 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 shadow-sm">
+              <div className="flex h-8 min-w-48 items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 shadow-sm">
                 <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Total Given</span>
-                <span className="text-xs font-black text-emerald-900">{formatCurrency(totalGivenSum)}</span>
+                <span className="text-[11px] font-black text-emerald-900">{formatCurrency(totalGivenSum)}</span>
               </div>
             ),
           },
@@ -523,8 +523,8 @@ export default function SetComm() {
         loadingMessage="Loading complete policy commission report..."
         error={error}
         emptyMessage="No policies found for the selected criteria."
-        serialHeaderClassName="sticky left-0 top-0 z-[30] whitespace-nowrap bg-slate-100 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-[1px_0_0_#e2e8f0] sm:px-3 sm:py-3"
-        serialCellClassName="sticky left-0 z-10 whitespace-nowrap bg-slate-50 px-2 py-2 text-[10px] font-bold text-slate-500 shadow-[1px_0_0_#f1f5f9] sm:px-3 sm:py-3"
+        serialHeaderClassName="sticky left-0 top-0 z-[30] whitespace-nowrap bg-slate-100 px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 shadow-[1px_0_0_#e2e8f0]"
+        serialCellClassName="sticky left-0 z-10 whitespace-nowrap bg-slate-50 px-2 py-2 text-[10px] font-bold text-slate-500 shadow-[1px_0_0_#f1f5f9]"
       />
     </main>
   );

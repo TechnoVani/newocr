@@ -16,7 +16,7 @@ const get = (source, path) => path.split(".").reduce((value, key) => value?.[key
 const money = value => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 export default function Dashboard({ overview = {} }) {
-  return <div className="space-y-6">
+  return <div className="space-y-4">
     <DashboardHero
       eyebrow="Human Resources department dashboard"
       description="Manage employees, attendance, payroll, performance and workforce activity from one HR workspace."
@@ -24,12 +24,15 @@ export default function Dashboard({ overview = {} }) {
       actionLabel="Add Employee"
       actionIcon={UserPlus}
     />
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map(([label, path, Icon, color, background]) => (
-        <div key={label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${background} ${color}`}><Icon size={20}/></div>
-          <p className="mt-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="mt-1 text-2xl font-black text-slate-900">{path.includes("net_pay") || path.includes("amount") ? money(get(overview, path)) : get(overview, path)}</p>
+        <div key={label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+          <div className="flex items-start justify-between gap-3">
+            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${background} ${color}`}><Icon size={18}/></div>
+            <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">HR</span>
+          </div>
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+          <p className="mt-0.5 truncate text-xl font-black text-slate-900">{path.includes("net_pay") || path.includes("amount") ? money(get(overview, path)) : get(overview, path)}</p>
         </div>
       ))}
     </div>
