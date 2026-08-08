@@ -10,7 +10,7 @@ export const departmentApi = {
   entryHistory: async (department, id) => readData(await axiosInstance.get(`/departments/${department}/entries/${id}/history`)),
   policies: async (department) => readData(await axiosInstance.get(`/departments/${department}/policies`)),
   renewals: async (department, params = {}) => readData(await axiosInstance.get(`/departments/${department}/renewals`, { params })),
-  followups: async (department) => readData(await axiosInstance.get(`/departments/${department}/followups`)),
+  followups: async (department, params = {}) => readData(await axiosInstance.get(`/departments/${department}/followups`, { params })),
   createFollowup: async (department, payload) => readData(await axiosInstance.post(`/departments/${department}/followups`, payload)),
   reports: async (department, params = {}) => readData(await axiosInstance.get(`/departments/${department}/reports`, { params })),
   masters: async (department) => readData(await axiosInstance.get(`/departments/${department}/masters`)),

@@ -275,15 +275,21 @@ class DepartmentDashboardModel {
           ...scope.params,
           ...ownership.params,
         ]),
-        db.query(`SELECT pf.id, CONCAT('Follow-up · ', pf.policy_number) title,
-          pf.status, pf.disposition priority, pf.policy_number,
+        db.query(`SELECT DISTINCT CONCAT('policy-', p.id) id,
+          CONCAT('Entry · ', p.policy_number) title,
+          CASE
+            WHEN pc.id IS NOT NULL THEN 'Cancelled'
+            ELSE 'Active'
+          END status,
+          'Normal' priority,
+          p.policy_number,
           COALESCE(e.name, 'Renewal Team') owner
-         FROM policy_followup pf
-         LEFT JOIN employees e ON e.id = pf.created_by
-         INNER JOIN department_work_items wi ON wi.policy_id = pf.policy_id
-         INNER JOIN policies_motor p ON p.id = pf.policy_id
+         FROM department_work_items wi
+         INNER JOIN policies_motor p ON wi.policy_id = p.id
+         LEFT JOIN policies_cancelled pc ON pc.policy_id = p.id
+         LEFT JOIN employees e ON e.id = p.created_by
          WHERE wi.department_slug = ? AND ${scope.sql} AND ${ownership.sql}
-         ORDER BY pf.updated_at DESC LIMIT 8`, [department, ...scope.params, ...ownership.params]),
+         ORDER BY p.created_at DESC, p.id DESC LIMIT 8`, [department, ...scope.params, ...ownership.params]),
       ]);
       const row = counts[0] || {};
       return {
@@ -510,6 +516,10 @@ class DepartmentDashboardModel {
       )`);
       renewalParams.push(startDate, endDate, startDate, endDate);
     }
+    if (filters.insurance_company && filters.insurance_company !== "All") {
+      renewalConditions.push("p.insurance_company = ?");
+      renewalParams.push(filters.insurance_company);
+    }
     const [renewalRows] = await db.query(
       `SELECT DISTINCT CONCAT('policy-renewal-', p.id) id,
         p.id policyId,
@@ -550,6 +560,13 @@ class DepartmentDashboardModel {
        ORDER BY renewalDate LIMIT 1000`,
       [...departmentParams, ...scope.params, ...ownership.params, ...renewalParams],
     );
+
+    const cancellationConditions = [];
+    const cancellationParams = [];
+    if (filters.insurance_company && filters.insurance_company !== "All") {
+      cancellationConditions.push("p.insurance_company = ?");
+      cancellationParams.push(filters.insurance_company);
+    }
     const [cancellationRows] = await db.query(
       `SELECT DISTINCT CONCAT('cancelled-renewal-', pc.id) id,
         DATE_FORMAT(pc.created_at, '%Y-%m-%d') reportDate,
@@ -564,8 +581,9 @@ class DepartmentDashboardModel {
        WHERE ${departmentFilter}
          AND ${scope.sql}
          AND ${ownership.sql}
+         ${cancellationConditions.length ? `AND ${cancellationConditions.join(" AND ")}` : ""}
        ORDER BY pc.created_at DESC, pc.id DESC LIMIT 1000`,
-      [...departmentParams, ...scope.params, ...ownership.params],
+      [...departmentParams, ...scope.params, ...ownership.params, ...cancellationParams],
     );
     const rows = department === "renewal" && type ? renewalRows : [...renewalRows, ...cancellationRows];
     return rows
@@ -648,10 +666,16 @@ class DepartmentDashboardModel {
     return { id: result.insertId, policyId: policy.id, policyNumber: policy.policy_number };
   }
 
-  static async getPolicyFollowups(department, user) {
+  static async getPolicyFollowups(department, user, filters = {}) {
     if (department !== "renewal") return [];
     const scope = departmentWorkScope(user, "wi");
     const ownership = policyOwnershipFilter(getPolicyReadScope(user), "p.created_by");
+    const conditions = ["wi.department_slug = ?", scope.sql, ownership.sql];
+    const params = [department, ...scope.params, ...ownership.params];
+    if (filters.insurance_company && filters.insurance_company !== "All") {
+      conditions.push("p.insurance_company = ?");
+      params.push(filters.insurance_company);
+    }
     const [rows] = await db.query(
       `SELECT pf.id, pf.policy_id policyId, pf.policy_number policyNumber,
         pf.insured_name insuredName, DATE_FORMAT(pf.renewal_date, '%Y-%m-%d') renewalDate,
@@ -664,9 +688,9 @@ class DepartmentDashboardModel {
        INNER JOIN department_work_items wi ON wi.policy_id = pf.policy_id
        INNER JOIN policies_motor p ON p.id = pf.policy_id
        LEFT JOIN employees e ON e.id = pf.created_by
-       WHERE wi.department_slug = ? AND ${scope.sql} AND ${ownership.sql}
+       WHERE ${conditions.join(" AND ")}
        ORDER BY pf.created_at DESC, pf.id DESC LIMIT 2000`,
-      [department, ...scope.params, ...ownership.params],
+      params,
     );
     return rows;
   }

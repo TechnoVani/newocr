@@ -4,10 +4,19 @@ import Policies from "./Policies";
 import Renewals from "./Renewals";
 import LapsedPolicy from "./LapsedPolicy";
 import Reports from "./Reports";
-import Master from "./Master";
-import EntryForm from "./EntryForm";
+import MotorEntry from "../../features/policy-workspace/pages/MotorEntry";
 import Navbar from "./Navbar";
 import { department } from "./department";
 
-const pages = Object.freeze({ dashboard: Dashboard, policies: Policies, renewals: Renewals, "lapsed-policy": LapsedPolicy, reports: Reports, master: Master, form: EntryForm });
-export default function RenewalDepartmentApp() { return <GenericDepartmentApp department={department} pages={pages} Navbar={Navbar}/>; }
+const pages = Object.freeze({
+  dashboard: Dashboard,
+  policies: Policies,
+  renewals: Renewals,
+  "lapsed-policy": LapsedPolicy,
+  reports: Reports,
+  "motor-entry": MotorEntry
+});
+
+export default function RenewalDepartmentApp() {
+  return <GenericDepartmentApp department={department} pages={pages} Navbar={Navbar} />;
+}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Download, RotateCcw, Search } from "lucide-react";
 import ReusableSelect from "./ReusableSelect";
 import ReusableSearchSelect from "./ReusableSearchSelect";
+import { formControlClass, formLabelClass, formLabelTextClass } from "./ReusableForm";
 
 const normalizeFilterOptions = (filter) => {
   const options = (filter.options || []).map((option) => ({
@@ -104,16 +105,16 @@ export default function ReusableTable({
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
           {filters.map((filter) => filter.render ? (
             filter.label ? (
-              <label key={filter.name} className={`relative block pt-2 ${filter.className || "w-full sm:w-auto"}`}>
-                <span className="pointer-events-none absolute left-3 top-0 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">{filter.label}</span>
+              <label key={filter.name} className={`${formLabelClass} ${filter.className || "w-full sm:w-auto"}`}>
+                <span className={formLabelTextClass}>{filter.label}</span>
                 {filter.render}
               </label>
             ) : (
               <div key={filter.name} className={filter.className || "w-full sm:w-auto"}>{filter.render}</div>
             )
           ) : (
-            <label key={filter.name} className={`relative block w-full pt-2 ${filter.className || "sm:w-40"}`}>
-              <span className="pointer-events-none absolute left-3 top-0 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">{filter.label}</span>
+            <label key={filter.name} className={`${formLabelClass} w-full ${filter.className || "sm:w-40"}`}>
+              <span className={formLabelTextClass}>{filter.label}</span>
               {filter.type === "input" ? (
                 <input
                   value={filter.value ?? ""}
@@ -122,7 +123,7 @@ export default function ReusableTable({
                     setPage(1);
                   }}
                   placeholder={filter.placeholder || `Enter ${filter.label}`}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-500/10"
+                  className={`${formControlClass} h-9 px-3`}
                 />
               ) : (
                 <SearchableTableFilter
@@ -136,8 +137,8 @@ export default function ReusableTable({
               )}
             </label>
           ))}
-          <label className="relative block w-full pt-2 sm:w-56">
-            <span className="pointer-events-none absolute left-3 top-0 z-10 bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">Search</span>
+          <label className={`${formLabelClass} w-full sm:w-56`}>
+            <span className={formLabelTextClass}>Search</span>
             <span className="relative">
             <Search size={14} className="pointer-events-none absolute left-3 top-2.5 text-slate-400" aria-hidden="true" />
             <input
@@ -151,12 +152,12 @@ export default function ReusableTable({
               }}
               placeholder={searchConfig?.placeholder || "Search records..."}
               aria-label="Search table records"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-xs font-semibold text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-500/10"
+              className={`${formControlClass} h-9 py-2 pl-9 pr-4`}
             />
             </span>
           </label>
-          <label className="relative block w-full pt-2 sm:w-20">
-            <span className="pointer-events-none absolute left-3 top-0 z-10 bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500">Rows</span>
+          <label className={`${formLabelClass} w-full sm:w-20`}>
+            <span className={formLabelTextClass}>Rows</span>
             <ReusableSelect
               size="compact"
               value={effectiveRowsPerPage}

@@ -133,6 +133,17 @@ export default function GenericDepartmentApp({ department, pages, Navbar = Depar
     form: { department, fields: schema.formFields, onSubmit: createEntry },
   };
 
+  if (section === "motor-entry") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
+        <Navbar department={department} />
+        <main className="flex min-h-0 w-full flex-1 flex-col">
+          <Page {...(pageProps[section] || pageProps.dashboard)} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
       <Navbar department={department} />

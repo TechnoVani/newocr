@@ -33,56 +33,54 @@ const MotorEntrySection = ({
           <span>🚗</span> OFFICE ENTRY DETAILS
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {DROPDOWN_STEPS.map((step, idx) => {
           const disabled = isMotorStepDisabled(idx);
           const hasError = !!motorErrors[step.name];
           return (
-            <div key={step.name} className="flex min-w-0 flex-col pt-2">
-              <div className="relative min-w-0">
-                <label
-                  htmlFor={`motor-${step.name}`}
-                  className={`pointer-events-none absolute -top-1.5 left-3 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-bold uppercase tracking-wider ${
-                    hasError ? "text-red-500" : "text-slate-500"
-                  }`}
-                  title={step.label}
-                >
-                  {step.label}
-                </label>
-                <ReusableSearchSelect
-                  inputId={`motor-${step.name}`}
-                  hasError={hasError}
-                  minHeight={40}
-                  name={step.name}
-                  value={
-                    motorFormData[step.name]
-                      ? {
-                          value: motorFormData[step.name],
-                          label: (() => {
-                            const found = motorOptions[step.name]?.find(
-                              (o) => o.id.toString() === motorFormData[step.name]
-                            );
-                            return found ? formatOptionLabel(found) : motorFormData[step.name];
-                          })(),
-                        }
-                      : null
-                  }
-                  onChange={(selected) => {
-                    const val = selected ? selected.value : "";
-                    onMotorChange(step.name, val);
-                  }}
-                  options={(motorOptions[step.name] || []).map((opt) => ({
-                    value: opt.id.toString(),
-                    label: formatOptionLabel(opt),
-                    ...opt, // keep original data
-                  }))}
-                  isDisabled={disabled}
-                  isLoading={motorLoading[step.name]}
-                  isSearchable={true}
-                  placeholder={step.placeholder}
-                  noOptionsMessage={() => "No Data Available"}
-                />
-              </div>
+            <div key={step.name} className="relative min-w-0 pt-2">
+              <label
+                htmlFor={`motor-${step.name}`}
+                className={`pointer-events-none absolute left-3 top-0 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-semibold uppercase leading-none tracking-wider ${
+                  hasError ? "text-red-500" : "text-slate-500"
+                }`}
+                title={step.label}
+              >
+                {step.label}
+              </label>
+              <ReusableSearchSelect
+                inputId={`motor-${step.name}`}
+                hasError={hasError}
+                minHeight={40}
+                name={step.name}
+                value={
+                  motorFormData[step.name]
+                    ? {
+                        value: motorFormData[step.name],
+                        label: (() => {
+                          const found = motorOptions[step.name]?.find(
+                            (o) => o.id.toString() === motorFormData[step.name]
+                          );
+                          return found ? formatOptionLabel(found) : motorFormData[step.name];
+                        })(),
+                      }
+                    : null
+                }
+                onChange={(selected) => {
+                  const val = selected ? selected.value : "";
+                  onMotorChange(step.name, val);
+                }}
+                options={(motorOptions[step.name] || []).map((opt) => ({
+                  value: opt.id.toString(),
+                  label: formatOptionLabel(opt),
+                  ...opt, // keep original data
+                }))}
+                isDisabled={disabled}
+                isLoading={motorLoading[step.name]}
+                isSearchable={true}
+                placeholder={step.placeholder}
+                noOptionsMessage={() => "No Data Available"}
+              />
               {hasError && (
                 <div className="flex items-center gap-1 mt-1.5 text-red-500">
                   <AlertCircle size={10} className="shrink-0" />
