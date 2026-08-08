@@ -255,9 +255,9 @@ const SectionHeader = ({ icon, title, color }) => {
     teal: "from-teal-500 to-cyan-600 shadow-teal-100"
   };
   return (
-    <div className={`bg-gradient-to-r ${gradients[color] || "from-slate-600 to-slate-700"} text-white px-4 py-2.5 rounded-xl flex items-center gap-2 mb-4 shadow-sm`}>
+    <div className={`bg-gradient-to-r ${gradients[color] || "from-slate-600 to-slate-700"} text-white px-3.5 py-2 rounded-lg flex items-center gap-2 mb-4 shadow-sm`}>
       <span className="text-sm flex items-center">{icon}</span>
-      <h4 className="text-[11px] font-bold tracking-wider uppercase">{title}</h4>
+      <h4 className="text-[11px] font-bold uppercase">{title}</h4>
     </div>
   );
 };
@@ -317,10 +317,10 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
   }, [yearPickerOpen]);
 
   let inputElement;
-  const baseInputClass = "min-h-10 text-xs text-slate-800 font-medium bg-white hover:bg-slate-50/50 focus:bg-white border border-slate-300 hover:border-slate-400 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 shadow-sm";
+  const baseInputClass = "min-h-11 text-xs text-slate-800 font-semibold bg-white hover:bg-slate-50/60 focus:bg-white border border-slate-200 hover:border-slate-300 rounded-lg px-3 py-2.5 w-full min-w-0 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 shadow-sm";
 
   if (isTextarea) {
-    inputElement = <textarea id={inputId} value={value || ""} onChange={(e) => onChange(e.target.value)} rows={2} className={`${baseInputClass} resize-none`} />;
+    inputElement = <textarea id={inputId} value={value || ""} onChange={(e) => onChange(e.target.value)} rows={3} className={`${baseInputClass} resize-y leading-relaxed`} />;
   } else if (isDate) {
     const dateValue = toDateInputValue(value);
     const handleClick = () => { if (dateInputRef.current && dateInputRef.current.showPicker) dateInputRef.current.showPicker(); };
@@ -353,7 +353,7 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
   } else if (type === "file") {
     const fileName = value?.name || (typeof value === 'string' ? value : '');
     inputElement = (
-      <div className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-2 shadow-sm transition-all duration-150 hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+      <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm transition-all duration-150 hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
         <input
           id={inputId}
           type="file"
@@ -362,13 +362,20 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
             const file = e.target.files[0];
             if (file) onChange(file);
           }}
-          className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+          className="sr-only"
         />
+        <label
+          htmlFor={inputId}
+          className="shrink-0 cursor-pointer rounded-md bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-100"
+        >
+          Choose
+        </label>
         {fileName && (
-          <span className="text-[10px] text-slate-600 truncate max-w-[100px]" title={fileName}>
+          <span className="min-w-0 truncate text-[11px] font-semibold text-slate-600" title={fileName}>
             {fileName}
           </span>
         )}
+        {!fileName && <span className="min-w-0 truncate text-[11px] font-semibold text-slate-400">No file selected</span>}
       </div>
     );
   } else if (type === "select") {
@@ -380,7 +387,7 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
         options={options}
         isSearchable
         isClearable
-        minHeight={40}
+        minHeight={44}
         placeholder={`Select ${label}`}
         noOptionsMessage={() => "No Data Available"}
       />
@@ -390,17 +397,17 @@ const EditableRow = ({ label, value, onChange, type = "text", highlight = false,
   }
 
   return (
-    <div className={`min-w-0 pb-1 pt-2 ${highlight ? 'rounded-xl bg-blue-50/60 px-2' : ''}`}>
-      <div className="relative min-w-0">
-        <label
-          htmlFor={inputId}
-          className={`pointer-events-none absolute -top-1.5 left-3 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-bold uppercase tracking-wider ${
-            highlight ? 'text-blue-700' : 'text-slate-500'
-          }`}
-          title={label}
-        >
-          {label}
-        </label>
+    <div className={`min-w-0 rounded-lg ${highlight ? 'bg-blue-50/70 p-2' : ''}`}>
+      <label
+        htmlFor={inputId}
+        className={`mb-1.5 block min-w-0 break-words text-[10px] font-bold uppercase leading-snug ${
+          highlight ? 'text-blue-700' : 'text-slate-500'
+        }`}
+        title={label}
+      >
+        {label}
+      </label>
+      <div className="min-w-0">
         {inputElement}
       </div>
     </div>
@@ -850,9 +857,9 @@ function PolicyCardView({
           </div>
 
           {/* ===== THREE COLUMNS ===== */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-5 mb-5">
             {/* Insured Details */}
-            <div className="bg-slate-50/20 border border-slate-100 rounded-2xl p-4 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
+            <div className="min-w-0 bg-slate-50/20 border border-slate-100 rounded-xl p-4 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
               <SectionHeader icon="👤" title="INSURED DETAILS" color="blue" />
               <EditableRow label="Name" value={formData.insuredName} onChange={(val) => handleFieldChange("insuredName", val)} />
               <EditableRow label="PAN" value={formData.panNumber} onChange={(val) => handleFieldChange("panNumber", val)} />
@@ -863,7 +870,7 @@ function PolicyCardView({
             </div>
 
             {/* Policy Details */}
-            <div className="bg-slate-50/20 border border-slate-100 rounded-2xl p-4 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
+            <div className="min-w-0 bg-slate-50/20 border border-slate-100 rounded-xl p-4 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
               <SectionHeader icon="📋" title="POLICY DETAILS" color="green" />
               <EditableRow label="Start Date" value={formData.policyDates?.startDate} onChange={(val) => handleDateChange("startDate", val)} isDate />
               <EditableRow label="OD Expiry" value={formData.policyDates?.odExpireDate} onChange={(val) => handleDateChange("odExpireDate", val)} isDate />
@@ -877,7 +884,7 @@ function PolicyCardView({
             </div>
 
             {/* Premium Details */}
-            <div className="bg-slate-50/20 border border-slate-100 rounded-2xl p-4 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
+            <div className="min-w-0 bg-slate-50/20 border border-slate-100 rounded-xl p-4 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
               <SectionHeader icon="💰" title="PREMIUM DETAILS" color="purple" />
               {shouldShowPremiumField(matchedPolicy, "calculatedOdPremium") && <EditableRow label="First Year OD" value={getPremiumValue(formData.finalPremium?.calculatedOdPremium)} onChange={(val) => handlePremiumChange("calculatedOdPremium", val)} type="number" />}
               {shouldShowPremiumField(matchedPolicy, "calculatedTpPremium") && <EditableRow label="First Year TP" value={getPremiumValue(formData.finalPremium?.calculatedTpPremium)} onChange={(val) => handlePremiumChange("calculatedTpPremium", val)} type="number" />}
@@ -890,9 +897,9 @@ function PolicyCardView({
           </div>
 
           {/* ===== VEHICLE DETAILS ===== */}
-          <div className="bg-slate-50/20 border border-slate-100 rounded-2xl p-4 mb-5 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
+          <div className="min-w-0 bg-slate-50/20 border border-slate-100 rounded-xl p-4 mb-5 shadow-sm hover:bg-slate-50/40 transition-colors duration-200">
             <SectionHeader icon="🚗" title="VEHICLE DETAILS" color="light blue" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-2">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-x-5 gap-y-4">
               <EditableRow label="Reg No" value={mergedVehicle.registrationNumber} onChange={handleRegistrationNumberChange} />
               <EditableRow
                 label="Registration Authority *"
