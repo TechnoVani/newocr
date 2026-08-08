@@ -1,8 +1,8 @@
 import { RotateCcw, Save } from "lucide-react";
 
-export const formControlClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60";
+export const formControlClass = "h-11 w-full min-w-0 truncate rounded-xl border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[#1E88E5] focus:ring-2 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70 aria-invalid:border-red-400 aria-invalid:focus:border-red-500 aria-invalid:focus:ring-red-500/10";
 export const formLabelClass = "relative block min-w-0 pt-2";
-export const formLabelTextClass = "pointer-events-none absolute left-3 top-0 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-bold uppercase leading-none tracking-wider text-slate-500";
+export const formLabelTextClass = "pointer-events-none absolute left-3 top-0 z-10 max-w-[calc(100%-1.5rem)] truncate bg-white px-1 text-[9px] font-semibold uppercase leading-none tracking-wider text-slate-500";
 
 export default function ReusableForm({
   title,

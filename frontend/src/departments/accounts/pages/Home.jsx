@@ -8,7 +8,6 @@ import {
   CircleDollarSign,
   FileCheck2,
   FileX2,
-  FileSpreadsheet,
   GitBranch,
   IndianRupee,
   Landmark,
@@ -179,7 +178,6 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
   const maxInsurer = Math.max(...(dashboard.top_insurers || []).map(item => Number(item.net_premium) || 0), 1);
   const policies = dashboard.policies || fallback.policies;
   const masters = dashboard.masters || fallback.masters;
-  const payout = dashboard.payout_grid || fallback.payout_grid;
   const verificationRate = policies.current_month
     ? Math.round(((policies.current_month - policies.pending_verification) / policies.current_month) * 100)
     : 0;
@@ -284,25 +282,6 @@ export default function Home({ companies = [], branches = [], dbStatus = "checki
 
       <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.6fr] relative z-10">
         <div className="grid gap-4">
-          <article className="relative overflow-hidden rounded-2xl border border-slate-950/5 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-md">
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-300">Payout grid control</p>
-                <p className="mt-2 text-2xl font-black tracking-tight">{payout.rules.toLocaleString("en-IN")} rules</p>
-                <p className="mt-1 text-[11px] text-slate-400">{payout.batches} upload batches · {payout.companies} insurers</p>
-              </div>
-              <FileSpreadsheet className="text-blue-300" size={24} />
-            </div>
-            <div className="mt-4 flex items-center justify-between rounded-xl bg-white/5 px-3.5 py-2.5 border border-white/5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Latest grid</p>
-                <p className="mt-1 text-sm font-bold">{payout.latest_month || "Not uploaded"}</p>
-              </div>
-              <Link to="/accounts/payout-grid/report" className="inline-flex items-center gap-1 text-xs font-bold text-blue-300 hover:text-white transition-colors">Open report <ArrowRight size={13} /></Link>
-            </div>
-          </article>
-
           <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-blue-100">
             <div className="flex items-center justify-between gap-3">
               <div>

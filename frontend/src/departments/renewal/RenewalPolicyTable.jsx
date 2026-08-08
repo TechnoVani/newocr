@@ -4,6 +4,7 @@ import ReusableTable from "../../components/reusable/ReusableTable";
 import ReusableSelect from "../../components/reusable/ReusableSelect";
 import MonthYearPicker from "../../pages/reusable/MonthYearPicker";
 import { departmentApi } from "../shared/departmentApi";
+import { accountsApi } from "../accounts/services/accountsApi";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -142,12 +143,27 @@ export default function RenewalPolicyTable({ rows = [], lapsedOnly = false }) {
   const now = useMemo(() => new Date(), []);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedCompany, setSelectedCompany] = useState("All");
+  const [companiesList, setCompaniesList] = useState([]);
   const [fetchedRows, setFetchedRows] = useState(null);
   const [error, setError] = useState("");
-  const requestParams = useMemo(() => lapsedOnly
-    ? { type: "lapsed", month: selectedMonth, year: selectedYear }
-    : { type: "upcoming" },
-    [lapsedOnly, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    accountsApi.companies()
+      .then((data) => setCompaniesList(Array.isArray(data) ? data.filter(c => c.status === "Active") : []))
+      .catch(() => {});
+  }, []);
+
+  const requestParams = useMemo(() => {
+    const params = lapsedOnly
+      ? { type: "lapsed", month: selectedMonth, year: selectedYear }
+      : { type: "upcoming" };
+    if (selectedCompany && selectedCompany !== "All") {
+      params.insurance_company = selectedCompany;
+    }
+    return params;
+  }, [lapsedOnly, selectedMonth, selectedYear, selectedCompany]);
+
   const reloadRows = () => departmentApi.renewals("renewal", requestParams).then(setFetchedRows).catch(() => {});
   useEffect(() => {
     let active = true;
@@ -190,6 +206,38 @@ export default function RenewalPolicyTable({ rows = [], lapsedOnly = false }) {
     },
   ], []);
 
+  const companyFilter = {
+    name: "insurance_company",
+    label: "Insurance Company",
+    render: (
+      <ReusableSelect value={selectedCompany} onChange={(event) => setSelectedCompany(event.target.value)}>
+        <option value="All">All Companies</option>
+        {companiesList.map((company) => (
+          <option key={company.id} value={company.insurer}>
+            {company.insurer}
+          </option>
+        ))}
+      </ReusableSelect>
+    ),
+  };
+
+  const tableFilters = lapsedOnly ? [
+    {
+      name: "lapsed-period",
+      render: <MonthYearPicker
+        label="Lapsed Month"
+        month={selectedMonth}
+        year={selectedYear}
+        clearable={false}
+        onChange={(nextMonth, nextYear) => {
+          setSelectedMonth(nextMonth);
+          setSelectedYear(nextYear);
+        }}
+      />,
+    },
+    companyFilter
+  ] : [companyFilter];
+
   return (
     <>
       <ReusableTable
@@ -198,19 +246,7 @@ export default function RenewalPolicyTable({ rows = [], lapsedOnly = false }) {
         icon={lapsedOnly ? TriangleAlert : RefreshCw}
         rows={visibleRows}
         columns={columns}
-        filters={lapsedOnly ? [{
-          name: "lapsed-period",
-          render: <MonthYearPicker
-            label="Lapsed Month"
-            month={selectedMonth}
-            year={selectedYear}
-            clearable={false}
-            onChange={(nextMonth, nextYear) => {
-              setSelectedMonth(nextMonth);
-              setSelectedYear(nextYear);
-            }}
-          />,
-        }] : []}
+        filters={tableFilters}
         pageSize={20}
         pageSizeOptions={[20, 50, 100]}
         error={error}

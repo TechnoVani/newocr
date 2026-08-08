@@ -9,6 +9,7 @@ import {
   ClipboardPlus,
   Database,
   FileCheck2,
+  FilePlus2,
   FileSearch,
   Files,
   GraduationCap,
@@ -112,7 +113,9 @@ export const DEPARTMENT_MENUS = Object.freeze({
     item("renewals", "Upcoming Policy", RefreshCw),
     item("lapsed-policy", "Lapsed Policy", TriangleAlert),
     item("reports", "Follow-up Report", ClipboardCheck),
-    item("master", "Renewal Master", Database, ACCESS_ROLES.MANAGER),
+    group("Policy Entry", FilePlus2, [
+      item("motor-entry", "Motor Entry", FilePlus2),
+    ]),
   ],
   finance: workflowMenu({
     queueLabel: "Finance Desk",

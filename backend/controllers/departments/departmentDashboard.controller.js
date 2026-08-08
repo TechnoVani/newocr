@@ -62,7 +62,7 @@ class DepartmentDashboardController {
 
     static async followups(req, res, next) {
         try {
-            return successResponse(res, "Policy follow-ups retrieved successfully", await DepartmentDashboardModel.getPolicyFollowups(req.departmentPortal, req.user));
+            return successResponse(res, "Policy follow-ups retrieved successfully", await DepartmentDashboardModel.getPolicyFollowups(req.departmentPortal, req.user, req.query));
         } catch (error) { next(error); }
     }
 
