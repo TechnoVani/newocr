@@ -26,6 +26,37 @@ const swalBase = {
   },
 };
 
+const toastBase = {
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  showCloseButton: false,
+  timer: 2500,
+  timerProgressBar: true,
+  heightAuto: false,
+  backdrop: false,
+  scrollbarPadding: false,
+  allowOutsideClick: false,
+  customClass: {
+    container: "nib-swal-toast-container",
+    popup: "nib-swal-toast-popup",
+  },
+  didOpen: () => {
+    const container = document.querySelector(".nib-swal-toast-container");
+    const popup = document.querySelector(".nib-swal-toast-popup");
+    if (container) {
+      container.style.position = "fixed";
+      container.style.inset = "16px 16px auto auto";
+      container.style.zIndex = "2147483647";
+      container.style.width = "auto";
+      container.style.pointerEvents = "none";
+    }
+    if (popup) {
+      popup.style.pointerEvents = "none";
+    }
+  },
+};
+
 const closeDuplicate = (key) => {
   if (!key) return;
   const currentKey = Swal.getPopup()?.dataset?.alertKey;
@@ -53,11 +84,35 @@ export const notify = async ({ icon = "info", title, text, html, confirmButtonTe
   });
 };
 
+export const notifyToast = async ({ icon = "info", title, text, html, key, ...options }) => {
+  const alertKey = key || `toast:${icon}:${title || ""}:${text || html || ""}`;
+  if (closeDuplicate(alertKey)) return { isConfirmed: false, isDuplicateAlert: true };
+  return Swal.fire({
+    ...toastBase,
+    icon,
+    title,
+    text,
+    html,
+    ...options,
+    didOpen: (popup) => {
+      popup.dataset.alertKey = alertKey;
+      toastBase.didOpen();
+      options.didOpen?.(popup);
+    },
+  });
+};
+
 export const showSuccess = (message = "Saved successfully.", options = {}) =>
   notify({ icon: "success", title: "Success", text: message, ...options });
 
+export const showSuccessToast = (message = "Saved successfully.", options = {}) =>
+  notifyToast({ icon: "success", title: "Success", text: message, ...options });
+
 export const showError = (message = "Something went wrong. Please try again.", options = {}) =>
   notify({ icon: "error", title: "Error", text: message, ...options });
+
+export const showErrorToast = (message = "Something went wrong. Please try again.", options = {}) =>
+  notifyToast({ icon: "error", title: "Error", text: message, ...options });
 
 export const showValidation = (message = "Please check the highlighted fields.", options = {}) =>
   notify({ icon: "warning", title: "Validation Error", text: message, ...options });
@@ -102,8 +157,11 @@ export const showApiError = (error, fallback, options = {}) => {
 
 export default {
   notify,
+  notifyToast,
   showSuccess,
+  showSuccessToast,
   showError,
+  showErrorToast,
   showValidation,
   showDuplicate,
   showAccessDenied,
