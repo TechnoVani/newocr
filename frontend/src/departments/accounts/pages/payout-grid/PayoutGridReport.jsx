@@ -102,7 +102,7 @@ export default function PayoutGridReport() {
             ["company", "Company", report.options?.companies],
             ["month", "Month", report.options?.months],
             ["business_type", "Business Type", report.options?.businessTypes],
-            ["category", "Vehicle Category", report.options?.categories],
+            ["category", "Categories", report.options?.categories],
             ["classification", "Classification", report.options?.classifications],
           ].map(([name, label, values]) => (
             <label key={name} className="relative block pt-2">

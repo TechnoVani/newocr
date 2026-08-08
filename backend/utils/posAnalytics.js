@@ -10,13 +10,12 @@ const asDate = value => {
 };
 const startOfDay = date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const getLob = policy =>
-    policy.registration_number || policy.vehicle_category || policy.make_name
+    policy.registration_number || policy.categories || policy.make_name
         ? "Motor"
-        : policy.policy_type || "Other";
+        : policy.product_type || "Other";
 const getClassification = policy =>
-    policy.commercial_vehicle_type ||
-    policy.vehicle_category ||
-    policy.sub_type ||
+    policy.classification ||
+    policy.categories ||
     "Unclassified";
 const getExpiryDate = policy => {
     const dates = [asDate(policy.od_expiry), asDate(policy.tp_expiry)].filter(Boolean);
@@ -96,7 +95,7 @@ export const buildPosAnalytics = (policies, now = new Date()) => {
             motor.netPremium += amount(policy.net_premium);
             motorGroups.set(classification, motor);
 
-            const category = policy.vehicle_category || "Unclassified";
+            const category = policy.categories || "Unclassified";
             const categoryRow = categoryGroups.get(category) || { label: category, policyCount: 0, premium: 0 };
             categoryRow.policyCount += 1;
             categoryRow.premium += amount(policy.net_premium);

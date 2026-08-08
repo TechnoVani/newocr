@@ -22,29 +22,62 @@ const ensurePolicyTableName = async () => {
     }
 };
 
-export const ensurePoliciesMotorSchema = async () => {
-    await ensurePolicyTableName();
-
+const getPolicyColumns = async () => {
     const [columns] = await db.query(
         `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
          FROM information_schema.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'policies_motor'
-           AND COLUMN_NAME IN (
-               'insurer_branch',
-               'rto',
-               'ncb',
-               'seating_capacity',
-               'first_year_od',
-               'first_year_tp'
-           )`
+           AND TABLE_NAME = 'policies_motor'`
     );
+    return new Map(columns.map((column) => [column.COLUMN_NAME, column]));
+};
 
-    const columnsByName = new Map(columns.map((column) => [column.COLUMN_NAME, column]));
+const renamePolicyColumn = async (columnsByName, oldName, newName, definition) => {
+    const hasOld = columnsByName.has(oldName);
+    const hasNew = columnsByName.has(newName);
+
+    if (hasOld && !hasNew) {
+        await db.query(`ALTER TABLE policies_motor CHANGE COLUMN \`${oldName}\` \`${newName}\` ${definition}`);
+        columnsByName.delete(oldName);
+        columnsByName.set(newName, { COLUMN_NAME: newName });
+        return;
+    }
+
+    if (hasOld && hasNew) {
+        await db.query(
+            `UPDATE policies_motor
+             SET \`${newName}\` = COALESCE(NULLIF(\`${newName}\`, ''), \`${oldName}\`)
+             WHERE \`${oldName}\` IS NOT NULL`
+        );
+        await db.query(`ALTER TABLE policies_motor DROP COLUMN \`${oldName}\``);
+        columnsByName.delete(oldName);
+    }
+};
+
+export const ensurePoliciesMotorSchema = async () => {
+    await ensurePolicyTableName();
+
+    const columnsByName = await getPolicyColumns();
+
+    await renamePolicyColumn(columnsByName, "policy_type", "product_type", "VARCHAR(100) DEFAULT NULL");
+    await renamePolicyColumn(columnsByName, "vehicle_category", "categories", "VARCHAR(100) DEFAULT NULL");
+    await renamePolicyColumn(columnsByName, "commercial_vehicle_type", "classification", "VARCHAR(100) DEFAULT NULL");
+
+    if (columnsByName.has("sub_type")) {
+        await db.query("ALTER TABLE policies_motor DROP COLUMN `sub_type`");
+        columnsByName.delete("sub_type");
+    }
+
     const seatingCapacity = columnsByName.get("seating_capacity");
     const rto = columnsByName.get("rto");
     const ncb = columnsByName.get("ncb");
     const premiumColumns = ["first_year_od", "first_year_tp"];
+
+    for (const columnName of ["product_type", "categories", "classification"]) {
+        if (!columnsByName.has(columnName)) {
+            throw new Error(`policies_motor.${columnName} column is missing`);
+        }
+    }
 
     if (!seatingCapacity) {
         throw new Error("policies_motor.seating_capacity column is missing");
@@ -61,7 +94,7 @@ export const ensurePoliciesMotorSchema = async () => {
 
     if (!columnsByName.has("insurer_branch")) {
         await db.query(
-            "ALTER TABLE policies_motor ADD COLUMN insurer_branch VARCHAR(255) DEFAULT NULL AFTER vehicle_category"
+            "ALTER TABLE policies_motor ADD COLUMN insurer_branch VARCHAR(255) DEFAULT NULL AFTER categories"
         );
     }
 
@@ -80,7 +113,7 @@ export const ensurePoliciesMotorSchema = async () => {
 
     if (!ncb) {
         await db.query(
-            "ALTER TABLE policies_motor ADD COLUMN ncb VARCHAR(30) DEFAULT NULL AFTER commercial_vehicle_type"
+            "ALTER TABLE policies_motor ADD COLUMN ncb VARCHAR(30) DEFAULT NULL AFTER classification"
         );
     } else if (
         String(ncb.DATA_TYPE).toLowerCase() !== "varchar" ||

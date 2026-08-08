@@ -44,7 +44,7 @@ const normalizeMonth = (value) => {
 
 const normalizeRow = (row, index, userId, fileName) => ({
   business_type: text(read(row, "business_type", "Business_Type"), 100),
-  category: text(read(row, "category", "vehicle_category", "Motor_Category"), 100),
+  category: text(read(row, "category", "categories", "Motor_Category"), 100),
   classification: text(read(row, "classification", "vehicle_classification", "vehicle_Classification"), 150),
   product_type: text(read(row, "product_type", "Product_Type"), 150),
   rto: text(read(row, "rto", "RTO"), 255),

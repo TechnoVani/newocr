@@ -32,7 +32,7 @@ export default function PosReports() {
   }, [month]);
 
   const business = useMemo(() => Object.values((report.policies || []).reduce((groups, row) => {
-    const key = row.policy_type || "Other";
+    const key = row.product_type || "Other";
     groups[key] ||= { policyType: key, policyCount: 0, odPremium: 0, tpPremium: 0, netPremium: 0 };
     groups[key].policyCount += 1;
     groups[key].odPremium += Number(row.total_od) || 0;
@@ -42,7 +42,7 @@ export default function PosReports() {
   }, {})), [report.policies]);
 
   const columns = [
-    { key: "policyType", label: "Policy Type" },
+    { key: "policyType", label: "Product Type" },
     { key: "policyCount", label: "Policy Count" },
     { key: "odPremium", label: "OD Premium", render: value => `₹${currency(value)}` },
     { key: "tpPremium", label: "TP Premium", render: value => `₹${currency(value)}` },

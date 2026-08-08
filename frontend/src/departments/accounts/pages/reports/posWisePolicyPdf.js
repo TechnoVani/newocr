@@ -959,7 +959,7 @@ export function downloadPosWiseSelectedPoliciesPdf({ policies, pos, month, posId
   drawSectionTitle("Grouped Business Summary");
 
   const classMap = selectedPolicies.reduce((map, policy) => {
-    const key = normalizeText(policy.vehicle_category || policy.commercial_vehicle_type || policy.policy_type, "Motor");
+    const key = normalizeText(policy.categories || policy.classification || policy.product_type, "Motor");
     const value = map.get(key) || { count: 0, od: 0, tp: 0, net: 0, commission: 0 };
     value.count += 1;
     value.od += numberValue(policy.total_od);
@@ -977,7 +977,7 @@ export function downloadPosWiseSelectedPoliciesPdf({ policies, pos, month, posId
 
   drawTable({
     columns: [
-      { label: "Vehicle Category", width: 145, maxLines: 2 },
+      { label: "Categories", width: 145, maxLines: 2 },
       { label: "NOP", width: 42, align: "center" },
       { label: "OD Premium", width: 82, align: "right" },
       { label: "TP Premium", width: 82, align: "right" },
@@ -1029,7 +1029,7 @@ export function downloadPosWiseSelectedPoliciesPdf({ policies, pos, month, posId
     normalizeText(policy.insurance_company || policy.insurer_name),
     normalizeText(policy.policy_number || policy.policy_no),
     getPolicyDisplayDate(policy),
-    normalizeText(policy.vehicle_category || policy.commercial_vehicle_type || policy.policy_type, "Motor"),
+    normalizeText(policy.categories || policy.classification || policy.product_type, "Motor"),
     money(policy.total_od), money(policy.total_tp), money(policy.net_premium),
     percentage(policy.pos_od), percentage(policy.pos_tp), percentage(policy.pos_net),
     money(posIncome(policy)),

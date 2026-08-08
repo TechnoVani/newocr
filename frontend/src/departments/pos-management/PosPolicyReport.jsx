@@ -25,10 +25,10 @@ export default function PosPolicyReport({ renewal = false }) {
       .finally(() => setLoading(false));
   }, [month, renewal]);
 
-  const lobs = useMemo(() => [...new Set(rows.map(row => row.policy_type).filter(Boolean))].sort(), [rows]);
-  const categories = useMemo(() => [...new Set(rows.map(row => row.vehicle_category).filter(Boolean))].sort(), [rows]);
+  const lobs = useMemo(() => [...new Set(rows.map(row => row.product_type).filter(Boolean))].sort(), [rows]);
+  const categories = useMemo(() => [...new Set(rows.map(row => row.categories).filter(Boolean))].sort(), [rows]);
   const filtered = useMemo(() => rows.filter(row =>
-    (!lob || row.policy_type === lob) && (!category || row.vehicle_category === category)
+    (!lob || row.product_type === lob) && (!category || row.categories === category)
   ), [rows, lob, category]);
 
   return <ReusableTable
@@ -42,7 +42,7 @@ export default function PosPolicyReport({ renewal = false }) {
     pageSizeOptions={[10, 20, 50]}
     filters={[
       ...(!renewal ? [{ name: "month", label: "Issue Month", render: <input type="month" value={month} onChange={event => { setMonth(event.target.value); setLob(""); setCategory(""); }} className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold"/> }] : []),
-      { name: "lob", label: "Policy Type", value: lob, options: [{ value: "", label: "All Types" }, ...lobs], onChange: event => setLob(event.target.value), clearable: true },
+      { name: "lob", label: "Product Type", value: lob, options: [{ value: "", label: "All Types" }, ...lobs], onChange: event => setLob(event.target.value), clearable: true },
       { name: "category", label: "Category", value: category, options: [{ value: "", label: "All Categories" }, ...categories], onChange: event => setCategory(event.target.value), clearable: true },
     ]}
     onResetFilters={() => { setLob(""); setCategory(""); }}

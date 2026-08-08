@@ -53,10 +53,9 @@ const displayValue = (policy, column) => {
 // Column definitions – Updated with (%) labels for all percentage fields
 // ---------------------------------------------------------------------
 const REPORT_COLUMNS = [
-  { key: "policy_type", label: "Policy Type" },
-  { key: "vehicle_category", label: "Vehicle Category" },  
-  { key: "commercial_vehicle_type", label: "Commercial Vehicle Type" },
-  { key: "sub_type", label: "Sub Type" },
+  { key: "product_type", label: "Product Type" },
+  { key: "categories", label: "Categories" },  
+  { key: "classification", label: "Classification" },
   { key: "gvw", label: "GVW" },
   { key: "insurance_company", label: "Insurance Company" },
   { key: "policy_number", label: "Policy Number" },

@@ -429,7 +429,7 @@ class DepartmentDashboardModel {
       `SELECT DISTINCT CONCAT('policy-', p.id) id,
         DATE_FORMAT(p.issue_date, '%Y-%m-%d') reportDate,
         p.policy_number policyNumber, p.insured_name insuredName,
-        CONCAT_WS(' · ', p.insurance_company, p.policy_type) product,
+        CONCAT_WS(' · ', p.insurance_company, p.product_type) product,
         p.total_payable premium,
         CASE
           WHEN p.tp_expiry < CURRENT_DATE() THEN 'Expired'
@@ -449,7 +449,7 @@ class DepartmentDashboardModel {
       `SELECT DISTINCT CONCAT('cancelled-', pc.id) id,
         DATE_FORMAT(pc.created_at, '%Y-%m-%d') reportDate,
         p.policy_number policyNumber, p.insured_name insuredName,
-        CONCAT_WS(' · ', p.insurance_company, p.policy_type) product,
+        CONCAT_WS(' · ', p.insurance_company, p.product_type) product,
         -ABS(COALESCE(p.total_payable, 0)) premium,
         'Cancelled' status,
         DATE_FORMAT(pc.cancellation_date, '%Y-%m-%d') cancellationDate
@@ -528,7 +528,7 @@ class DepartmentDashboardModel {
         p.policy_number policyNumber, p.insured_name insuredName,
         p.contact contact,
         p.email email,
-        CONCAT_WS(' · ', p.insurance_company, p.policy_type) product,
+        CONCAT_WS(' · ', p.insurance_company, p.product_type) product,
         LEAST(COALESCE(p.od_expiry, '9999-12-31'), COALESCE(p.tp_expiry, '9999-12-31')) renewalDate,
         p.total_payable premium,
         CASE

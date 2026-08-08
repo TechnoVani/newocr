@@ -205,8 +205,8 @@ class OCRService {
                 - business_type (e.g., New, Roll-over, Renewal)
                 - insurance_company
                 - policy_number
-                - policy_type (e.g., Package Policy, Standalone OD, Liability Policy)
-                - vehicle_category (e.g., Two Wheeler, Private Car, Commercial)
+                - product_type (e.g., Package Policy, Standalone OD, Liability Policy)
+                - categories (e.g., Two Wheeler, Private Car, Commercial)
                 - insurer_branch
                 - insured_name
                 - pan
@@ -231,10 +231,9 @@ class OCRService {
                 - registration_number
                 - rto (first four normalized characters of registration_number, e.g. MP04; empty when registration is NEW)
                 - manufacturing_year (Integer)
-                - commercial_vehicle_type
+                - classification
                 - ncb
                 - chassis_number
-                - sub_type
                 - engine_number
                 - fuel (e.g., Petrol, Diesel, CNG)
                 - gvw

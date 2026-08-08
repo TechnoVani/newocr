@@ -176,7 +176,7 @@ export const ProductType = ({ policyType, fullText, chipProps = {} }) => {
 };
 
 // =======================================
-// Vehicle Category
+// Categories
 // =======================================
 export const getVehicleCategory = (policyType = "", fullText = "") => {
   if (!policyType && !fullText) return "-";

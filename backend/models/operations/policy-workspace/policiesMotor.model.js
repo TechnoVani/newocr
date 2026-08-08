@@ -40,8 +40,8 @@ class PoliciesMotorModel {
             business_type,
             insurance_company,
             policy_number,
-            policy_type,
-            vehicle_category,
+            product_type,
+            categories,
             insurer_branch,
             insured_name,
             pan,
@@ -66,10 +66,9 @@ class PoliciesMotorModel {
             registration_number,
             rto,
             manufacturing_year,
-            commercial_vehicle_type,
+            classification,
             ncb,
             chassis_number,
-            sub_type,
             engine_number,
             fuel,
             gvw,
@@ -90,7 +89,7 @@ class PoliciesMotorModel {
             payment_status,
             created_by
         )
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         `;
 
         const values = [
@@ -102,8 +101,8 @@ class PoliciesMotorModel {
             policyData.business_type,
             policyData.insurance_company,
             policyData.policy_number,
-            policyData.policy_type,
-            policyData.vehicle_category,
+            policyData.product_type,
+            policyData.categories,
             policyData.insurer_branch,
             policyData.insured_name,
             policyData.pan,
@@ -128,10 +127,9 @@ class PoliciesMotorModel {
             policyData.registration_number,
             policyData.rto,
             policyData.manufacturing_year,
-            policyData.commercial_vehicle_type,
+            policyData.classification,
             policyData.ncb,
             policyData.chassis_number,
-            policyData.sub_type,
             policyData.engine_number,
             policyData.fuel,
             policyData.gvw,

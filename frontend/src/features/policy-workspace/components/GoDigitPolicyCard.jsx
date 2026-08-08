@@ -39,7 +39,7 @@ const parseFromPolicyType = (policyType) => {
   return "-";
 };
 
-// ---------- Vehicle Category (unchanged) ----------
+// ---------- Categories (unchanged) ----------
 export const getVehicleCategory = (policyType = "", fullText = "") => {
   if (!fullText && !policyType) return "-";
 
